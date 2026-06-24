@@ -1,0 +1,17 @@
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Log e temporanei
+*.log
+node_modules/
+dist/
+.tmp/
