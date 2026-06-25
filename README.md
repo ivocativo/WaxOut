@@ -18,13 +18,17 @@ connessione né alcun server.
 
 ## 🎮 Comandi
 
-| Azione    | Tasti                          |
-|-----------|--------------------------------|
-| Muoviti   | `A` / `D` o frecce ← →         |
-| Salta     | `W` / `Spazio` / ↑             |
-| Attacca   | `J` o click sinistro           |
-| Scatto    | `Shift` (se sbloccato)         |
-| Riprova   | `R` (dopo un game over)        |
+| Azione    | Tasti / Tocco                          |
+|-----------|----------------------------------------|
+| Muoviti   | `A` / `D` o frecce ← → · pad a schermo  |
+| Salta     | `W` / `Spazio` / ↑ · pulsante ▲         |
+| Attacca   | `J` o click sinistro · pulsante ◆       |
+| Scatto    | `Shift` (se sbloccato) · pulsante »     |
+| Pausa     | `ESC` / `P` o pulsante ∥ in alto a dx   |
+| Nuova run | `R` (dopo un game over)                 |
+
+> Su telefono/tablet i comandi a schermo compaiono da soli. Da PC puoi vederli
+> aggiungendo `?touch=1` in fondo all'indirizzo.
 
 Obiettivo: **distruggi tutti i blocchi del muro di cerume** per completare il livello.
 Attento ai **Cerumini** (blob di cerume) e alle **Croste** (sporco più resistente): fanno
@@ -62,11 +66,31 @@ generate con `this.load.image(...)` in `BootScene` servendo la cartella via HTTP
 
 ## 🗺️ Stato del progetto
 
-Prototipo MVP giocabile. Possibili sviluppi futuri:
-- Sprite animati e asset pack pixel-art dedicati
-- Boss di fine condotto, livelli con scrolling, più tipi di nemici
-- Negozio per spendere il cerume raccolto, salvataggio progressi
-- Audio/musica di sottofondo
+Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-25._
+
+**Fatto finora:**
+- Comandi **touch** a schermo (pad direzionale, salto, attacco, scatto) per giocare da cellulare
+- **Menu di pausa** (`ESC`/`P` o pulsante a schermo)
+- Struttura **roguelike**: ogni run riparte dal livello 1; alla sconfitta la run finisce
+- **Banca permanente** del cerume (salvataggio nel browser) e **negozio** di potenziamenti permanenti
+
+**Prossimi passi (in ordine):**
+1. Musica di sottofondo e miglioramento degli effetti audio
+2. Più varietà: nuovi nemici, eventi, tipi di livello
+3. Impacchettamento con **Capacitor** → app Android per Google Play
+
+**Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e tablet Android).
+
+> Nota tecnica: il salvataggio (`localStorage`) funziona quando il gioco è servito
+> via HTTP o nell'app Android; aprendo `index.html` da `file://` alcuni browser
+> non lo permettono.
+
+## 🔁 Riprendere lo sviluppo in una nuova sessione
+
+Apri Claude Code **nella cartella `C:\Users\ivanf\Claude\code`** (la stessa di
+prima) e scrivi qualcosa come _"riprendiamo earwax war, da dove eravamo?"_.
+Lo stato e i prossimi passi sono qui sopra e nel repository
+[ivocativo/earwax-war](https://github.com/ivocativo/earwax-war).
 
 ## 📜 Licenza
 
