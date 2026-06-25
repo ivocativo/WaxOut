@@ -6,6 +6,10 @@ class UpgradeScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const p = window.GameState.player;
 
+    // La scena Phaser viene riusata: azzera la "scelta gia fatta" a ogni apertura,
+    // altrimenti dal 2o potenziamento in poi i click verrebbero ignorati.
+    this._chosen = false;
+
     // sfondo
     const g = this.add.graphics();
     g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
