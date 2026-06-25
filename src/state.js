@@ -33,7 +33,17 @@ window.CONFIG = {
   },
 };
 
-// Stato di progressione del giocatore (persiste tra i livelli, non tra i refresh).
+// Potenziamenti PERMANENTI del negozio (roguelike meta-progression).
+// 'per' = bonus per ogni livello acquistato; base/step = costo (in cerume) del
+// prossimo acquisto = base + step * livelloAttuale; max = quante volte si compra.
+window.UNLOCKS = {
+  hp:    { per: 20, base: 15, step: 12, max: 10, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
+  dmg:   { per: 4,  base: 20, step: 16, max: 10, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
+  speed: { per: 15, base: 14, step: 11, max: 8,  name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  djump: { per: 1,  base: 70, step: 0,  max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
+};
+
+// Stato di progressione DELLA RUN corrente (azzerato a ogni nuova run).
 window.GameState = {
   level: 1,
   wax: 0,
@@ -41,15 +51,20 @@ window.GameState = {
   ownedAbilities: [],   // es. 'doublejump', 'dash', 'hammer'
 
   newPlayer() {
+    // Applica i potenziamenti permanenti acquistati al negozio.
+    const u = window.Meta ? window.Meta.get().unlocks : {};
+    const lv = (id) => u[id] || 0;
+    const U = window.UNLOCKS;
+    const maxHp = 100 + lv('hp') * U.hp.per;
     return {
-      maxHp: 100,
-      hp: 100,
-      damage: 26,
-      moveSpeed: 220,
+      maxHp: maxHp,
+      hp: maxHp,
+      damage: 26 + lv('dmg') * U.dmg.per,
+      moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
       attackCooldown: 360,  // ms
       attackRange: 1,        // moltiplicatore portata
-      doubleJump: false,
+      doubleJump: lv('djump') > 0,
       dash: false,
       weapon: 'swab',        // 'swab' | 'hammer'
     };

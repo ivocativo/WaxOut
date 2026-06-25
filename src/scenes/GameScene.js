@@ -298,22 +298,31 @@ class GameScene extends Phaser.Scene {
     window.Sfx.lose();
     if (this.spawnTimer) this.spawnTimer.remove();
 
+    // Fine della run: incassa il cerume raccolto nella banca permanente.
+    const lvl = window.GameState.level;
+    const earned = window.GameState.wax;
+    const meta = window.Meta.bankRun(earned, lvl);
+
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(50).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 - 20, 'SOPRAFFATTO DAL CERUME', {
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(50).setScrollFactor(0);
+    this.add.text(W / 2, H / 2 - 56, 'SOPRAFFATTO DAL CERUME', {
       fontFamily: 'monospace', fontSize: '30px', color: '#e74c3c',
       stroke: '#14161f', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 22, 'Riprova il livello (o premi R)', {
-      fontFamily: 'monospace', fontSize: '16px', color: '#fff7e8',
+    this.add.text(W / 2, H / 2 - 14, 'Run terminata al livello ' + lvl, {
+      fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
+      stroke: '#14161f', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+    this.add.text(W / 2, H / 2 + 16, 'Cerume incassato: +' + earned + '   (in banca: ' + meta.bank + ')', {
+      fontFamily: 'monospace', fontSize: '16px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
 
     // Pulsanti toccabili (indispensabili su telefono/tablet)
     const mkButton = (x, label, onTap) => {
-      const t = this.add.text(x, H / 2 + 78, label, {
-        fontFamily: 'monospace', fontSize: '22px', color: '#14161f',
-        backgroundColor: '#ffd166', padding: { x: 18, y: 10 },
+      const t = this.add.text(x, H / 2 + 80, label, {
+        fontFamily: 'monospace', fontSize: '18px', color: '#14161f',
+        backgroundColor: '#ffd166', padding: { x: 16, y: 10 }, align: 'center',
       }).setOrigin(0.5).setDepth(52).setScrollFactor(0)
         .setInteractive({ useHandCursor: true });
       t.on('pointerover', () => t.setStyle({ backgroundColor: '#ffe199' }));
@@ -321,10 +330,11 @@ class GameScene extends Phaser.Scene {
       t.on('pointerdown', onTap);
       return t;
     };
-    mkButton(W / 2 - 92, '↻ RIPROVA', () => this.scene.restart());
-    mkButton(W / 2 + 92, 'MENU', () => { window.GameState.reset(); this.scene.start('MenuScene'); });
+    mkButton(W / 2 - 175, 'NUOVA RUN', () => { window.GameState.reset(); this.scene.start('GameScene'); });
+    mkButton(W / 2, 'NEGOZIO', () => { window.GameState.reset(); this.scene.start('ShopScene'); });
+    mkButton(W / 2 + 175, 'MENU', () => { window.GameState.reset(); this.scene.start('MenuScene'); });
 
-    this.input.keyboard.once('keydown-R', () => this.scene.restart());
+    this.input.keyboard.once('keydown-R', () => { window.GameState.reset(); this.scene.start('GameScene'); });
   }
 
   // ---------- HUD ----------

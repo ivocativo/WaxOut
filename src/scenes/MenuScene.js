@@ -20,6 +20,13 @@ class MenuScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 4,
     }).setOrigin(0.5);
 
+    // Banca permanente (roguelike): cerume accumulato + record
+    const meta = window.Meta.get();
+    this.add.text(W / 2, 184, 'Cerume in banca: ' + meta.bank + '      Miglior livello: ' + meta.bestLevel, {
+      fontFamily: 'monospace', fontSize: '16px', color: '#ffd166',
+      stroke: '#14161f', strokeThickness: 3,
+    }).setOrigin(0.5);
+
     // Mascotte
     const guy = this.add.sprite(W / 2 - 150, 320, 'player_a').setScale(2.4);
     this.tweens.add({ targets: guy, y: '-=10', duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
@@ -42,20 +49,27 @@ class MenuScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 3, lineSpacing: 2,
     }).setOrigin(0.5);
 
-    const start = this.add.text(W / 2, 510, '» PREMI INVIO O CLICCA PER INIZIARE «', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 4,
-    }).setOrigin(0.5);
-    this.tweens.add({ targets: start, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
-
-    const begin = () => {
-      window.Sfx.unlock();
-      window.GameState.reset();
-      this.scene.start('GameScene');
+    const mkBtn = (x, label, onTap) => {
+      const t = this.add.text(x, 508, label, {
+        fontFamily: 'monospace', fontSize: '20px', color: '#14161f',
+        backgroundColor: '#ffd166', padding: { x: 18, y: 10 },
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      t.on('pointerover', () => t.setStyle({ backgroundColor: '#ffe199' }));
+      t.on('pointerout', () => t.setStyle({ backgroundColor: '#ffd166' }));
+      t.on('pointerdown', onTap);
+      return t;
     };
+
+    const begin = () => { window.Sfx.unlock(); window.GameState.reset(); this.scene.start('GameScene'); };
+    const openShop = () => { window.Sfx.unlock(); this.scene.start('ShopScene'); };
+
+    const startBtn = mkBtn(W / 2 - 110, 'INIZIA RUN', begin);
+    this.tweens.add({ targets: startBtn, alpha: 0.55, duration: 650, yoyo: true, repeat: -1 });
+    mkBtn(W / 2 + 110, 'NEGOZIO (N)', openShop);
+
     this.input.keyboard.once('keydown-ENTER', begin);
     this.input.keyboard.once('keydown-SPACE', begin);
-    this.input.once('pointerdown', begin);
+    this.input.keyboard.once('keydown-N', openShop);
   }
 
   drawBackground() {

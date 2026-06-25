@@ -58,6 +58,8 @@ class PauseScene extends Phaser.Scene {
   toMenu() {
     const g = this.scene.get(this.fromKey);
     g.scene.stop();
+    // Abbandonare la run incassa comunque il cerume raccolto finora.
+    if (window.Meta) window.Meta.bankRun(window.GameState.wax, window.GameState.level);
     window.GameState.reset();
     this.scene.start('MenuScene');
   }

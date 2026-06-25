@@ -19,7 +19,7 @@ window.addEventListener('load', function () {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [BootScene, MenuScene, GameScene, UpgradeScene, PauseScene],
+    scene: [BootScene, MenuScene, GameScene, UpgradeScene, PauseScene, ShopScene],
   };
 
   window.game = new Phaser.Game(config);
