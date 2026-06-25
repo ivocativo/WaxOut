@@ -95,6 +95,75 @@ class BootScene extends Phaser.Scene {
     ];
     PA.fromGrid(this, 'enemy_crust', crosta, dPal, sE);
 
+    // --- Nemico "Moscerino" (vola e insegue in aria) ---
+    const fPal = {
+      w: 0x7fae3a,   // corpo verde "germe"
+      L: 0xd8e8f5,   // ali chiare
+      o: C.outline,
+    };
+    const moscerino = [
+      '....wwww....',
+      '...wwwwww...',
+      '..wwowwoww..',
+      '.LwwwwwwwwL.',
+      'LLwwwwwwwwLL',
+      '.LwwwwwwwwL.',
+      '..wwwwwwww..',
+      '...woooow...',
+      '....w..w....',
+    ];
+    PA.fromGrid(this, 'enemy_fly', moscerino, fPal, sE);
+
+    // --- Nemico "Gorgogliante" (sputa cerume a distanza) ---
+    const gPal = {
+      w: 0x3fae9c,   // corpo turchese "infetto"
+      L: 0x86d9cb,   // riflesso chiaro
+      o: C.outline,
+    };
+    const gorgogliante = [
+      '...wwwwww...',
+      '..wwwwwwww..',
+      '.wwLwwwwLww.',
+      'wwwwwwwwwwww',
+      'wwoowwwwooww',
+      'wwwwwwwwwwww',
+      '.woooooooow.',
+      '.wwwwwwwwww.',
+      '..ww....ww..',
+    ];
+    PA.fromGrid(this, 'enemy_spit', gorgogliante, gPal, sE);
+
+    // --- BOSS "Tappo di Cerume" (grande, due volte la scala) ---
+    const bPal = {
+      w: C.waxHard,
+      L: C.waxHardLight,
+      o: C.outline,
+    };
+    const tappo = [
+      '..oooooooooo..',
+      '.owwwwwwwwwwo.',
+      'owwLLwwwwLLwwo',
+      'owwwwwwwwwwwwo',
+      'owwoowwwwoowwo',
+      'owwoowwwwoowwo',
+      'owwwwwwwwwwwwo',
+      'owwoooooooowwo',
+      'owwwwwwwwwwwwo',
+      '.owwwwwwwwwwo.',
+      '..owwwwwwwwo..',
+      '...oooooooo...',
+    ];
+    PA.fromGrid(this, 'enemy_boss', tappo, bPal, sE * 2);
+
+    // --- Pallina di cerume sputata (proiettile nemico) ---
+    const glob = [
+      '.ww.',
+      'wwww',
+      'wwww',
+      '.ww.',
+    ];
+    PA.fromGrid(this, 'wax_glob', glob, { w: 0xb6e85a }, sE);
+
     // --- Blocchi del muro (3 durezze) ---
     PA.block(this, 'block_soft', C.waxSoft, C.waxSoftLight, C.waxSoftDark,
       [[6, 7], [18, 5], [11, 19], [22, 14], [5, 22]]);

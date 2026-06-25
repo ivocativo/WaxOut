@@ -31,8 +31,15 @@ connessione né alcun server.
 > aggiungendo `?touch=1` in fondo all'indirizzo.
 
 Obiettivo: **distruggi tutti i blocchi del muro di cerume** per completare il livello.
-Attento ai **Cerumini** (blob di cerume) e alle **Croste** (sporco più resistente): fanno
-danno al contatto.
+Occhio ai nemici:
+- **Cerumino** — blob veloce, danno al contatto
+- **Crosta** — sporco lento ma resistente
+- **Gorgogliante** (dal liv. 3) — sta a terra e ti **sputa palline di cerume** a distanza
+- **Moscerino** (dal liv. 4) — **vola** e ti insegue in aria
+- **Tappo di Cerume** (BOSS, ogni 5 livelli) — gigante, coriaceo, sputa e vale tantissimo cerume
+
+Ogni **5 livelli** arriva un **boss**; altri livelli sono di tipo **Sciame** (più nemici,
+muro più piccolo). Un cartello a schermo annuncia i livelli speciali.
 
 ## 🔓 Potenziamenti (fine livello)
 
@@ -73,10 +80,12 @@ Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-25._
 - **Menu di pausa** (`ESC`/`P` o pulsante a schermo)
 - Struttura **roguelike**: ogni run riparte dal livello 1; alla sconfitta la run finisce
 - **Banca permanente** del cerume (salvataggio nel browser) e **negozio** di potenziamenti permanenti
+- **Varietà di nemici e livelli**: Gorgogliante (sputatore), Moscerino (volante), boss
+  "Tappo di Cerume" ogni 5 livelli, livelli "Sciame", cartelli per i livelli speciali
 
 **Prossimi passi (in ordine):**
 1. Musica di sottofondo e miglioramento degli effetti audio
-2. Più varietà: nuovi nemici, eventi, tipi di livello
+2. Ancora più varietà: nuovi eventi e potenziamenti
 3. Impacchettamento con **Capacitor** → app Android per Google Play
 
 **Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e tablet Android).

@@ -29,9 +29,16 @@ class GameScene extends Phaser.Scene {
     this.add.rectangle(W / 2, H - gh, W, 5, C.groundDark).setDepth(4);
     this.physics.add.existing(this.ground, true);
 
+    // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato), altrimenti normale
+    const levelNum = window.GameState.level;
+    this.levelKind =
+      (levelNum % 5 === 0) ? 'boss' :
+      (levelNum % 5 === 3) ? 'swarm' : 'normal';
+
     // Gruppi
     this.blocks = this.physics.add.staticGroup();
     this.enemies = this.physics.add.group();
+    this.projectiles = this.physics.add.group();  // palline sputate dai nemici
 
     this.buildWall();
 
@@ -42,8 +49,18 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.blocks);
 
-    this.physics.add.collider(this.enemies, this.ground);
-    this.physics.add.collider(this.enemies, this.blocks);
+    // I nemici a terra collidono col pavimento e col muro; i Moscerini volano sopra a tutto.
+    const notFlyer = (e) => e.kind !== 'fly';
+    this.physics.add.collider(this.enemies, this.ground, null, notFlyer);
+    this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
+
+    // Le palline sputate feriscono il giocatore e si spappolano contro muro/pavimento.
+    this.physics.add.overlap(this.player, this.projectiles, (pl, proj) => {
+      this.hurtPlayer(proj.dmg, proj.x);
+      this.popProjectile(proj);
+    });
+    this.physics.add.collider(this.projectiles, this.blocks, (proj) => this.popProjectile(proj));
+    this.physics.add.collider(this.projectiles, this.ground, (proj) => this.popProjectile(proj));
 
     if (!this.anims.exists('walk')) {
       this.anims.create({
@@ -68,12 +85,27 @@ class GameScene extends Phaser.Scene {
       });
     }
 
-    // Nemici iniziali + spawner periodico
+    // Nemici iniziali + spawner periodico (variano col tipo di livello)
     const lvl = window.GameState.level;
-    this.maxEnemies = Math.min(2 + lvl, 6);
-    for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
+    let spawnDelay;
+    if (this.levelKind === 'boss') {
+      this.maxEnemies = Math.min(2 + Math.floor(lvl / 3), 3);  // il boss + pochi sgherri
+      spawnDelay = Math.max(2000, 3200 - lvl * 120);
+      this.spawnEnemy('boss');
+      this.spawnEnemy();
+      this.showBanner('!  ARRIVA IL TAPPO DI CERUME  !', '#ffb04a');
+    } else if (this.levelKind === 'swarm') {
+      this.maxEnemies = Math.min(4 + lvl, 9);
+      spawnDelay = Math.max(800, 1700 - lvl * 110);
+      for (let i = 0; i < Math.min(4, this.maxEnemies); i++) this.spawnEnemy();
+      this.showBanner('SCIAME IN ARRIVO!', '#9be870');
+    } else {
+      this.maxEnemies = Math.min(2 + lvl, 6);
+      spawnDelay = Math.max(1500, 2800 - lvl * 150);
+      for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
+    }
     this.spawnTimer = this.time.addEvent({
-      delay: Math.max(1500, 2800 - lvl * 150), loop: true,
+      delay: spawnDelay, loop: true,
       callback: () => { if (!this.locked && this.enemies.countActive(true) < this.maxEnemies) this.spawnEnemy(); },
     });
 
@@ -105,8 +137,9 @@ class GameScene extends Phaser.Scene {
     const gh = window.CONFIG.GROUND_H;
     const lvl = window.GameState.level;
 
-    const cols = Math.min(4 + Math.ceil(lvl / 2), 7);
-    const rows = Math.min(4 + Math.floor(lvl / 3), 6);
+    let cols = Math.min(4 + Math.ceil(lvl / 2), 7);
+    let rows = Math.min(4 + Math.floor(lvl / 3), 6);
+    if (this.levelKind === 'swarm') { cols = Math.max(3, cols - 1); rows = Math.max(3, rows - 1); }
     const rightX = W - 24 - B / 2;
     const groundTop = H - gh;
 
@@ -134,31 +167,106 @@ class GameScene extends Phaser.Scene {
     this.blocksLeft = this.totalBlocks;
   }
 
-  spawnEnemy() {
-    const C = window.CONFIG.COLORS;
+  // Sceglie a caso un tipo di nemico tra quelli sbloccati al livello attuale.
+  chooseEnemyKind() {
+    const lvl = window.GameState.level;
+    const pool = [['blob', 5]];
+    if (lvl >= 2) pool.push(['crust', 3]);
+    if (lvl >= 3) pool.push(['spit', 2]);
+    if (lvl >= 4) pool.push(['fly', 2]);
+    let total = 0;
+    pool.forEach((p) => { total += p[1]; });
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= pool[i][1];
+      if (r < 0) return pool[i][0];
+    }
+    return 'blob';
+  }
+
+  spawnEnemy(kind) {
+    const W = window.CONFIG.WIDTH;
     const H = window.CONFIG.HEIGHT;
     const gh = window.CONFIG.GROUND_H;
     const lvl = window.GameState.level;
-    const isCrust = lvl >= 2 && Math.random() < 0.3;
-    const key = isCrust ? 'enemy_crust' : 'enemy_blob';
-    const x = Phaser.Math.Between(40, 140);
-    const y = H - gh - 70;
+    kind = kind || this.chooseEnemyKind();
 
-    const e = this.enemies.create(x, y, key).setDepth(8);
+    // Tabella dei tipi di nemico (statistiche scalate col livello).
+    let cfg;
+    if (kind === 'crust') {
+      cfg = { tex: 'enemy_crust', hp: 60 + lvl * 6, speed: 46, dmg: 16 + lvl * 2, wax: 8, bit: 'bit_dirt', body: [26, 22] };
+    } else if (kind === 'fly') {
+      cfg = { tex: 'enemy_fly', hp: 24 + lvl * 3, speed: 88 + lvl * 4, dmg: 10 + lvl * 2, wax: 7, bit: 'bit_wax', body: [24, 18], fly: true };
+    } else if (kind === 'spit') {
+      cfg = { tex: 'enemy_spit', hp: 45 + lvl * 5, speed: 28, dmg: 12 + lvl, wax: 9, bit: 'bit_dirt', body: [26, 24], spit: true, projDmg: 9 + lvl * 2, spitEvery: 2200 };
+    } else if (kind === 'boss') {
+      cfg = { tex: 'enemy_boss', hp: 420 + lvl * 40, speed: 34, dmg: 20 + lvl * 2, wax: 60 + lvl * 6, bit: 'bit_hard', body: [60, 54], spit: true, projDmg: 12 + lvl * 2, spitEvery: 1500, boss: true };
+    } else {
+      cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22] };
+    }
+
+    // Posizione di comparsa: i volanti entrano dall'alto, il boss da destra, gli altri da sinistra.
+    let x, y;
+    if (cfg.fly) { x = Phaser.Math.Between(W * 0.35, W - 60); y = Phaser.Math.Between(80, 180); }
+    else if (cfg.boss) { x = Phaser.Math.Between(W * 0.55, W * 0.7); y = H - gh - 90; }
+    else { x = Phaser.Math.Between(40, 140); y = H - gh - 70; }
+
+    const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
+    e.kind = kind;
     e.setCollideWorldBounds(true);
-    e.setBounce(0.1);
-    e.body.setSize(26, 22, true);
-    e.hp = isCrust ? 60 + lvl * 6 : 30 + lvl * 4;
-    e.maxHp = e.hp;
-    e.speed = isCrust ? 46 : 72 + lvl * 3;
-    e.contactDamage = (isCrust ? 16 : 11) + lvl * 2;
-    e.waxValue = isCrust ? 8 : 5;
-    e.bitKey = isCrust ? 'bit_dirt' : 'bit_wax';
+    if (cfg.fly) e.body.setAllowGravity(false);
+    else e.setBounce(0.1);
+    e.body.setSize(cfg.body[0], cfg.body[1], true);
+    e.hp = cfg.hp; e.maxHp = cfg.hp;
+    e.speed = cfg.speed;
+    e.contactDamage = cfg.dmg;
+    e.waxValue = cfg.wax;
+    e.bitKey = cfg.bit;
     e.knockUntil = 0;
+    if (cfg.spit) {
+      e.projDamage = cfg.projDmg;
+      e.spitEvery = cfg.spitEvery;
+      e.nextSpit = this.time.now + Phaser.Math.Between(700, cfg.spitEvery);
+    }
 
     // comparsa
+    const targetScale = 1;
     e.setScale(0.2);
-    this.tweens.add({ targets: e, scaleX: 1, scaleY: 1, duration: 250, ease: 'Back.out' });
+    this.tweens.add({ targets: e, scaleX: targetScale, scaleY: targetScale, duration: 250, ease: 'Back.out' });
+  }
+
+  // Una pallina di cerume sputata da un nemico verso il giocatore.
+  spitAt(e) {
+    const dx = this.player.x - e.x;
+    const dy = (this.player.y - 10) - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const sp = 210;
+    const proj = this.projectiles.create(e.x + Math.sign(dx) * 12, e.y - 6, 'wax_glob').setDepth(9);
+    proj.body.setAllowGravity(false);
+    proj.body.setSize(10, 10, true);
+    proj.setVelocity((dx / d) * sp, (dy / d) * sp);
+    proj.dmg = e.projDamage;
+    window.Sfx.spit();
+    this.time.delayedCall(2600, () => { if (proj.active) proj.destroy(); });
+  }
+
+  popProjectile(proj) {
+    if (!proj || !proj.active) return;
+    this.burst('bit_wax', proj.x, proj.y, 4);
+    proj.destroy();
+  }
+
+  // Cartello a schermo per annunciare i livelli speciali (boss / sciame).
+  showBanner(text, color) {
+    const W = window.CONFIG.WIDTH;
+    const t = this.add.text(W / 2, 120, text, {
+      fontFamily: 'monospace', fontSize: '24px', color: color || '#ffd166',
+      stroke: '#14161f', strokeThickness: 5, align: 'center',
+    }).setOrigin(0.5).setDepth(120).setScrollFactor(0).setAlpha(0);
+    this.tweens.add({
+      targets: t, alpha: 1, y: 100, duration: 300, ease: 'Back.out',
+      onComplete: () => this.tweens.add({ targets: t, alpha: 0, delay: 1700, duration: 600, onComplete: () => t.destroy() }),
+    });
   }
 
   // ---------- Combattimento ----------
@@ -232,12 +340,21 @@ class GameScene extends Phaser.Scene {
     e.setTintFill(0xffffff);
     this.time.delayedCall(70, () => { if (e.active) e.clearTint(); });
     const dir = Math.sign(e.x - this.player.x) || 1;
-    e.setVelocity(dir * 190, -150);
+    // Il Boss è massiccio: subisce molta meno spinta degli altri.
+    const kbX = e.kind === 'boss' ? 70 : 190;
+    const kbY = e.kind === 'boss' ? -60 : -150;
+    e.setVelocity(dir * kbX, kbY);
     e.knockUntil = this.time.now + 200;
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
-      this.burst(e.bitKey, e.x, e.y, 14);
       window.GameState.wax += e.waxValue;
+      if (e.kind === 'boss') {
+        this.cameras.main.shake(260, 0.014);
+        this.burst(e.bitKey, e.x, e.y, 28);
+        this.showBanner('TAPPO DI CERUME DISTRUTTO!  +' + e.waxValue, '#ffd166');
+      } else {
+        this.burst(e.bitKey, e.x, e.y, 14);
+      }
       e.destroy();
     }
   }
@@ -470,11 +587,29 @@ class GameScene extends Phaser.Scene {
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
-      if (now >= e.knockUntil) {
-        const dir = Math.sign(this.player.x - e.x);
-        e.setVelocityX(dir * e.speed);
-        e.setFlipX(dir < 0);
+
+      // Sputatori (Gorgogliante e Boss): lanciano una pallina ogni tanto.
+      if (e.nextSpit !== undefined && now >= e.nextSpit && now >= e.knockUntil) {
+        this.spitAt(e);
+        e.nextSpit = now + e.spitEvery;
       }
+
+      if (now >= e.knockUntil) {
+        if (e.kind === 'fly') {
+          // Volante: punta il giocatore in linea d'aria (leggermente sopra la sua testa).
+          const dx = this.player.x - e.x;
+          const dy = (this.player.y - 14) - e.y;
+          const d = Math.hypot(dx, dy) || 1;
+          e.setVelocity((dx / d) * e.speed, (dy / d) * e.speed);
+          e.setFlipX(dx < 0);
+        } else {
+          // A terra: cammina verso il giocatore.
+          const dir = Math.sign(this.player.x - e.x);
+          e.setVelocityX(dir * e.speed);
+          e.setFlipX(dir < 0);
+        }
+      }
+
       if (Phaser.Geom.Intersects.RectangleToRectangle(e.getBounds(), pb)) {
         this.hurtPlayer(e.contactDamage, e.x);
       }
