@@ -55,10 +55,18 @@ class GameScene extends Phaser.Scene {
 
     // Input
     this.keys = this.input.keyboard.addKeys('W,A,S,D,J,SPACE,SHIFT,R,UP,DOWN,LEFT,RIGHT');
-    this.input.on('pointerdown', () => {
-      window.Sfx.unlock();
-      if (!this.locked) this.tryAttack();
-    });
+
+    // Comandi a schermo per telefono/tablet (vuoti su PC).
+    this.touch = window.TouchControls.attach(this);
+
+    // Su PC (mouse, niente touch): clic per attaccare. Su mobile usa il
+    // pulsante dedicato, così toccare il pad direzionale non fa attaccare.
+    if (!this.touch.enabled) {
+      this.input.on('pointerdown', () => {
+        window.Sfx.unlock();
+        if (!this.locked) this.tryAttack();
+      });
+    }
 
     // Nemici iniziali + spawner periodico
     const lvl = window.GameState.level;
@@ -291,10 +299,25 @@ class GameScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '30px', color: '#e74c3c',
       stroke: '#14161f', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 26, 'Premi R per riprovare il livello', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
-      stroke: '#14161f', strokeThickness: 4,
+    this.add.text(W / 2, H / 2 + 22, 'Riprova il livello (o premi R)', {
+      fontFamily: 'monospace', fontSize: '16px', color: '#fff7e8',
+      stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+
+    // Pulsanti toccabili (indispensabili su telefono/tablet)
+    const mkButton = (x, label, onTap) => {
+      const t = this.add.text(x, H / 2 + 78, label, {
+        fontFamily: 'monospace', fontSize: '22px', color: '#14161f',
+        backgroundColor: '#ffd166', padding: { x: 18, y: 10 },
+      }).setOrigin(0.5).setDepth(52).setScrollFactor(0)
+        .setInteractive({ useHandCursor: true });
+      t.on('pointerover', () => t.setStyle({ backgroundColor: '#ffe199' }));
+      t.on('pointerout', () => t.setStyle({ backgroundColor: '#ffd166' }));
+      t.on('pointerdown', onTap);
+      return t;
+    };
+    mkButton(W / 2 - 92, '↻ RIPROVA', () => this.scene.restart());
+    mkButton(W / 2 + 92, 'MENU', () => { window.GameState.reset(); this.scene.start('MenuScene'); });
 
     this.input.keyboard.once('keydown-R', () => this.scene.restart());
   }
@@ -359,9 +382,9 @@ class GameScene extends Phaser.Scene {
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
     if (onGround) this.jumpsLeft = p.doubleJump ? 2 : 1;
 
-    // Movimento
-    const left = k.A.isDown || k.LEFT.isDown;
-    const right = k.D.isDown || k.RIGHT.isDown;
+    // Movimento (tastiera o pad a schermo)
+    const left = k.A.isDown || k.LEFT.isDown || this.touch.left;
+    const right = k.D.isDown || k.RIGHT.isDown || this.touch.right;
     let vx = 0;
     if (left) { vx = -p.moveSpeed; this.facing = -1; }
     else if (right) { vx = p.moveSpeed; this.facing = 1; }
@@ -372,7 +395,9 @@ class GameScene extends Phaser.Scene {
     const jumpPressed =
       Phaser.Input.Keyboard.JustDown(k.W) ||
       Phaser.Input.Keyboard.JustDown(k.SPACE) ||
-      Phaser.Input.Keyboard.JustDown(k.UP);
+      Phaser.Input.Keyboard.JustDown(k.UP) ||
+      this.touch.jumpQueued;
+    this.touch.jumpQueued = false;
     if (jumpPressed && this.jumpsLeft > 0) {
       this.player.setVelocityY(-p.jumpVelocity);
       this.jumpsLeft--;
@@ -380,7 +405,9 @@ class GameScene extends Phaser.Scene {
     }
 
     // Scatto
-    if (p.dash && Phaser.Input.Keyboard.JustDown(k.SHIFT) && now > this.dashReady) {
+    const dashPressed = Phaser.Input.Keyboard.JustDown(k.SHIFT) || this.touch.dashQueued;
+    this.touch.dashQueued = false;
+    if (p.dash && dashPressed && now > this.dashReady) {
       this.dashUntil = now + 160;
       this.dashReady = now + 700;
       this.invulnUntil = Math.max(this.invulnUntil, now + 160);
@@ -388,7 +415,8 @@ class GameScene extends Phaser.Scene {
     }
 
     // Attacco
-    if (Phaser.Input.Keyboard.JustDown(k.J)) { window.Sfx.unlock(); this.tryAttack(); }
+    if (Phaser.Input.Keyboard.JustDown(k.J) || this.touch.attackQueued) { window.Sfx.unlock(); this.tryAttack(); }
+    this.touch.attackQueued = false;
 
     // Animazione
     this.player.setFlipX(this.facing < 0);

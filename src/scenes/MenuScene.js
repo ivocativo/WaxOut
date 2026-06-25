@@ -32,13 +32,14 @@ class MenuScene extends Phaser.Scene {
       'Salta:    W / Spazio / Su',
       'Attacca:  J  o  click sinistro',
       'Scatto:   Shift  (se sbloccato)',
+      'Su telefono: usa i pulsanti a schermo',
       '',
       'Demolisci tutto il muro di cerume per vincere il livello.',
       'A fine livello sblocchi una nuova abilita o arma.',
     ];
-    this.add.text(W / 2, 408, controls.join('\n'), {
+    this.add.text(W / 2, 386, controls.join('\n'), {
       fontFamily: 'monospace', fontSize: '17px', color: '#fff7e8', align: 'center',
-      stroke: '#14161f', strokeThickness: 3, lineSpacing: 4,
+      stroke: '#14161f', strokeThickness: 3, lineSpacing: 2,
     }).setOrigin(0.5);
 
     const start = this.add.text(W / 2, 510, '» PREMI INVIO O CLICCA PER INIZIARE «', {
