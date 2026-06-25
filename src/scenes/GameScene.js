@@ -79,6 +79,11 @@ class GameScene extends Phaser.Scene {
 
     this.buildHud();
 
+    // Pausa: tasti ESC/P + pulsante a schermo (in alto a destra)
+    this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
+    this.input.keyboard.on('keydown-P', () => this.pauseGame());
+    this.buildPauseButton();
+
     // Suggerimento abilita di questo livello
     if (window.GameState.ownedAbilities.length > 0) {
       const txt = 'Abilita: ' + window.GameState.ownedAbilities.join(', ');
@@ -330,7 +335,7 @@ class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(18, 16, '', style).setDepth(101).setScrollFactor(0);
     this.levelText = this.add.text(window.CONFIG.WIDTH / 2, 16, '', style).setOrigin(0.5, 0).setDepth(101).setScrollFactor(0);
     this.blockText = this.add.text(window.CONFIG.WIDTH / 2, 38, '', style).setOrigin(0.5, 0).setDepth(101).setScrollFactor(0);
-    this.waxText = this.add.text(window.CONFIG.WIDTH - 18, 16, '', style).setOrigin(1, 0).setDepth(101).setScrollFactor(0);
+    this.waxText = this.add.text(window.CONFIG.WIDTH - 18, 44, '', style).setOrigin(1, 0).setDepth(101).setScrollFactor(0);
     this.updateHud();
   }
 
@@ -348,6 +353,33 @@ class GameScene extends Phaser.Scene {
     this.levelText.setText('Livello ' + window.GameState.level);
     this.blockText.setText('Muro: ' + this.blocksLeft + '/' + this.totalBlocks);
     this.waxText.setText('Cerume: ' + window.GameState.wax);
+  }
+
+  // ---------- Pausa ----------
+
+  buildPauseButton() {
+    const W = window.CONFIG.WIDTH;
+    const btn = this.add.circle(W - 30, 26, 17, 0x000000, 0.35)
+      .setScrollFactor(0).setDepth(110).setInteractive({ useHandCursor: true });
+    btn.setStrokeStyle(2, 0xfff7e8, 0.6);
+    const g = this.add.graphics().setScrollFactor(0).setDepth(111);
+    g.fillStyle(0xfff7e8, 0.9);
+    g.fillRect(W - 35, 19, 4, 14);   // due barrette = simbolo "pausa"
+    g.fillRect(W - 28, 19, 4, 14);
+    btn.on('pointerdown', (pointer, x, y, event) => {
+      if (event) event.stopPropagation();   // non far partire l'attacco col clic
+      this.pauseGame();
+    });
+  }
+
+  pauseGame() {
+    if (this.locked || this.scene.isPaused()) return;
+    window.Sfx.unlock();
+    // azzera gli stati "tenuti" del touch, così non si resta a muoversi in pausa
+    this.touch.left = false;
+    this.touch.right = false;
+    this.scene.launch('PauseScene', { from: 'GameScene' });
+    this.scene.pause();
   }
 
   // ---------- Sfondo ----------

@@ -1,0 +1,65 @@
+// PauseScene: overlay di pausa mostrato sopra il gioco.
+// Viene avviata con this.scene.launch('PauseScene', { from: 'GameScene' })
+// mentre la scena di gioco resta in pausa sotto di essa.
+class PauseScene extends Phaser.Scene {
+  constructor() { super('PauseScene'); }
+
+  create(data) {
+    const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
+    this.fromKey = (data && data.from) || 'GameScene';
+
+    // Velo scuro sopra il gioco congelato
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setScrollFactor(0);
+
+    this.add.text(W / 2, H / 2 - 120, 'PAUSA', {
+      fontFamily: 'monospace', fontSize: '46px', color: '#ffd166',
+      stroke: '#14161f', strokeThickness: 7,
+    }).setOrigin(0.5);
+
+    this.add.text(W / 2, H / 2 - 74, 'ESC o P per riprendere', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8',
+      stroke: '#14161f', strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    this.mkButton(W / 2, H / 2 - 18, 'RIPRENDI', () => this.resumeGame());
+    this.mkButton(W / 2, H / 2 + 42, 'RIAVVIA LIVELLO', () => this.restartLevel());
+    this.mkButton(W / 2, H / 2 + 102, 'MENU PRINCIPALE', () => this.toMenu());
+
+    // Scorciatoie da tastiera
+    this.input.keyboard.on('keydown-ESC', () => this.resumeGame());
+    this.input.keyboard.on('keydown-P', () => this.resumeGame());
+
+    window.Sfx.pick();
+  }
+
+  mkButton(x, y, label, onTap) {
+    const t = this.add.text(x, y, label, {
+      fontFamily: 'monospace', fontSize: '22px', color: '#14161f',
+      backgroundColor: '#ffd166', padding: { x: 22, y: 11 }, align: 'center',
+    }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    t.on('pointerover', () => t.setStyle({ backgroundColor: '#ffe199' }));
+    t.on('pointerout', () => t.setStyle({ backgroundColor: '#ffd166' }));
+    t.on('pointerdown', () => { window.Sfx.pick(); onTap(); });
+    return t;
+  }
+
+  resumeGame() {
+    window.Sfx.unlock();
+    this.scene.resume(this.fromKey);
+    this.scene.stop();
+  }
+
+  restartLevel() {
+    const g = this.scene.get(this.fromKey);
+    this.scene.stop();
+    g.scene.restart();
+  }
+
+  toMenu() {
+    const g = this.scene.get(this.fromKey);
+    g.scene.stop();
+    window.GameState.reset();
+    this.scene.start('MenuScene');
+  }
+}
+window.PauseScene = PauseScene;
