@@ -15,25 +15,28 @@ class UpgradeScene extends Phaser.Scene {
     g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
     g.fillStyle(0x000000, 0.35); g.fillRect(0, 0, W, H);
 
-    this.add.text(W / 2, 60, 'POTENZIAMENTO', {
+    const T = window.I18n;
+
+    this.add.text(W / 2, 60, T.t('up_title'), {
       fontFamily: 'monospace', fontSize: '44px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 7,
     }).setOrigin(0.5);
-    this.add.text(W / 2, 108, 'Scegli una nuova abilita o arma (1 / 2 / 3 o click)', {
+    this.add.text(W / 2, 108, T.t('up_hint'), {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    // Pool di potenziamenti
+    // Pool di potenziamenti. Nome/descrizione vengono dal dizionario (up_<id>_name
+    // / up_<id>_desc). Per le abilita 'ability' e' un id stabile, tradotto a parte.
     const ALL = [
-      { id: 'damage', name: 'Affilatura', desc: '+8 danno', rep: true, apply: (s) => { s.damage += 8; } },
-      { id: 'hp', name: 'Fibra Extra', desc: '+25 HP max\n(e cura completa)', rep: true, apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
-      { id: 'attspd', name: 'Riflessi', desc: 'Attacco piu rapido', rep: true, apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
-      { id: 'speed', name: 'Stivali Veloci', desc: '+30 velocita', rep: true, apply: (s) => { s.moveSpeed += 30; } },
-      { id: 'range', name: 'Braccio Lungo', desc: '+25% portata', rep: true, apply: (s) => { s.attackRange += 0.25; } },
-      { id: 'doublejump', name: 'Salto Doppio', desc: 'Salta due volte', rep: false, ability: 'salto doppio', apply: (s) => { s.doubleJump = true; } },
-      { id: 'dash', name: 'Scatto', desc: 'Shift per scattare', rep: false, ability: 'scatto', apply: (s) => { s.dash = true; } },
-      { id: 'hammer', name: 'Martello di Cerume', desc: 'Arma ad area\n+6 danno', rep: false, ability: 'martello', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
+      { id: 'damage', rep: true, apply: (s) => { s.damage += 8; } },
+      { id: 'hp', rep: true, apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
+      { id: 'attspd', rep: true, apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
+      { id: 'speed', rep: true, apply: (s) => { s.moveSpeed += 30; } },
+      { id: 'range', rep: true, apply: (s) => { s.attackRange += 0.25; } },
+      { id: 'doublejump', rep: false, ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
+      { id: 'dash', rep: false, ability: 'dash', apply: (s) => { s.dash = true; } },
+      { id: 'hammer', rep: false, ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
     ];
 
     const avail = ALL.filter((u) => {
@@ -57,16 +60,16 @@ class UpgradeScene extends Phaser.Scene {
       const card = this.add.rectangle(cx, cy, cardW, cardH, 0x2b1d12, 1)
         .setStrokeStyle(4, 0xffd166).setInteractive({ useHandCursor: true });
 
-      this.add.text(cx, cy - 55, (i + 1) + '. ' + u.name, {
+      this.add.text(cx, cy - 55, (i + 1) + '. ' + T.t('up_' + u.id + '_name'), {
         fontFamily: 'monospace', fontSize: '20px', color: '#ffe2b0',
         align: 'center', wordWrap: { width: cardW - 20 },
       }).setOrigin(0.5);
-      this.add.text(cx, cy + 10, u.desc, {
+      this.add.text(cx, cy + 10, T.t('up_' + u.id + '_desc'), {
         fontFamily: 'monospace', fontSize: '16px', color: '#fff7e8',
         align: 'center', lineSpacing: 4, wordWrap: { width: cardW - 24 },
       }).setOrigin(0.5);
       if (!u.rep) {
-        this.add.text(cx, cy + 65, '★ ABILITA', {
+        this.add.text(cx, cy + 65, T.t('up_ability_tag'), {
           fontFamily: 'monospace', fontSize: '13px', color: '#9fe6a0',
         }).setOrigin(0.5);
       }
@@ -82,10 +85,11 @@ class UpgradeScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-THREE', () => { if (choices[2]) this.choose(choices[2]); });
 
     // Riepilogo statistiche
+    const weaponName = T.t(p.weapon === 'hammer' ? 'weapon_hammer' : 'weapon_swab');
     const stats = [
-      'Cerume raccolto: ' + window.GameState.wax,
-      'Danno: ' + p.damage + '   HP max: ' + p.maxHp + '   Velocita: ' + p.moveSpeed,
-      'Arma: ' + (p.weapon === 'hammer' ? 'Martello di Cerume' : 'Cotton fioc'),
+      T.t('up_stat_wax', { wax: window.GameState.wax }),
+      T.t('up_stat_line', { dmg: p.damage, hp: p.maxHp, spd: p.moveSpeed }),
+      T.t('up_stat_weapon', { weapon: weaponName }),
     ];
     this.add.text(W / 2, H - 70, stats.join('\n'), {
       fontFamily: 'monospace', fontSize: '15px', color: '#ffeccb', align: 'center', lineSpacing: 4,

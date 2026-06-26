@@ -11,7 +11,9 @@ class ShopScene extends Phaser.Scene {
     g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
     g.fillStyle(0x000000, 0.35); g.fillRect(0, 0, W, H);
 
-    this.add.text(W / 2, 46, 'NEGOZIO DEL CERUME', {
+    const T = window.I18n;
+
+    this.add.text(W / 2, 46, T.t('shop_title'), {
       fontFamily: 'monospace', fontSize: '40px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 7,
     }).setOrigin(0.5);
@@ -39,15 +41,16 @@ class ShopScene extends Phaser.Scene {
         .setStrokeStyle(3, 0xffd166);
 
       // nome + effetto (sinistra)
-      this.add.text(x - rowW / 2 + 18, y - 16, (i + 1) + '. ' + item.name, {
+      this.add.text(x - rowW / 2 + 18, y - 16, (i + 1) + '. ' + T.t('unlock_' + id + '_name'), {
         fontFamily: 'monospace', fontSize: '20px', color: '#ffe2b0',
       }).setOrigin(0, 0.5);
-      this.add.text(x - rowW / 2 + 18, y + 12, item.effect, {
+      this.add.text(x - rowW / 2 + 18, y + 12, T.t('unlock_' + id + '_eff', { n: item.per }), {
         fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8',
       }).setOrigin(0, 0.5);
 
       // livello (centro-destra)
-      const lvLabel = item.max > 1 ? ('Liv. ' + lv + '/' + item.max) : (lv > 0 ? 'Acquistato' : 'Non posseduto');
+      const lvLabel = item.max > 1 ? T.t('shop_lv', { lv: lv, max: item.max })
+        : (lv > 0 ? T.t('shop_owned') : T.t('shop_notowned'));
       this.add.text(x + rowW / 2 - 220, y, lvLabel, {
         fontFamily: 'monospace', fontSize: '15px', color: '#ffeccb',
       }).setOrigin(0.5);
@@ -57,7 +60,7 @@ class ShopScene extends Phaser.Scene {
     });
 
     // Pulsante indietro
-    const back = this.add.text(W / 2, H - 40, 'INDIETRO (ESC)', {
+    const back = this.add.text(W / 2, H - 40, T.t('shop_back'), {
       fontFamily: 'monospace', fontSize: '22px', color: '#14161f',
       backgroundColor: '#ffd166', padding: { x: 22, y: 10 },
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
@@ -76,11 +79,12 @@ class ShopScene extends Phaser.Scene {
   }
 
   makeBuyButton(x, y, id, item, lv, cost, maxed) {
+    const T = window.I18n;
     const enough = window.Meta.get().bank >= cost;
     let label, bg, fg;
-    if (maxed) { label = 'MAX'; bg = '#5a4a2a'; fg = '#cabfa0'; }
-    else if (enough) { label = 'COMPRA\n' + cost; bg = '#ffd166'; fg = '#14161f'; }
-    else { label = cost + ' cerume'; bg = '#6a3030'; fg = '#ffd9d9'; }
+    if (maxed) { label = T.t('shop_max'); bg = '#5a4a2a'; fg = '#cabfa0'; }
+    else if (enough) { label = T.t('shop_buy', { cost: cost }); bg = '#ffd166'; fg = '#14161f'; }
+    else { label = T.t('shop_need', { cost: cost }); bg = '#6a3030'; fg = '#ffd9d9'; }
 
     const btn = this.add.text(x, y, label, {
       fontFamily: 'monospace', fontSize: '15px', color: fg, align: 'center',
@@ -108,7 +112,7 @@ class ShopScene extends Phaser.Scene {
 
   refreshBank() {
     const meta = window.Meta.get();
-    this.bankText.setText('Cerume in banca: ' + meta.bank + '   |   Miglior livello: ' + meta.bestLevel);
+    this.bankText.setText(window.I18n.t('shop_bank', { bank: meta.bank, best: meta.bestLevel }));
   }
 
   toMenu() {

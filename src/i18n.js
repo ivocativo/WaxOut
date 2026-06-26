@@ -1,0 +1,221 @@
+// i18n.js — dizionario centrale delle scritte e traduzioni.
+// Lingua di DEFAULT: inglese (per facilitare la diffusione dell'app).
+// La scelta si salva in localStorage; aggiungere una lingua = aggiungere un
+// blocco a STRINGS e il suo codice a ORDER/NATIVE. Niente accenti nelle stringhe
+// (il font pixel del gioco non li disegna bene), come nel resto del progetto.
+//
+// Uso:  window.I18n.t('menu_start')                       -> "START RUN"
+//       window.I18n.t('hud_level', { n: 3 })              -> "Level 3"
+//   I segnaposto {nome} vengono sostituiti coi valori passati in params.
+window.I18n = (function () {
+  const KEY = 'earwaxwar.lang';
+  const ORDER = ['en', 'it'];                 // lingue disponibili, in ordine di scelta
+  const NATIVE = { en: 'English', it: 'Italiano' };
+
+  const STRINGS = {
+    en: {
+      // --- Menu ---
+      menu_subtitle: 'The Earwax War',
+      menu_bank: 'Wax in the bank: {bank}      Best level: {best}',
+      menu_ctrl_title: 'CONTROLS',
+      menu_ctrl_move: 'Move:    A / D  or arrows',
+      menu_ctrl_jump: 'Jump:    W / Space / Up',
+      menu_ctrl_attack: 'Attack:  J  or left click',
+      menu_ctrl_dash: 'Dash:    Shift  (if unlocked)',
+      menu_ctrl_touch: 'On phone: use the on-screen buttons',
+      menu_goal_1: 'Smash the whole earwax wall to win the level.',
+      menu_goal_2: 'After each level you unlock a new ability or weapon.',
+      menu_start: 'START RUN',
+      menu_shop: 'SHOP (N)',
+      menu_lang: 'Language: {lang}',
+      // --- HUD ---
+      hud_hp: 'HP {hp}/{max}',
+      hud_level: 'Level {n}',
+      hud_wall: 'Wall: {left}/{total}',
+      hud_wax: 'Wax: {n}',
+      hud_abilities: 'Abilities: {list}',
+      // --- Banner di gioco ---
+      game_boss_in: '!  THE WAX PLUG APPROACHES  !',
+      game_swarm_in: 'SWARM INCOMING!',
+      game_boss_dead: 'WAX PLUG DESTROYED!  +{wax}',
+      // --- Livello completato ---
+      done_title: 'LEVEL {n} COMPLETE!',
+      done_sub: 'Earwax wall smashed!',
+      // --- Game over ---
+      over_title: 'OVERWHELMED BY EARWAX',
+      over_level: 'Run ended at level {n}',
+      over_banked: 'Wax banked: +{earned}   (in bank: {bank})',
+      over_newrun: 'NEW RUN',
+      over_shop: 'SHOP',
+      over_menu: 'MENU',
+      // --- Negozio ---
+      shop_title: 'EARWAX SHOP',
+      shop_bank: 'Wax in bank: {bank}   |   Best level: {best}',
+      shop_lv: 'Lv. {lv}/{max}',
+      shop_owned: 'Owned',
+      shop_notowned: 'Not owned',
+      shop_max: 'MAX',
+      shop_buy: 'BUY\n{cost}',
+      shop_need: '{cost} wax',
+      shop_back: 'BACK (ESC)',
+      unlock_hp_name: 'Extra Heart',
+      unlock_hp_eff: '+{n} HP at run start',
+      unlock_dmg_name: 'Sharp Blade',
+      unlock_dmg_eff: '+{n} damage at run start',
+      unlock_speed_name: 'Spring Boots',
+      unlock_speed_eff: '+{n} speed at run start',
+      unlock_djump_name: 'Innate Double Jump',
+      unlock_djump_eff: 'Start every run with double jump',
+      // --- Pausa ---
+      pause_title: 'PAUSED',
+      pause_hint: 'ESC or P to resume',
+      pause_resume: 'RESUME',
+      pause_restart: 'RESTART LEVEL',
+      pause_menu: 'MAIN MENU',
+      // --- Potenziamento (a fine livello) ---
+      up_title: 'UPGRADE',
+      up_hint: 'Choose a new ability or weapon (1 / 2 / 3 or click)',
+      up_ability_tag: '★ ABILITY',
+      up_stat_wax: 'Wax collected: {wax}',
+      up_stat_line: 'Damage: {dmg}   Max HP: {hp}   Speed: {spd}',
+      up_stat_weapon: 'Weapon: {weapon}',
+      up_damage_name: 'Sharpen', up_damage_desc: '+8 damage',
+      up_hp_name: 'Extra Fibre', up_hp_desc: '+25 max HP\n(and full heal)',
+      up_attspd_name: 'Reflexes', up_attspd_desc: 'Faster attack',
+      up_speed_name: 'Fast Boots', up_speed_desc: '+30 speed',
+      up_range_name: 'Long Arm', up_range_desc: '+25% range',
+      up_doublejump_name: 'Double Jump', up_doublejump_desc: 'Jump twice',
+      up_dash_name: 'Dash', up_dash_desc: 'Shift to dash',
+      up_hammer_name: 'Earwax Hammer', up_hammer_desc: 'Area weapon\n+6 damage',
+      // --- Abilita (lista HUD) + armi ---
+      ability_doublejump: 'double jump',
+      ability_dash: 'dash',
+      ability_hammer: 'hammer',
+      weapon_swab: 'Cotton Swab',
+      weapon_hammer: 'Earwax Hammer',
+    },
+
+    it: {
+      // --- Menu ---
+      menu_subtitle: 'La Guerra del Cerume',
+      menu_bank: 'Cerume in banca: {bank}      Miglior livello: {best}',
+      menu_ctrl_title: 'COMANDI',
+      menu_ctrl_move: 'Muoviti:  A / D  o  frecce',
+      menu_ctrl_jump: 'Salta:    W / Spazio / Su',
+      menu_ctrl_attack: 'Attacca:  J  o  click sinistro',
+      menu_ctrl_dash: 'Scatto:   Shift  (se sbloccato)',
+      menu_ctrl_touch: 'Su telefono: usa i pulsanti a schermo',
+      menu_goal_1: 'Demolisci tutto il muro di cerume per vincere il livello.',
+      menu_goal_2: 'A fine livello sblocchi una nuova abilita o arma.',
+      menu_start: 'INIZIA RUN',
+      menu_shop: 'NEGOZIO (N)',
+      menu_lang: 'Lingua: {lang}',
+      // --- HUD ---
+      hud_hp: 'HP {hp}/{max}',
+      hud_level: 'Livello {n}',
+      hud_wall: 'Muro: {left}/{total}',
+      hud_wax: 'Cerume: {n}',
+      hud_abilities: 'Abilita: {list}',
+      // --- Banner di gioco ---
+      game_boss_in: '!  ARRIVA IL TAPPO DI CERUME  !',
+      game_swarm_in: 'SCIAME IN ARRIVO!',
+      game_boss_dead: 'TAPPO DI CERUME DISTRUTTO!  +{wax}',
+      // --- Livello completato ---
+      done_title: 'LIVELLO {n} COMPLETATO!',
+      done_sub: 'Muro di cerume sfondato!',
+      // --- Game over ---
+      over_title: 'SOPRAFFATTO DAL CERUME',
+      over_level: 'Run terminata al livello {n}',
+      over_banked: 'Cerume incassato: +{earned}   (in banca: {bank})',
+      over_newrun: 'NUOVA RUN',
+      over_shop: 'NEGOZIO',
+      over_menu: 'MENU',
+      // --- Negozio ---
+      shop_title: 'NEGOZIO DEL CERUME',
+      shop_bank: 'Cerume in banca: {bank}   |   Miglior livello: {best}',
+      shop_lv: 'Liv. {lv}/{max}',
+      shop_owned: 'Acquistato',
+      shop_notowned: 'Non posseduto',
+      shop_max: 'MAX',
+      shop_buy: 'COMPRA\n{cost}',
+      shop_need: '{cost} cerume',
+      shop_back: 'INDIETRO (ESC)',
+      unlock_hp_name: 'Cuore Extra',
+      unlock_hp_eff: '+{n} HP a inizio run',
+      unlock_dmg_name: 'Lama Affilata',
+      unlock_dmg_eff: '+{n} danno a inizio run',
+      unlock_speed_name: 'Stivali Molla',
+      unlock_speed_eff: '+{n} velocita a inizio run',
+      unlock_djump_name: 'Doppio Salto Innato',
+      unlock_djump_eff: 'Inizi ogni run col doppio salto',
+      // --- Pausa ---
+      pause_title: 'PAUSA',
+      pause_hint: 'ESC o P per riprendere',
+      pause_resume: 'RIPRENDI',
+      pause_restart: 'RIAVVIA LIVELLO',
+      pause_menu: 'MENU PRINCIPALE',
+      // --- Potenziamento (a fine livello) ---
+      up_title: 'POTENZIAMENTO',
+      up_hint: 'Scegli una nuova abilita o arma (1 / 2 / 3 o click)',
+      up_ability_tag: '★ ABILITA',
+      up_stat_wax: 'Cerume raccolto: {wax}',
+      up_stat_line: 'Danno: {dmg}   HP max: {hp}   Velocita: {spd}',
+      up_stat_weapon: 'Arma: {weapon}',
+      up_damage_name: 'Affilatura', up_damage_desc: '+8 danno',
+      up_hp_name: 'Fibra Extra', up_hp_desc: '+25 HP max\n(e cura completa)',
+      up_attspd_name: 'Riflessi', up_attspd_desc: 'Attacco piu rapido',
+      up_speed_name: 'Stivali Veloci', up_speed_desc: '+30 velocita',
+      up_range_name: 'Braccio Lungo', up_range_desc: '+25% portata',
+      up_doublejump_name: 'Salto Doppio', up_doublejump_desc: 'Salta due volte',
+      up_dash_name: 'Scatto', up_dash_desc: 'Shift per scattare',
+      up_hammer_name: 'Martello di Cerume', up_hammer_desc: 'Arma ad area\n+6 danno',
+      // --- Abilita (lista HUD) + armi ---
+      ability_doublejump: 'salto doppio',
+      ability_dash: 'scatto',
+      ability_hammer: 'martello',
+      weapon_swab: 'Cotton fioc',
+      weapon_hammer: 'Martello di Cerume',
+    },
+  };
+
+  let lang = (function () {
+    try { const s = window.localStorage.getItem(KEY); if (s && STRINGS[s]) return s; } catch (e) { /* niente */ }
+    return 'en';
+  })();
+
+  // Sostituisce i segnaposto {nome} con i valori passati.
+  function fmt(str, params) {
+    if (!params) return str;
+    return String(str).replace(/\{(\w+)\}/g, function (m, k) {
+      return (params[k] !== undefined && params[k] !== null) ? params[k] : m;
+    });
+  }
+
+  return {
+    get lang() { return lang; },
+    list() { return ORDER.slice(); },
+    nativeName(code) { return NATIVE[code] || code; },
+
+    // Traduce una chiave nella lingua corrente (fallback: inglese, poi la chiave).
+    t(key, params) {
+      const table = STRINGS[lang] || STRINGS.en;
+      let s = table[key];
+      if (s === undefined) s = STRINGS.en[key];
+      if (s === undefined) s = key;
+      return fmt(s, params);
+    },
+
+    setLang(code) {
+      if (!STRINGS[code]) return;
+      lang = code;
+      try { window.localStorage.setItem(KEY, code); } catch (e) { /* niente */ }
+    },
+
+    // Passa alla lingua successiva del ciclo e la restituisce.
+    next() {
+      const i = ORDER.indexOf(lang);
+      this.setLang(ORDER[(i + 1) % ORDER.length]);
+      return lang;
+    },
+  };
+})();

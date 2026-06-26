@@ -93,12 +93,12 @@ class GameScene extends Phaser.Scene {
       spawnDelay = Math.max(2000, 3200 - lvl * 120);
       this.spawnEnemy('boss');
       this.spawnEnemy();
-      this.showBanner('!  ARRIVA IL TAPPO DI CERUME  !', '#ffb04a');
+      this.showBanner(window.I18n.t('game_boss_in'), '#ffb04a');
     } else if (this.levelKind === 'swarm') {
       this.maxEnemies = Math.min(4 + lvl, 9);
       spawnDelay = Math.max(800, 1700 - lvl * 110);
       for (let i = 0; i < Math.min(4, this.maxEnemies); i++) this.spawnEnemy();
-      this.showBanner('SCIAME IN ARRIVO!', '#9be870');
+      this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
     } else {
       this.maxEnemies = Math.min(2 + lvl, 6);
       spawnDelay = Math.max(1500, 2800 - lvl * 150);
@@ -118,7 +118,8 @@ class GameScene extends Phaser.Scene {
 
     // Suggerimento abilita di questo livello
     if (window.GameState.ownedAbilities.length > 0) {
-      const txt = 'Abilita: ' + window.GameState.ownedAbilities.join(', ');
+      const names = window.GameState.ownedAbilities.map((id) => window.I18n.t('ability_' + id));
+      const txt = window.I18n.t('hud_abilities', { list: names.join(', ') });
       const t = this.add.text(W / 2, H - gh - 8, txt, {
         fontFamily: 'monospace', fontSize: '13px', color: '#fff7e8',
         stroke: '#14161f', strokeThickness: 3,
@@ -143,6 +144,9 @@ class GameScene extends Phaser.Scene {
     const rightX = W - 24 - B / 2;
     const groundTop = H - gh;
 
+    // Disegno del cerume come massa unica gommosa (sopra i blocchi, che restano invisibili).
+    this.waxGfx = this.add.graphics().setDepth(6);
+
     for (let c = 0; c < cols; c++) {
       for (let r = 0; r < rows; r++) {
         const x = rightX - c * B;
@@ -158,13 +162,95 @@ class GameScene extends Phaser.Scene {
         else if (type === 'dirt') { key = 'block_dirt'; hp = 50 + lvl * 8; bitKey = 'bit_dirt'; wax = 4; }
         else { key = 'block_soft'; hp = 30 + lvl * 6; bitKey = 'bit_wax'; wax = 3; }
 
-        const b = this.blocks.create(x, y, key).setDepth(5);
+        const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
         b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
+        b.col = c; b.row = r; b.waxType = type;
+        b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
         b.refreshBody();
       }
     }
     this.totalBlocks = this.blocks.countActive(true);
     this.blocksLeft = this.totalBlocks;
+    this.drawWax();
+  }
+
+  // Disegna il muro come UN'UNICA massa di cerume gommosa e lucida, sovrapponendo
+  // blob arrotondati ai blocchi (cosi i bordi si fondono e non si vede piu il reticolo).
+  // Richiamata a ogni colpo per "erodere" la massa col muro.
+  drawWax() {
+    const g = this.waxGfx;
+    if (!g) return;
+    const C = window.CONFIG.COLORS;
+    const B = window.CONFIG.BLOCK;
+    g.clear();
+    const blocks = this.blocks.getChildren().filter((b) => b.active);
+    if (!blocks.length) return;
+
+    const occ = new Set(blocks.map((b) => b.col + ',' + b.row));
+    const has = (col, row) => occ.has(col + ',' + row);
+    const PAL = {
+      soft: [C.waxSoft, C.waxSoftLight, C.waxSoftDark],
+      hard: [C.waxHard, C.waxHardLight, C.waxHardDark],
+      dirt: [C.dirt, C.dirtLight, C.dirtDark],
+    };
+
+    // 1) Ombra/base: blob scuri spostati in basso, danno spessore alla massa.
+    blocks.forEach((b) => {
+      g.fillStyle(PAL[b.waxType][2], 1);
+      g.fillCircle(b.x + 2, b.y + 4, B * 0.80);
+    });
+
+    // 2) Gocce che colano dagli sporti (blocco senza nulla sotto).
+    blocks.forEach((b) => {
+      if (b.row > 0 && !has(b.col, b.row - 1) && b.dripLen > 0) {
+        const x = b.x, y0 = b.y + B * 0.40, len = b.dripLen, w = 5;
+        g.fillStyle(PAL[b.waxType][2], 1);
+        g.fillRect(x - w / 2, y0, w, len);
+        g.fillCircle(x, y0 + len, w * 0.9);
+        g.fillStyle(PAL[b.waxType][0], 1);
+        g.fillRect(x - w / 2 + 1, y0, w - 2, len * 0.7);
+      }
+    });
+
+    // 3) Corpo principale a colore pieno; piu scuro dove e danneggiato ("livido").
+    blocks.forEach((b) => {
+      g.fillStyle(PAL[b.waxType][0], 1);
+      g.fillCircle(b.x, b.y, B * 0.76);
+    });
+    blocks.forEach((b) => {
+      const t = Phaser.Math.Clamp(b.hp / b.maxHp, 0, 1);
+      if (t < 0.98) {
+        g.fillStyle(PAL[b.waxType][2], (1 - t) * 0.55);
+        g.fillCircle(b.x, b.y, B * 0.70);
+      }
+    });
+
+    // 4) Riflessi lucidi: bordo superiore e faccia esposta + puntini speculari.
+    blocks.forEach((b) => {
+      const light = PAL[b.waxType][1];
+      if (!has(b.col, b.row + 1)) {           // niente blocco sopra = cresta
+        g.fillStyle(light, 0.6);
+        g.fillEllipse(b.x - 4, b.y - B * 0.34, B * 0.70, B * 0.34);
+      }
+      if (!has(b.col + 1, b.row)) {            // niente blocco a sinistra = faccia verso il giocatore
+        g.fillStyle(light, 0.28);
+        g.fillEllipse(b.x - B * 0.32, b.y, B * 0.26, B * 0.62);
+      }
+    });
+    blocks.forEach((b) => {
+      if (!has(b.col, b.row + 1) && !has(b.col + 1, b.row)) {
+        g.fillStyle(0xffffff, 0.5);
+        g.fillCircle(b.x - B * 0.22, b.y - B * 0.26, 2.6);
+      }
+    });
+  }
+
+  // Piccolo "splat" di feedback quando un pezzo di cerume si stacca.
+  splat(x, y, type) {
+    const C = window.CONFIG.COLORS;
+    const col = { soft: C.waxSoftLight, hard: C.waxHardLight, dirt: C.dirtLight }[type] || C.waxSoftLight;
+    const ring = this.add.circle(x, y, 6, col, 0.7).setDepth(7);
+    this.tweens.add({ targets: ring, scale: 3.4, alpha: 0, duration: 260, ease: 'Quad.out', onComplete: () => ring.destroy() });
   }
 
   // Sceglie a caso un tipo di nemico tra quelli sbloccati al livello attuale.
@@ -316,22 +402,19 @@ class GameScene extends Phaser.Scene {
 
   damageBlock(b, dmg) {
     b.hp -= dmg;
-    this.tweens.add({ targets: b, scaleX: 1.16, scaleY: 0.85, duration: 60, yoyo: true });
     if (b.hp <= 0) {
       window.Sfx.smash();
-      this.burst(b.bitKey, b.x, b.y, 12);
+      this.burst(b.bitKey, b.x, b.y, 14);
+      this.splat(b.x, b.y, b.waxType);
       window.GameState.wax += b.waxValue;
       b.destroy();
       this.blocksLeft = this.blocks.countActive(true);
+      this.drawWax();
       if (this.blocksLeft === 0) this.levelComplete();
     } else {
       window.Sfx.crack();
       this.burst(b.bitKey, b.x, b.y, 3);
-      const t = Phaser.Math.Clamp(b.hp / b.maxHp, 0, 1);
-      const col = Phaser.Display.Color.Interpolate.ColorWithColor(
-        Phaser.Display.Color.IntegerToColor(0x6b4a1f),
-        Phaser.Display.Color.IntegerToColor(0xffffff), 100, Math.floor(t * 100));
-      b.setTint(Phaser.Display.Color.GetColor(col.r, col.g, col.b));
+      this.drawWax();
     }
   }
 
@@ -351,7 +434,7 @@ class GameScene extends Phaser.Scene {
       if (e.kind === 'boss') {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
-        this.showBanner('TAPPO DI CERUME DISTRUTTO!  +' + e.waxValue, '#ffd166');
+        this.showBanner(window.I18n.t('game_boss_dead', { wax: e.waxValue }), '#ffd166');
       } else {
         this.burst(e.bitKey, e.x, e.y, 14);
       }
@@ -397,11 +480,11 @@ class GameScene extends Phaser.Scene {
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setDepth(50).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 - 20, 'LIVELLO ' + window.GameState.level + ' COMPLETATO!', {
+    this.add.text(W / 2, H / 2 - 20, window.I18n.t('done_title', { n: window.GameState.level }), {
       fontFamily: 'monospace', fontSize: '34px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 6, align: 'center',
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 26, 'Muro di cerume sfondato!', {
+    this.add.text(W / 2, H / 2 + 26, window.I18n.t('done_sub'), {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
       stroke: '#14161f', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
@@ -422,15 +505,15 @@ class GameScene extends Phaser.Scene {
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(50).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 - 56, 'SOPRAFFATTO DAL CERUME', {
+    this.add.text(W / 2, H / 2 - 56, window.I18n.t('over_title'), {
       fontFamily: 'monospace', fontSize: '30px', color: '#e74c3c',
       stroke: '#14161f', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 - 14, 'Run terminata al livello ' + lvl, {
+    this.add.text(W / 2, H / 2 - 14, window.I18n.t('over_level', { n: lvl }), {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(W / 2, H / 2 + 16, 'Cerume incassato: +' + earned + '   (in banca: ' + meta.bank + ')', {
+    this.add.text(W / 2, H / 2 + 16, window.I18n.t('over_banked', { earned: earned, bank: meta.bank }), {
       fontFamily: 'monospace', fontSize: '16px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
@@ -447,9 +530,9 @@ class GameScene extends Phaser.Scene {
       t.on('pointerdown', onTap);
       return t;
     };
-    mkButton(W / 2 - 175, 'NUOVA RUN', () => { window.GameState.reset(); this.scene.start('GameScene'); });
-    mkButton(W / 2, 'NEGOZIO', () => { window.GameState.reset(); this.scene.start('ShopScene'); });
-    mkButton(W / 2 + 175, 'MENU', () => { window.GameState.reset(); this.scene.start('MenuScene'); });
+    mkButton(W / 2 - 175, window.I18n.t('over_newrun'), () => { window.GameState.reset(); this.scene.start('GameScene'); });
+    mkButton(W / 2, window.I18n.t('over_shop'), () => { window.GameState.reset(); this.scene.start('ShopScene'); });
+    mkButton(W / 2 + 175, window.I18n.t('over_menu'), () => { window.GameState.reset(); this.scene.start('MenuScene'); });
 
     this.input.keyboard.once('keydown-R', () => { window.GameState.reset(); this.scene.start('GameScene'); });
   }
@@ -476,10 +559,11 @@ class GameScene extends Phaser.Scene {
     const col = ratio > 0.5 ? 0x4caf50 : (ratio > 0.25 ? 0xe0a020 : 0xe74c3c);
     this.hudG.fillStyle(col, 1); this.hudG.fillRect(x, y, w * ratio, h);
 
-    this.hpText.setText('HP ' + Math.ceil(p.hp) + '/' + p.maxHp);
-    this.levelText.setText('Livello ' + window.GameState.level);
-    this.blockText.setText('Muro: ' + this.blocksLeft + '/' + this.totalBlocks);
-    this.waxText.setText('Cerume: ' + window.GameState.wax);
+    const T = window.I18n;
+    this.hpText.setText(T.t('hud_hp', { hp: Math.ceil(p.hp), max: p.maxHp }));
+    this.levelText.setText(T.t('hud_level', { n: window.GameState.level }));
+    this.blockText.setText(T.t('hud_wall', { left: this.blocksLeft, total: this.totalBlocks }));
+    this.waxText.setText(T.t('hud_wax', { n: window.GameState.wax }));
   }
 
   // ---------- Pausa ----------
@@ -514,20 +598,45 @@ class GameScene extends Phaser.Scene {
   drawBackground() {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const g = this.add.graphics().setDepth(-10);
-    const steps = 24;
-    for (let i = 0; i < steps; i++) {
-      const col = Phaser.Display.Color.Interpolate.ColorWithColor(
-        Phaser.Display.Color.IntegerToColor(C.bgTop),
-        Phaser.Display.Color.IntegerToColor(C.bgBottom), steps - 1, i);
-      g.fillStyle(Phaser.Display.Color.GetColor(col.r, col.g, col.b), 1);
-      g.fillRect(0, Math.floor(i / steps * H), W, Math.ceil(H / steps) + 1);
-    }
-    // pieghe del condotto
-    g.fillStyle(C.canalShade, 0.15);
-    for (let i = 0; i < 6; i++) g.fillEllipse(W * 0.4, 80 + i * 90, W * 1.1, 70);
-    // accenno di timpano sullo sfondo a destra
-    g.fillStyle(C.eardrum, 0.35);
-    g.fillEllipse(W - 60, H * 0.5, 180, 360);
+
+    // Centro del condotto: in fondo, verso il timpano (punto luminoso).
+    const cx = W * 0.82, cy = H * 0.44;
+
+    // Parete scura del condotto (base).
+    g.fillStyle(0x6e3f30, 1);
+    g.fillRect(0, 0, W, H);
+
+    // Bagliore caldo "a tunnel": ellissi concentriche dal buio esterno alla luce in fondo.
+    const rings = [
+      [W * 1.90, H * 2.00, 0x7c4736],
+      [W * 1.50, H * 1.60, 0x8d5340],
+      [W * 1.18, H * 1.26, 0xa5654b],
+      [W * 0.90, H * 0.96, 0xbb7657],
+      [W * 0.64, H * 0.70, 0xd08c67],
+      [W * 0.42, H * 0.46, 0xe2a578],
+      [W * 0.26, H * 0.30, 0xf0c293],
+      [W * 0.15, H * 0.18, 0xf8d8b0],
+    ];
+    rings.forEach((r) => { g.fillStyle(r[2], 1); g.fillEllipse(cx, cy, r[0], r[1]); });
+
+    // Anelli di profondita del condotto (sottili e scuri).
+    g.lineStyle(7, 0x4f2c20, 0.13);
+    for (let i = 1; i <= 5; i++) g.strokeEllipse(cx, cy, W * 0.34 * i, H * 0.38 * i);
+
+    // Pieghe carnose lungo i bordi (translucide).
+    g.fillStyle(0x5a3322, 0.16);
+    for (let i = 0; i < 5; i++) g.fillEllipse(W * 0.30, 70 + i * 110, W * 1.2, 64);
+
+    // Membrana del timpano in fondo, appena accennata.
+    g.fillStyle(C.eardrum, 0.18);
+    g.fillEllipse(cx, cy, W * 0.20, H * 0.34);
+
+    // Alone luminoso del timpano che "respira".
+    this.bgGlow = this.add.ellipse(cx, cy, W * 0.22, H * 0.26, 0xfbe2bf, 0.28).setDepth(-9);
+    this.tweens.add({
+      targets: this.bgGlow, scaleX: 1.18, scaleY: 1.18, alpha: 0.42,
+      duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+    });
   }
 
   // ---------- Loop ----------

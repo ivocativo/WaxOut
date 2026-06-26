@@ -11,19 +11,21 @@ class PauseScene extends Phaser.Scene {
     // Velo scuro sopra il gioco congelato
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setScrollFactor(0);
 
-    this.add.text(W / 2, H / 2 - 120, 'PAUSA', {
+    const T = window.I18n;
+
+    this.add.text(W / 2, H / 2 - 120, T.t('pause_title'), {
       fontFamily: 'monospace', fontSize: '46px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 7,
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, H / 2 - 74, 'ESC o P per riprendere', {
+    this.add.text(W / 2, H / 2 - 74, T.t('pause_hint'), {
       fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    this.mkButton(W / 2, H / 2 - 18, 'RIPRENDI', () => this.resumeGame());
-    this.mkButton(W / 2, H / 2 + 42, 'RIAVVIA LIVELLO', () => this.restartLevel());
-    this.mkButton(W / 2, H / 2 + 102, 'MENU PRINCIPALE', () => this.toMenu());
+    this.mkButton(W / 2, H / 2 - 18, T.t('pause_resume'), () => this.resumeGame());
+    this.mkButton(W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel());
+    this.mkButton(W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu());
 
     // Scorciatoie da tastiera
     this.input.keyboard.on('keydown-ESC', () => this.resumeGame());

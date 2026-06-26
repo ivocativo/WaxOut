@@ -15,14 +15,16 @@ class MenuScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 8,
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, 150, 'La Guerra del Cerume', {
+    const T = window.I18n;
+
+    this.add.text(W / 2, 150, T.t('menu_subtitle'), {
       fontFamily: 'monospace', fontSize: '22px', color: '#ffe2b0',
       stroke: '#14161f', strokeThickness: 4,
     }).setOrigin(0.5);
 
     // Banca permanente (roguelike): cerume accumulato + record
     const meta = window.Meta.get();
-    this.add.text(W / 2, 184, 'Cerume in banca: ' + meta.bank + '      Miglior livello: ' + meta.bestLevel, {
+    this.add.text(W / 2, 184, T.t('menu_bank', { bank: meta.bank, best: meta.bestLevel }), {
       fontFamily: 'monospace', fontSize: '16px', color: '#ffd166',
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
@@ -34,15 +36,15 @@ class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: blob, scaleY: 2.1, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     const controls = [
-      'COMANDI',
-      'Muoviti:  A / D  o  frecce',
-      'Salta:    W / Spazio / Su',
-      'Attacca:  J  o  click sinistro',
-      'Scatto:   Shift  (se sbloccato)',
-      'Su telefono: usa i pulsanti a schermo',
+      T.t('menu_ctrl_title'),
+      T.t('menu_ctrl_move'),
+      T.t('menu_ctrl_jump'),
+      T.t('menu_ctrl_attack'),
+      T.t('menu_ctrl_dash'),
+      T.t('menu_ctrl_touch'),
       '',
-      'Demolisci tutto il muro di cerume per vincere il livello.',
-      'A fine livello sblocchi una nuova abilita o arma.',
+      T.t('menu_goal_1'),
+      T.t('menu_goal_2'),
     ];
     this.add.text(W / 2, 386, controls.join('\n'), {
       fontFamily: 'monospace', fontSize: '17px', color: '#fff7e8', align: 'center',
@@ -63,9 +65,18 @@ class MenuScene extends Phaser.Scene {
     const begin = () => { window.Sfx.unlock(); window.GameState.reset(); this.scene.start('GameScene'); };
     const openShop = () => { window.Sfx.unlock(); this.scene.start('ShopScene'); };
 
-    const startBtn = mkBtn(W / 2 - 110, 'INIZIA RUN', begin);
+    const startBtn = mkBtn(W / 2 - 110, T.t('menu_start'), begin);
     this.tweens.add({ targets: startBtn, alpha: 0.55, duration: 650, yoyo: true, repeat: -1 });
-    mkBtn(W / 2 + 110, 'NEGOZIO (N)', openShop);
+    mkBtn(W / 2 + 110, T.t('menu_shop'), openShop);
+
+    // Selettore lingua: in alto a destra; toccarlo cambia lingua e ridisegna.
+    const langBtn = this.add.text(W - 16, 16, T.t('menu_lang', { lang: T.nativeName(T.lang) }), {
+      fontFamily: 'monospace', fontSize: '15px', color: '#14161f',
+      backgroundColor: '#ffd166', padding: { x: 12, y: 7 },
+    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    langBtn.on('pointerover', () => langBtn.setStyle({ backgroundColor: '#ffe199' }));
+    langBtn.on('pointerout', () => langBtn.setStyle({ backgroundColor: '#ffd166' }));
+    langBtn.on('pointerdown', () => { window.Sfx.unlock(); T.next(); this.scene.restart(); });
 
     this.input.keyboard.once('keydown-ENTER', begin);
     this.input.keyboard.once('keydown-SPACE', begin);
