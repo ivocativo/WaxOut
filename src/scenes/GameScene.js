@@ -42,8 +42,8 @@ class GameScene extends Phaser.Scene {
 
     this.buildWall();
 
-    // Giocatore
-    this.player = this.physics.add.sprite(80, H - gh - 60, 'player_a').setDepth(10);
+    // Giocatore (sprite PNG: scala per portarlo alla dimensione di gioco; hitbox invariato)
+    this.player = this.physics.add.sprite(80, H - gh - 60, 'player_a').setDepth(10).setScale(1.5);
     this.player.body.setSize(18, 40, true);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.ground);
@@ -280,7 +280,7 @@ class GameScene extends Phaser.Scene {
     // Tabella dei tipi di nemico (statistiche scalate col livello).
     let cfg;
     if (kind === 'crust') {
-      cfg = { tex: 'enemy_crust', hp: 60 + lvl * 6, speed: 46, dmg: 16 + lvl * 2, wax: 8, bit: 'bit_dirt', body: [26, 22] };
+      cfg = { tex: 'enemy_crust', hp: 60 + lvl * 6, speed: 46, dmg: 16 + lvl * 2, wax: 8, bit: 'bit_dirt', body: [26, 22], scale: 1.6 };
     } else if (kind === 'fly') {
       cfg = { tex: 'enemy_fly', hp: 24 + lvl * 3, speed: 88 + lvl * 4, dmg: 10 + lvl * 2, wax: 7, bit: 'bit_wax', body: [24, 18], fly: true };
     } else if (kind === 'spit') {
@@ -288,7 +288,7 @@ class GameScene extends Phaser.Scene {
     } else if (kind === 'boss') {
       cfg = { tex: 'enemy_boss', hp: 420 + lvl * 40, speed: 34, dmg: 20 + lvl * 2, wax: 60 + lvl * 6, bit: 'bit_hard', body: [60, 54], spit: true, projDmg: 12 + lvl * 2, spitEvery: 1500, boss: true };
     } else {
-      cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22] };
+      cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22], scale: 1.6 };
     }
 
     // Posizione di comparsa: i volanti entrano dall'alto, il boss da destra, gli altri da sinistra.
@@ -315,9 +315,9 @@ class GameScene extends Phaser.Scene {
       e.nextSpit = this.time.now + Phaser.Math.Between(700, cfg.spitEvery);
     }
 
-    // comparsa
-    const targetScale = 1;
-    e.setScale(0.2);
+    // comparsa (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi)
+    const targetScale = cfg.scale || 1;
+    e.setScale(targetScale * 0.2);
     this.tweens.add({ targets: e, scaleX: targetScale, scaleY: targetScale, duration: 250, ease: 'Back.out' });
   }
 
