@@ -291,14 +291,29 @@ class GameScene extends Phaser.Scene {
       cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22], scale: 1.6 };
     }
 
-    // Posizione di comparsa: i volanti entrano dall'alto, il boss da destra, gli altri da sinistra.
+    // Posizione di comparsa: i volanti calano dal soffitto, gli altri emergono dal
+    // terreno in punti lontani dal giocatore (il boss esce verso destra).
+    const groundTop = H - gh;
+    const targetScale = cfg.scale || 1;
+    // L'hitbox scala con lo sprite: la quota di riposo va calcolata con l'altezza
+    // GIA' scalata, così il corpo appoggia esattamente sul pavimento (niente
+    // sprofondamento sotto la linea del terreno).
+    const restY = groundTop - (cfg.body[1] * targetScale) / 2;
     let x, y;
-    if (cfg.fly) { x = Phaser.Math.Between(W * 0.35, W - 60); y = Phaser.Math.Between(80, 180); }
-    else if (cfg.boss) { x = Phaser.Math.Between(W * 0.55, W * 0.7); y = H - gh - 90; }
-    else { x = Phaser.Math.Between(40, 140); y = H - gh - 70; }
+    if (cfg.fly) {
+      x = Phaser.Math.Between(W * 0.25, W * 0.6);
+      y = -24;                                   // parte sopra lo schermo
+    } else if (cfg.boss) {
+      x = Phaser.Math.Between(W * 0.55, W * 0.68);
+      y = restY;                                 // a livello del pavimento
+    } else {
+      x = this.pickGroundX();
+      y = restY;
+    }
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
     e.kind = kind;
+    e.spawning = true;                            // ancora in fase di comparsa: inerte
     e.setCollideWorldBounds(true);
     if (cfg.fly) e.body.setAllowGravity(false);
     else e.setBounce(0.1);
@@ -315,25 +330,90 @@ class GameScene extends Phaser.Scene {
       e.nextSpit = this.time.now + Phaser.Math.Between(700, cfg.spitEvery);
     }
 
-    // comparsa (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi)
-    const targetScale = cfg.scale || 1;
-    e.setScale(targetScale * 0.2);
-    this.tweens.add({ targets: e, scaleX: targetScale, scaleY: targetScale, duration: 250, ease: 'Back.out' });
+    // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
+    if (cfg.fly) this.dropFromCeiling(e, targetScale);
+    else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
   }
 
-  // Una pallina di cerume sputata da un nemico verso il giocatore.
+  // Sceglie un punto di spawn a terra lontano dal giocatore (mai addosso, mai nel muro).
+  pickGroundX() {
+    const W = window.CONFIG.WIDTH;
+    const cands = [W * 0.20, W * 0.33, W * 0.46, W * 0.60];
+    cands.sort((a, b) => Math.abs(b - this.player.x) - Math.abs(a - this.player.x));
+    return cands[Phaser.Math.Between(0, 1)];      // uno dei due più lontani
+  }
+
+  // Il nemico sbuca dal pavimento: parte schiacciato a terra e "cresce" in altezza.
+  // La gravità resta ATTIVA: il collider tiene il corpo appoggiato al pavimento mentre
+  // lo sprite si allunga verso l'alto (così non sprofonda mai sotto la linea del terreno).
+  emergeFromGround(e, targetScale, restY, x, groundTop, big) {
+    e.setScale(targetScale, targetScale * 0.12);  // appiattito a terra
+    e.setAlpha(0.9);
+    this.groundPuff(x, groundTop, big);
+    if (big) this.cameras.main.shake(220, 0.009);
+    window.Sfx.emerge(big);
+    this.tweens.add({
+      targets: e, scaleY: targetScale, alpha: 1,
+      duration: big ? 600 : 380, ease: 'Back.out',
+      onComplete: () => {
+        e.spawning = false;
+        // assestamento gommoso
+        this.tweens.add({ targets: e, scaleX: targetScale * 1.1, scaleY: targetScale * 0.9, yoyo: true, duration: 90 });
+      },
+    });
+  }
+
+  // Il volante cala dal soffitto con un piccolo rimbalzo elastico.
+  dropFromCeiling(e, targetScale) {
+    const restY = Phaser.Math.Between(90, 170);
+    e.setScale(targetScale * 0.5);
+    e.setVelocity(0, 0);
+    this.ceilingDrip(e.x, restY);
+    window.Sfx.emerge(false);
+    this.tweens.add({ targets: e, scaleX: targetScale, scaleY: targetScale, duration: 420, ease: 'Quad.out' });
+    this.tweens.add({
+      targets: e, y: restY, duration: 560, ease: 'Bounce.out',
+      onComplete: () => { e.spawning = false; },
+    });
+  }
+
+  // Sbuffo di terriccio/cerume quando qualcosa emerge dal pavimento.
+  groundPuff(x, groundTop, big) {
+    this.burst('bit_dirt', x, groundTop - 4, big ? 18 : 9);
+    const C = window.CONFIG.COLORS;
+    const mound = this.add.ellipse(x, groundTop - 2, big ? 70 : 44, big ? 26 : 16, C.dirtDark, 0.8).setDepth(7);
+    this.tweens.add({ targets: mound, scaleX: 1.6, scaleY: 0.2, alpha: 0, duration: 360, ease: 'Quad.out', onComplete: () => mound.destroy() });
+  }
+
+  // Filo di cerume che cola dal soffitto sopra al volante mentre scende.
+  ceilingDrip(x, restY) {
+    const C = window.CONFIG.COLORS;
+    const strand = this.add.rectangle(x, 0, 5, restY + 20, C.waxSoftDark, 0.85).setOrigin(0.5, 0).setDepth(7);
+    const blob = this.add.circle(x, 6, 6, C.waxSoft, 0.9).setDepth(7);
+    this.tweens.add({ targets: [strand], scaleY: 0, alpha: 0, duration: 540, ease: 'Quad.in', onComplete: () => strand.destroy() });
+    this.tweens.add({ targets: [blob], y: 0, scale: 0, alpha: 0, duration: 300, onComplete: () => blob.destroy() });
+  }
+
+  // Una pallina di cerume sputata da un nemico: vola in PARABOLA (cade per gravità)
+  // mirando alla posizione attuale del giocatore. Curva = più realistica e schivabile.
   spitAt(e) {
-    const dx = this.player.x - e.x;
-    const dy = (this.player.y - 10) - e.y;
-    const d = Math.hypot(dx, dy) || 1;
-    const sp = 210;
-    const proj = this.projectiles.create(e.x + Math.sign(dx) * 12, e.y - 6, 'wax_glob').setDepth(9);
-    proj.body.setAllowGravity(false);
+    const g = window.CONFIG.GRAVITY;
+    const dir = Math.sign(this.player.x - e.x) || 1;
+    const sx = e.x + dir * 12, sy = e.y - 6;
+    const dx = this.player.x - sx;
+    const dy = (this.player.y - 8) - sy;
+    const dist = Math.hypot(dx, dy);
+    const T = Phaser.Math.Clamp(dist / 260, 0.5, 1.0);  // tempo di volo stimato
+    const vx = dx / T;
+    const vy = (dy - 0.5 * g * T * T) / T;               // soluzione balistica
+    const proj = this.projectiles.create(sx, sy, 'wax_glob').setDepth(9);
+    proj.body.setAllowGravity(true);                     // cade in parabola
     proj.body.setSize(10, 10, true);
-    proj.setVelocity((dx / d) * sp, (dy / d) * sp);
+    proj.setVelocity(vx, vy);
+    proj.setAngularVelocity(Phaser.Math.Between(-360, 360));  // rotea mentre vola
     proj.dmg = e.projDamage;
     window.Sfx.spit();
-    this.time.delayedCall(2600, () => { if (proj.active) proj.destroy(); });
+    this.time.delayedCall(3200, () => { if (proj.active) proj.destroy(); });
   }
 
   popProjectile(proj) {
@@ -696,6 +776,7 @@ class GameScene extends Phaser.Scene {
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
+      if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
 
       // Sputatori (Gorgogliante e Boss): lanciano una pallina ogni tanto.
       if (e.nextSpit !== undefined && now >= e.nextSpit && now >= e.knockUntil) {

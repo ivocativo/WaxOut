@@ -44,6 +44,12 @@ window.Sfx = (function () {
     hurt() { beep(120, 0.22, 'sawtooth', 0.07); },
     enemyDie() { beep(70, 0.22, 'square', 0.06); },
     spit() { beep(520, 0.05, 'triangle', 0.04); setTimeout(() => beep(300, 0.08, 'sawtooth', 0.04), 40); },
+    // Nemico che emerge dal terreno o cala dal soffitto: "splorch" gommoso che sale.
+    emerge(big) {
+      const v = big ? 0.08 : 0.05;
+      beep(90, 0.14, 'sawtooth', v);
+      setTimeout(() => beep(big ? 150 : 220, 0.12, 'square', v), 70);
+    },
     pick() { beep(680, 0.1, 'triangle', 0.05); },
     win() { beep(523, 0.12, 'square', 0.06); setTimeout(() => beep(784, 0.18, 'square', 0.06), 130); },
     lose() { beep(220, 0.2, 'sawtooth', 0.07); setTimeout(() => beep(140, 0.3, 'sawtooth', 0.07), 160); },
