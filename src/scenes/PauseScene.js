@@ -8,8 +8,9 @@ class PauseScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     this.fromKey = (data && data.from) || 'GameScene';
 
-    // Velo scuro sopra il gioco congelato
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setScrollFactor(0);
+    // Velo scuro sopra il gioco congelato (non troppo: altrimenti il pavimento,
+    // color sabbia, si confonde con le pareti e sembra sparito).
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setScrollFactor(0);
 
     const T = window.I18n;
 
