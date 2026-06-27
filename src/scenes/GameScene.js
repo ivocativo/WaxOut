@@ -68,6 +68,12 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
     this.physics.add.collider(this.enemies, this.platforms, null, notFlyer);
 
+    // Bonus di cerume raccoglibili sulle pedane.
+    this.physics.add.overlap(this.player, this.pickups, (pl, pk) => this.grabPickup(pk));
+
+    // Guardiani fermi a presidiare le membrane piene.
+    this.spawnGuardians();
+
     // Le palline sputate feriscono il giocatore e si spappolano contro muro/pavimento.
     this.physics.add.overlap(this.player, this.projectiles, (pl, proj) => {
       this.hurtPlayer(proj.dmg, proj.x);
@@ -165,12 +171,18 @@ class GameScene extends Phaser.Scene {
     const lastX = this.worldW - 520;              // ultima membrana prima del timpano
     const span = Math.max(1, lastX - firstX);
 
+    this.membranes = [];                          // metadati (x, tipo) per pedane/guardiani
     this.membraneXs = [];
+    this.pickups = this.physics.add.group({ allowGravity: false });
     for (let i = 0; i < count; i++) {
       const t = count === 1 ? 0 : i / (count - 1);
       const mx = Math.round(firstX + span * t);
+      // Varieta': la prima e' sempre "piena" (insegna a sfondare); poi si alternano
+      // membrane PIENE (alte, da sfondare) e BASSE (scavalcabili con un salto).
+      const type = (i % 2 === 1) ? 'short' : 'full';
+      const info = this.buildMembrane(mx, lvl, i, type);
+      this.membranes.push(info);
       this.membraneXs.push(mx);
-      this.buildMembrane(mx, lvl, i);
     }
     this.buildPlatforms();
     this.buildGoal();
@@ -181,16 +193,23 @@ class GameScene extends Phaser.Scene {
   }
 
   // Una membrana di cerume: una colonna di blocchi dal pavimento verso l'alto che
-  // sbarra il corridoio. Per proseguire bisogna sfondarne un varco (di solito in basso).
-  buildMembrane(mx, lvl, idx) {
+  // sbarra il corridoio. Tipo 'full' = alta, da sfondare (varco in basso); tipo
+  // 'short' = bassa, scavalcabile con un salto (o sfondabile, ha pochi HP).
+  buildMembrane(mx, lvl, idx, type) {
     const B = window.CONFIG.BLOCK;
     const H = window.CONFIG.HEIGHT;
     const groundTop = this.groundTop;
 
-    const thick = (lvl >= 4 && idx % 2 === 1) ? 2 : 1;    // qualche membrana piu' spessa
-    const fullRows = Math.floor((H - 90) / B);            // dal pavimento quasi al soffitto
-    const topGap = Math.random() < 0.45 ? Phaser.Math.Between(1, 2) : 0;  // a volte aperta in alto
-    const rows = Math.max(3, fullRows - topGap);
+    let rows, thick;
+    if (type === 'short') {
+      rows = Phaser.Math.Between(3, 4);                   // scavalcabile con un salto
+      thick = 1;
+    } else {
+      thick = (lvl >= 5) ? 2 : 1;                         // ai livelli alti qualcuna piu' spessa
+      const fullRows = Math.floor((H - 90) / B);          // dal pavimento quasi al soffitto
+      const topGap = Math.random() < 0.4 ? Phaser.Math.Between(1, 2) : 0;
+      rows = Math.max(4, fullRows - topGap);
+    }
     const baseCol = Math.round(mx / B);
 
     for (let tcol = 0; tcol < thick; tcol++) {
@@ -199,36 +218,63 @@ class GameScene extends Phaser.Scene {
       for (let r = 0; r < rows; r++) {
         const y = groundTop - r * B - B / 2;
 
-        // Base sporca, qualche blocco duro piu' in alto col crescere del livello.
-        let type = 'soft';
-        if (r === 0) type = 'dirt';
-        else if (lvl >= 2 && (r + col) % 4 === 0) type = 'hard';
+        // Base sporca, qualche blocco duro piu' in alto (solo sulle membrane piene).
+        let bt = 'soft';
+        if (r === 0) bt = 'dirt';
+        else if (type === 'full' && lvl >= 2 && (r + col) % 4 === 0) bt = 'hard';
 
         let key, hp, bitKey, wax;
-        if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
-        else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
+        if (bt === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
+        else if (bt === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
         else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
 
         const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
         b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
-        b.col = col; b.row = r; b.waxType = type;
+        b.col = col; b.row = r; b.waxType = bt;
         b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
         b.refreshBody();
       }
     }
+    return { x: mx, type: type, rows: rows };
   }
 
-  // Pedane sospese tra le membrane, per saltare e dare verticalita'.
+  // Pedane sospese: una "rampa" davanti a ogni membrana bassa (per scavalcarla con un
+  // salto) + qualche pedana piu' in alto tra le membrane, a volte con un bonus di cerume.
   buildPlatforms() {
+    this.membranes.forEach((m) => {
+      if (m.type !== 'short') return;
+      const px = Math.max(200, m.x - 110);
+      const py = this.groundTop - Phaser.Math.Between(72, 96);
+      this.addPlatform(px, py, 110);
+    });
+
     const xs = this.membraneXs;
     for (let i = 0; i < xs.length - 1; i++) {
-      if (Math.random() < 0.35) continue;          // non in ogni intervallo
+      if (Math.random() < 0.45) continue;          // non in ogni intervallo
       const midX = Math.round((xs[i] + xs[i + 1]) / 2);
-      const py = this.groundTop - Phaser.Math.Between(110, 200);
-      this.addPlatform(midX, py, Phaser.Math.Between(90, 150));
+      const py = this.groundTop - Phaser.Math.Between(150, 215);
+      this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
+      if (Math.random() < 0.6) this.addWaxPickup(midX, py - 26);
     }
-    // Una anche poco prima della prima membrana, come "rampa" iniziale.
-    this.addPlatform(Math.max(220, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 160), 120);
+    // Rampa d'avvio prima della prima membrana.
+    this.addPlatform(Math.max(200, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 150), 120);
+  }
+
+  // Pallina di cerume da raccogliere (premia chi sale sulle pedane). Ondeggia leggera.
+  addWaxPickup(x, y) {
+    const p = this.pickups.create(x, y, 'wax_glob').setDepth(7);
+    p.body.setAllowGravity(false);
+    p.body.setSize(14, 14, true);
+    p.waxValue = 5;
+    this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut' });
+  }
+
+  grabPickup(pk) {
+    if (!pk || !pk.active) return;
+    window.GameState.wax += pk.waxValue;
+    window.Sfx.crack();
+    this.burst('bit_wax', pk.x, pk.y, 6);
+    pk.destroy();
   }
 
   addPlatform(x, y, w) {
@@ -358,7 +404,8 @@ class GameScene extends Phaser.Scene {
     return 'blob';
   }
 
-  spawnEnemy(kind) {
+  spawnEnemy(kind, opts) {
+    opts = opts || {};
     const W = window.CONFIG.WIDTH;
     const H = window.CONFIG.HEIGHT;
     const gh = window.CONFIG.GROUND_H;
@@ -399,12 +446,14 @@ class GameScene extends Phaser.Scene {
       x = Phaser.Math.Clamp(this.goalX - 260, 700, this.worldW - 200);  // fa la guardia al timpano in fondo
       y = restY;                                 // a livello del pavimento
     } else {
-      x = this.pickGroundX();
+      // Posizione fissa (guardiano di una membrana) oppure scelta automatica.
+      x = (opts.x !== undefined) ? Phaser.Math.Clamp(opts.x, 60, this.worldW - 60) : this.pickGroundX();
       y = restY;
     }
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
     e.kind = kind;
+    if (opts.guard !== undefined) { e.guard = true; e.homeX = opts.guard; e.guardRange = 430; }
     e.spawning = true;                            // ancora in fase di comparsa: inerte
     e.setCollideWorldBounds(true);
     if (cfg.fly) e.body.setAllowGravity(false);
@@ -425,6 +474,23 @@ class GameScene extends Phaser.Scene {
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
     if (cfg.fly) this.dropFromCeiling(e, targetScale);
     else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
+    return e;
+  }
+
+  // Mette un nemico di guardia davanti ad alcune membrane piene: resta a presidiare
+  // la membrana finche' il giocatore non si avvicina (vedi la logica "guard" in update).
+  spawnGuardians() {
+    const lvl = window.GameState.level;
+    const ground = ['blob'];
+    if (lvl >= 2) ground.push('crust');
+    if (lvl >= 3) ground.push('spit');
+    (this.membranes || []).forEach((m) => {
+      if (m.type !== 'full') return;
+      if (Math.random() < 0.25) return;            // non tutte ne hanno una
+      const gx = m.x - 70;                         // appena prima della membrana
+      const kind = Phaser.Utils.Array.GetRandom(ground);
+      this.spawnEnemy(kind, { x: gx, guard: gx });
+    });
   }
 
   // Sceglie un punto di spawn a terra appena FUORI dalla visuale, di solito davanti
@@ -897,6 +963,11 @@ class GameScene extends Phaser.Scene {
           const d = Math.hypot(dx, dy) || 1;
           e.setVelocity((dx / d) * e.speed, (dy / d) * e.speed);
           e.setFlipX(dx < 0);
+        } else if (e.guard && Math.abs(this.player.x - e.homeX) > e.guardRange) {
+          // Guardiano in attesa: il giocatore e' lontano, resta a presidiare la membrana.
+          if (Math.abs(e.homeX - e.x) > 8) e.setVelocityX(Math.sign(e.homeX - e.x) * e.speed * 0.5);
+          else e.setVelocityX(0);
+          e.setFlipX(this.player.x < e.x);
         } else {
           // A terra: cammina verso il giocatore.
           const dir = Math.sign(this.player.x - e.x);
