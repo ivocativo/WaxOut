@@ -34,9 +34,12 @@ class GameScene extends Phaser.Scene {
 
     this.drawBackground();
 
-    // Pavimento del condotto (lungo tutto il mondo)
+    // Pavimento del condotto (lungo tutto il mondo). Il rettangolo si estende molto
+    // sotto il bordo del mondo: cosi' anche quando la telecamera "trema" (al colpo)
+    // non compare mai un buco di colore diverso sotto al pavimento. La SUPERFICIE
+    // (parte alta del corpo fisico) resta a H-gh, dove il giocatore appoggia.
     const gh = window.CONFIG.GROUND_H;
-    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh, C.ground).setDepth(4);
+    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2 + 90, this.worldW, gh + 180, C.ground).setDepth(4);
     this.add.rectangle(this.worldW / 2, H - gh, this.worldW, 5, C.groundDark).setDepth(4);
     this.physics.add.existing(this.ground, true);
 
@@ -493,23 +496,28 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // Sceglie un punto di spawn a terra appena FUORI dalla visuale, di solito davanti
-  // al giocatore (verso il timpano), così i nemici "popolano" il corridoio mentre avanzi.
+  // Sceglie un punto di spawn a terra DENTRO la "sezione" attuale del giocatore: cioe'
+  // tra la membrana subito dietro e quella subito davanti. Cosi' i nemici possono
+  // davvero raggiungerlo (non restano bloccati e ammucchiati contro una membrana) e
+  // non compaiono mai addosso al giocatore.
   pickGroundX() {
-    const camW = this.cameras.main.width;
-    const margin = camW * 0.5 + 60;
-    const ahead = Math.random() < 0.7 ? 1 : -1;
-    let x = Phaser.Math.Clamp(this.player.x + ahead * Phaser.Math.Between(margin, margin + 240), 60, this.worldW - 60);
-    // Mai troppo vicino al giocatore: lo spawn "dietro" puo' schiacciarsi sul bordo
-    // del mondo proprio addosso a lui (es. alla partenza). In tal caso, spostalo davanti.
-    if (Math.abs(x - this.player.x) < 240) {
-      x = Phaser.Math.Clamp(this.player.x + margin, 60, this.worldW - 60);
-    }
-    // Evita di farli sbucare dentro una membrana (resterebbero incastrati nei blocchi).
-    for (const mx of (this.membraneXs || [])) {
-      if (Math.abs(x - mx) < 60) { x = Phaser.Math.Clamp(mx + 90, 60, this.worldW - 60); break; }
-    }
-    return x;
+    const px = this.player.x;
+    let left = 40, right = this.worldW - 40;
+    (this.membraneXs || []).forEach((mx) => {
+      if (mx <= px) { if (mx + 80 > left) left = mx + 80; }     // appena dopo la membrana dietro
+      else { if (mx - 80 < right) right = mx - 80; }            // appena prima della membrana davanti
+    });
+    if (right <= left) return Math.round(Phaser.Math.Clamp(px, 40, this.worldW - 40));
+
+    const gap = 200;                                            // distanza minima dal giocatore
+    const aLo = Math.min(px + gap, right), aHi = right;         // davanti
+    const bLo = left, bHi = Math.max(px - gap, left);           // dietro
+    const aOk = aHi - aLo > 20, bOk = bHi - bLo > 20;
+    let x;
+    if (aOk && (Math.random() < 0.7 || !bOk)) x = Phaser.Math.Between(aLo, aHi);
+    else if (bOk) x = Phaser.Math.Between(bLo, bHi);
+    else x = Phaser.Math.Clamp(px + gap, left, right);          // sezione stretta: il meglio possibile
+    return Math.round(x);
   }
 
   // Il nemico sbuca dal pavimento: parte schiacciato a terra e "cresce" in altezza.
@@ -851,9 +859,10 @@ class GameScene extends Phaser.Scene {
     // Il timpano (luce) e' in fondo a destra: il condotto schiarisce mentre avanzi.
     const cx = WW - 220, cy = H * 0.46;
 
-    // Parete scura del condotto (base, per tutta la lunghezza del mondo).
+    // Parete scura del condotto (base). Si estende oltre i bordi alto/basso del mondo
+    // cosi' il tremolio della telecamera non scopre mai aree vuote.
     g.fillStyle(0x5e3528, 1);
-    g.fillRect(0, 0, WW, H);
+    g.fillRect(0, -180, WW, H + 360);
 
     // Gradiente "a tunnel": ellissi concentriche dal buio (ingresso, sinistra) alla
     // luce calda in fondo (timpano, destra). La piu' grande copre tutto il mondo.
@@ -953,6 +962,14 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
+
+      // Nemico rimasto troppo indietro (oltre una membrana gia' superata): non potra'
+      // piu' raggiungere il giocatore, lo rimuoviamo cosi' lo spawner ne crea di nuovi
+      // nella sezione attuale. Boss e guardiani sono esenti.
+      if (!e.guard && e.kind !== 'boss' && (this.player.x - e.x) > this.cameras.main.width * 1.3) {
+        e.destroy();
+        return;
+      }
 
       // Sputatori (Gorgogliante e Boss): lanciano una pallina ogni tanto.
       if (e.nextSpit !== undefined && now >= e.nextSpit && now >= e.knockUntil) {
