@@ -19,28 +19,34 @@ class GameScene extends Phaser.Scene {
     // Ogni livello si parte a vita piena
     window.GameState.player.hp = window.GameState.player.maxHp;
 
-    this.physics.world.setBounds(0, 0, W, H);
-
-    this.drawBackground();
-
-    // Pavimento del condotto
-    const gh = window.CONFIG.GROUND_H;
-    this.ground = this.add.rectangle(W / 2, H - gh / 2, W, gh, C.ground).setDepth(4);
-    this.add.rectangle(W / 2, H - gh, W, 5, C.groundDark).setDepth(4);
-    this.physics.add.existing(this.ground, true);
-
     // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato), altrimenti normale
     const levelNum = window.GameState.level;
     this.levelKind =
       (levelNum % 5 === 0) ? 'boss' :
       (levelNum % 5 === 3) ? 'swarm' : 'normal';
 
+    // Mondo LARGO da attraversare (cresce un po' col livello): la telecamera segue
+    // il giocatore mentre cammina verso il timpano (a destra). W/H restano la
+    // dimensione della "finestra" visibile; il mondo fisico e' molto piu' ampio.
+    this.worldW = Phaser.Math.Clamp(2400 + levelNum * 220, 2400, 5200);
+    if (this.levelKind === 'swarm') this.worldW += 300;
+    this.physics.world.setBounds(0, 0, this.worldW, H);
+
+    this.drawBackground();
+
+    // Pavimento del condotto (lungo tutto il mondo)
+    const gh = window.CONFIG.GROUND_H;
+    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh, C.ground).setDepth(4);
+    this.add.rectangle(this.worldW / 2, H - gh, this.worldW, 5, C.groundDark).setDepth(4);
+    this.physics.add.existing(this.ground, true);
+
     // Gruppi
     this.blocks = this.physics.add.staticGroup();
+    this.platforms = this.physics.add.staticGroup();  // pedane sospese (verticalita')
     this.enemies = this.physics.add.group();
     this.projectiles = this.physics.add.group();  // palline sputate dai nemici
 
-    this.buildWall();
+    this.buildLevel();
 
     // Giocatore (sprite PNG: scala per portarlo alla dimensione di gioco; hitbox invariato)
     this.player = this.physics.add.sprite(80, H - gh - 60, 'player_a').setDepth(10).setScale(1.5);
@@ -48,11 +54,19 @@ class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.blocks);
+    this.physics.add.collider(this.player, this.platforms);
+
+    // La telecamera segue il giocatore dentro al mondo largo.
+    this.cameras.main.setBounds(0, 0, this.worldW, H);
+    this.cameras.main.setRoundPixels(true);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.cameras.main.setDeadzone(160, 120);
 
     // I nemici a terra collidono col pavimento e col muro; i Moscerini volano sopra a tutto.
     const notFlyer = (e) => e.kind !== 'fly';
     this.physics.add.collider(this.enemies, this.ground, null, notFlyer);
     this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
+    this.physics.add.collider(this.enemies, this.platforms, null, notFlyer);
 
     // Le palline sputate feriscono il giocatore e si spappolano contro muro/pavimento.
     this.physics.add.overlap(this.player, this.projectiles, (pl, proj) => {
@@ -60,6 +74,7 @@ class GameScene extends Phaser.Scene {
       this.popProjectile(proj);
     });
     this.physics.add.collider(this.projectiles, this.blocks, (proj) => this.popProjectile(proj));
+    this.physics.add.collider(this.projectiles, this.platforms, (proj) => this.popProjectile(proj));
     this.physics.add.collider(this.projectiles, this.ground, (proj) => this.popProjectile(proj));
 
     if (!this.anims.exists('walk')) {
@@ -103,6 +118,7 @@ class GameScene extends Phaser.Scene {
       this.maxEnemies = Math.min(2 + lvl, 6);
       spawnDelay = Math.max(1500, 2800 - lvl * 150);
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
+      this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
     }
     this.spawnTimer = this.time.addEvent({
       delay: spawnDelay, loop: true,
@@ -130,48 +146,120 @@ class GameScene extends Phaser.Scene {
 
   // ---------- Costruzione livello ----------
 
-  buildWall() {
-    const C = window.CONFIG.COLORS;
-    const B = window.CONFIG.BLOCK;
-    const W = window.CONFIG.WIDTH;
+  // Costruisce il livello "da attraversare": piu' membrane di cerume (muri da
+  // sfondare) lungo il corridoio, qualche pedana per saltare, e il timpano in fondo.
+  buildLevel() {
     const H = window.CONFIG.HEIGHT;
     const gh = window.CONFIG.GROUND_H;
     const lvl = window.GameState.level;
-
-    let cols = Math.min(4 + Math.ceil(lvl / 2), 7);
-    let rows = Math.min(4 + Math.floor(lvl / 3), 6);
-    if (this.levelKind === 'swarm') { cols = Math.max(3, cols - 1); rows = Math.max(3, rows - 1); }
-    const rightX = W - 24 - B / 2;
-    const groundTop = H - gh;
+    this.groundTop = H - gh;
 
     // Disegno del cerume come massa unica gommosa (sopra i blocchi, che restano invisibili).
     this.waxGfx = this.add.graphics().setDepth(6);
 
-    for (let c = 0; c < cols; c++) {
+    // Quante membrane lungo il corridoio: cresce col livello.
+    let count = Phaser.Math.Clamp(2 + Math.floor(lvl / 2), 2, 6);
+    if (this.levelKind === 'swarm') count = Math.max(2, count - 1);
+
+    const firstX = 620;
+    const lastX = this.worldW - 520;              // ultima membrana prima del timpano
+    const span = Math.max(1, lastX - firstX);
+
+    this.membraneXs = [];
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0 : i / (count - 1);
+      const mx = Math.round(firstX + span * t);
+      this.membraneXs.push(mx);
+      this.buildMembrane(mx, lvl, i);
+    }
+    this.buildPlatforms();
+    this.buildGoal();
+
+    this.totalBlocks = this.blocks.countActive(true);
+    this.blocksLeft = this.totalBlocks;
+    this.drawWax();
+  }
+
+  // Una membrana di cerume: una colonna di blocchi dal pavimento verso l'alto che
+  // sbarra il corridoio. Per proseguire bisogna sfondarne un varco (di solito in basso).
+  buildMembrane(mx, lvl, idx) {
+    const B = window.CONFIG.BLOCK;
+    const H = window.CONFIG.HEIGHT;
+    const groundTop = this.groundTop;
+
+    const thick = (lvl >= 4 && idx % 2 === 1) ? 2 : 1;    // qualche membrana piu' spessa
+    const fullRows = Math.floor((H - 90) / B);            // dal pavimento quasi al soffitto
+    const topGap = Math.random() < 0.45 ? Phaser.Math.Between(1, 2) : 0;  // a volte aperta in alto
+    const rows = Math.max(3, fullRows - topGap);
+    const baseCol = Math.round(mx / B);
+
+    for (let tcol = 0; tcol < thick; tcol++) {
+      const col = baseCol + tcol;
+      const x = col * B + B / 2;
       for (let r = 0; r < rows; r++) {
-        const x = rightX - c * B;
         const y = groundTop - r * B - B / 2;
 
+        // Base sporca, qualche blocco duro piu' in alto col crescere del livello.
         let type = 'soft';
-        if (r === 0) type = 'dirt';                          // base sporca
-        else if ((r + c) % 4 === 0 && lvl >= 2) type = 'hard';
-        else if (Math.random() < lvl * 0.05) type = 'hard';
+        if (r === 0) type = 'dirt';
+        else if (lvl >= 2 && (r + col) % 4 === 0) type = 'hard';
 
         let key, hp, bitKey, wax;
-        if (type === 'hard') { key = 'block_hard'; hp = 70 + lvl * 12; bitKey = 'bit_hard'; wax = 6; }
-        else if (type === 'dirt') { key = 'block_dirt'; hp = 50 + lvl * 8; bitKey = 'bit_dirt'; wax = 4; }
-        else { key = 'block_soft'; hp = 30 + lvl * 6; bitKey = 'bit_wax'; wax = 3; }
+        if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
+        else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
+        else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
 
         const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
         b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
-        b.col = c; b.row = r; b.waxType = type;
+        b.col = col; b.row = r; b.waxType = type;
         b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
         b.refreshBody();
       }
     }
-    this.totalBlocks = this.blocks.countActive(true);
-    this.blocksLeft = this.totalBlocks;
-    this.drawWax();
+  }
+
+  // Pedane sospese tra le membrane, per saltare e dare verticalita'.
+  buildPlatforms() {
+    const xs = this.membraneXs;
+    for (let i = 0; i < xs.length - 1; i++) {
+      if (Math.random() < 0.35) continue;          // non in ogni intervallo
+      const midX = Math.round((xs[i] + xs[i + 1]) / 2);
+      const py = this.groundTop - Phaser.Math.Between(110, 200);
+      this.addPlatform(midX, py, Phaser.Math.Between(90, 150));
+    }
+    // Una anche poco prima della prima membrana, come "rampa" iniziale.
+    this.addPlatform(Math.max(220, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 160), 120);
+  }
+
+  addPlatform(x, y, w) {
+    const C = window.CONFIG.COLORS;
+    const h = 16;
+    const r = this.add.rectangle(x, y, w, h, C.ground).setDepth(4);
+    r.setStrokeStyle(2, C.groundDark, 0.85);
+    this.physics.add.existing(r, true);
+    this.platforms.add(r);
+  }
+
+  // Il timpano in fondo a destra: traguardo del livello. Raggiungerlo = vittoria.
+  buildGoal() {
+    const C = window.CONFIG.COLORS;
+    const H = window.CONFIG.HEIGHT;
+    const gh = window.CONFIG.GROUND_H;
+    this.goalX = this.worldW - 150;
+    const cx = this.goalX + 40;
+    const cy = (H - gh) * 0.5;
+    const ah = (H - gh) * 0.92;
+
+    this.add.ellipse(cx, cy, 150, ah, C.eardrum, 0.5).setDepth(2);
+    this.add.ellipse(cx, cy, 112, ah * 0.78, 0xf3b2ad, 0.5).setDepth(2);
+    const core = this.add.ellipse(cx, cy, 72, ah * 0.55, 0xfbe2bf, 0.55).setDepth(3);
+    this.tweens.add({ targets: core, scaleX: 1.15, scaleY: 1.08, alpha: 0.82, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+
+    // Indizio "vai a destra" che fluttua davanti al timpano.
+    const arrow = this.add.text(this.goalX - 70, cy, '>>', {
+      fontFamily: 'monospace', fontSize: '40px', color: '#fff7e8', stroke: '#14161f', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(7).setAlpha(0.85);
+    this.tweens.add({ targets: arrow, x: this.goalX - 36, alpha: 0.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
 
   // Disegna il muro come UN'UNICA massa di cerume gommosa e lucida, sovrapponendo
@@ -301,10 +389,10 @@ class GameScene extends Phaser.Scene {
     const restY = groundTop - (cfg.body[1] * targetScale) / 2;
     let x, y;
     if (cfg.fly) {
-      x = Phaser.Math.Between(W * 0.25, W * 0.6);
+      x = Phaser.Math.Clamp(this.player.x + Phaser.Math.Between(-220, 260), 60, this.worldW - 60);
       y = -24;                                   // parte sopra lo schermo
     } else if (cfg.boss) {
-      x = Phaser.Math.Between(W * 0.55, W * 0.68);
+      x = Phaser.Math.Clamp(this.player.x + 380, 400, this.worldW - 240);  // davanti, verso il timpano
       y = restY;                                 // a livello del pavimento
     } else {
       x = this.pickGroundX();
@@ -335,12 +423,18 @@ class GameScene extends Phaser.Scene {
     else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
   }
 
-  // Sceglie un punto di spawn a terra lontano dal giocatore (mai addosso, mai nel muro).
+  // Sceglie un punto di spawn a terra appena FUORI dalla visuale, di solito davanti
+  // al giocatore (verso il timpano), così i nemici "popolano" il corridoio mentre avanzi.
   pickGroundX() {
-    const W = window.CONFIG.WIDTH;
-    const cands = [W * 0.20, W * 0.33, W * 0.46, W * 0.60];
-    cands.sort((a, b) => Math.abs(b - this.player.x) - Math.abs(a - this.player.x));
-    return cands[Phaser.Math.Between(0, 1)];      // uno dei due più lontani
+    const camW = this.cameras.main.width;
+    const margin = camW * 0.5 + 60;
+    const ahead = Math.random() < 0.7 ? 1 : -1;
+    let x = Phaser.Math.Clamp(this.player.x + ahead * Phaser.Math.Between(margin, margin + 240), 60, this.worldW - 60);
+    // Evita di farli sbucare dentro una membrana (resterebbero incastrati nei blocchi).
+    for (const mx of (this.membraneXs || [])) {
+      if (Math.abs(x - mx) < 60) { x = Phaser.Math.Clamp(mx + 90 * ahead, 60, this.worldW - 60); break; }
+    }
+    return x;
   }
 
   // Il nemico sbuca dal pavimento: parte schiacciato a terra e "cresce" in altezza.
@@ -490,7 +584,6 @@ class GameScene extends Phaser.Scene {
       b.destroy();
       this.blocksLeft = this.blocks.countActive(true);
       this.drawWax();
-      if (this.blocksLeft === 0) this.levelComplete();
     } else {
       window.Sfx.crack();
       this.burst(b.bitKey, b.x, b.y, 3);
@@ -642,7 +735,8 @@ class GameScene extends Phaser.Scene {
     const T = window.I18n;
     this.hpText.setText(T.t('hud_hp', { hp: Math.ceil(p.hp), max: p.maxHp }));
     this.levelText.setText(T.t('hud_level', { n: window.GameState.level }));
-    this.blockText.setText(T.t('hud_wall', { left: this.blocksLeft, total: this.totalBlocks }));
+    const pct = this.goalX ? Phaser.Math.Clamp(Math.round((this.player.x / this.goalX) * 100), 0, 100) : 0;
+    this.blockText.setText(T.t('hud_goal', { pct: pct }));
     this.waxText.setText(T.t('hud_wax', { n: window.GameState.wax }));
   }
 
@@ -676,45 +770,43 @@ class GameScene extends Phaser.Scene {
   // ---------- Sfondo ----------
 
   drawBackground() {
-    const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
+    const WW = this.worldW, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const g = this.add.graphics().setDepth(-10);
 
-    // Centro del condotto: in fondo, verso il timpano (punto luminoso).
-    const cx = W * 0.82, cy = H * 0.44;
+    // Il timpano (luce) e' in fondo a destra: il condotto schiarisce mentre avanzi.
+    const cx = WW - 220, cy = H * 0.46;
 
-    // Parete scura del condotto (base).
-    g.fillStyle(0x6e3f30, 1);
-    g.fillRect(0, 0, W, H);
+    // Parete scura del condotto (base, per tutta la lunghezza del mondo).
+    g.fillStyle(0x5e3528, 1);
+    g.fillRect(0, 0, WW, H);
 
-    // Bagliore caldo "a tunnel": ellissi concentriche dal buio esterno alla luce in fondo.
-    const rings = [
-      [W * 1.90, H * 2.00, 0x7c4736],
-      [W * 1.50, H * 1.60, 0x8d5340],
-      [W * 1.18, H * 1.26, 0xa5654b],
-      [W * 0.90, H * 0.96, 0xbb7657],
-      [W * 0.64, H * 0.70, 0xd08c67],
-      [W * 0.42, H * 0.46, 0xe2a578],
-      [W * 0.26, H * 0.30, 0xf0c293],
-      [W * 0.15, H * 0.18, 0xf8d8b0],
-    ];
-    rings.forEach((r) => { g.fillStyle(r[2], 1); g.fillEllipse(cx, cy, r[0], r[1]); });
+    // Gradiente "a tunnel": ellissi concentriche dal buio (ingresso, sinistra) alla
+    // luce calda in fondo (timpano, destra). La piu' grande copre tutto il mondo.
+    const cols = [0x6e3f30, 0x7c4736, 0x8d5340, 0xa5654b, 0xbb7657, 0xd08c67, 0xe2a578, 0xf0c293, 0xf8d8b0];
+    const n = cols.length;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);                       // 0 = esterno/buio, 1 = interno/luce
+      const rx = (WW * 1.08) * (1 - t) + 130 * t;
+      const ry = (H * 1.15) * (1 - t) + 50 * t;
+      g.fillStyle(cols[i], 1);
+      g.fillEllipse(cx, cy, rx, ry);
+    }
 
     // Anelli di profondita del condotto (sottili e scuri).
-    g.lineStyle(7, 0x4f2c20, 0.13);
-    for (let i = 1; i <= 5; i++) g.strokeEllipse(cx, cy, W * 0.34 * i, H * 0.38 * i);
+    g.lineStyle(6, 0x4f2c20, 0.12);
+    for (let i = 1; i <= 6; i++) g.strokeEllipse(cx, cy, WW * 0.16 * i, H * 0.22 * i);
 
-    // Pieghe carnose lungo i bordi (translucide).
-    g.fillStyle(0x5a3322, 0.16);
-    for (let i = 0; i < 5; i++) g.fillEllipse(W * 0.30, 70 + i * 110, W * 1.2, 64);
-
-    // Membrana del timpano in fondo, appena accennata.
-    g.fillStyle(C.eardrum, 0.18);
-    g.fillEllipse(cx, cy, W * 0.20, H * 0.34);
+    // Pieghe carnose lungo i bordi, ripetute per tutta la lunghezza.
+    g.fillStyle(0x5a3322, 0.14);
+    for (let x = 120; x < WW; x += 280) {
+      g.fillEllipse(x, 64, 360, 70);
+      g.fillEllipse(x + 140, H - 64, 360, 70);
+    }
 
     // Alone luminoso del timpano che "respira".
-    this.bgGlow = this.add.ellipse(cx, cy, W * 0.22, H * 0.26, 0xfbe2bf, 0.28).setDepth(-9);
+    this.bgGlow = this.add.ellipse(cx, cy, 240, H * 0.5, 0xfbe2bf, 0.22).setDepth(-9);
     this.tweens.add({
-      targets: this.bgGlow, scaleX: 1.18, scaleY: 1.18, alpha: 0.42,
+      targets: this.bgGlow, scaleX: 1.16, scaleY: 1.16, alpha: 0.34,
       duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.inOut',
     });
   }
@@ -726,6 +818,9 @@ class GameScene extends Phaser.Scene {
     const p = window.GameState.player;
     const k = this.keys;
     const now = time;
+
+    // Traguardo: raggiunto il timpano in fondo al condotto = livello completato.
+    if (this.player.x >= this.goalX) { this.levelComplete(); return; }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
     if (onGround) this.jumpsLeft = p.doubleJump ? 2 : 1;

@@ -30,7 +30,9 @@ connessione né alcun server.
 > Su telefono/tablet i comandi a schermo compaiono da soli. Da PC puoi vederli
 > aggiungendo `?touch=1` in fondo all'indirizzo.
 
-Obiettivo: **distruggi tutti i blocchi del muro di cerume** per completare il livello.
+Obiettivo: **attraversa il condotto da sinistra verso il timpano** (a destra),
+**sfondando le membrane di cerume** che sbarrano il passaggio. Raggiungere il timpano
+in fondo completa il livello. La barra in alto ("Timpano: %") indica quanto manca.
 Occhio ai nemici:
 - **Cerumino** — blob veloce, danno al contatto
 - **Crosta** — sporco lento ma resistente
@@ -73,7 +75,7 @@ generate con `this.load.image(...)` in `BootScene` servendo la cartella via HTTP
 
 ## 🗺️ Stato del progetto
 
-Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-25._
+Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-27._
 
 **Fatto finora:**
 - Comandi **touch** a schermo (pad direzionale, salto, attacco, scatto) per giocare da cellulare
@@ -82,11 +84,17 @@ Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-25._
 - **Banca permanente** del cerume (salvataggio nel browser) e **negozio** di potenziamenti permanenti
 - **Varietà di nemici e livelli**: Gorgogliante (sputatore), Moscerino (volante), boss
   "Tappo di Cerume" ogni 5 livelli, livelli "Sciame", cartelli per i livelli speciali
+- **Livelli esplorabili** (scrolling): il condotto è un mondo largo che attraversi da
+  sinistra verso il **timpano**, con **telecamera che segue**, **membrane di cerume** da
+  sfondare lungo il percorso e **pedane** per saltare. Si vince **raggiungendo il timpano**.
 
 **Prossimi passi (in ordine):**
-1. Musica di sottofondo e miglioramento degli effetti audio
-2. Ancora più varietà: nuovi eventi e potenziamenti
-3. Impacchettamento con **Capacitor** → app Android per Google Play
+1. Grafica definitiva: sprite mancanti (Moscerino, Gorgogliante, boss) e poi
+   **animazioni** dei personaggi (camminata/salto/attacco) — da fare *dopo* aver
+   bloccato l'aspetto, per non rifarle due volte
+2. Restyle dei menu (Menu/Negozio/Pausa/Potenziamenti/game-over) col look "viscido"
+3. Musica di sottofondo e miglioramento degli effetti audio
+4. Impacchettamento con **Capacitor** → app Android per Google Play
 
 **Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e tablet Android).
 
