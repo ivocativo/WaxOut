@@ -39,6 +39,7 @@ window.I18n = (function () {
       game_boss_in: '!  THE WAX PLUG APPROACHES  !',
       game_swarm_in: 'SWARM INCOMING!',
       game_goal: 'REACH THE EARDRUM  >>',
+      game_boss_guard: 'DEFEAT THE WAX PLUG TO BREAK THROUGH!',
       game_boss_dead: 'WAX PLUG DESTROYED!  +{wax}',
       // --- Livello completato ---
       done_title: 'LEVEL {n} COMPLETE!',
@@ -123,6 +124,7 @@ window.I18n = (function () {
       game_boss_in: '!  ARRIVA IL TAPPO DI CERUME  !',
       game_swarm_in: 'SCIAME IN ARRIVO!',
       game_goal: 'RAGGIUNGI IL TIMPANO  >>',
+      game_boss_guard: 'SCONFIGGI IL TAPPO DI CERUME PER PASSARE!',
       game_boss_dead: 'TAPPO DI CERUME DISTRUTTO!  +{wax}',
       // --- Livello completato ---
       done_title: 'LIVELLO {n} COMPLETATO!',

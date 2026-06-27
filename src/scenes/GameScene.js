@@ -389,10 +389,14 @@ class GameScene extends Phaser.Scene {
     const restY = groundTop - (cfg.body[1] * targetScale) / 2;
     let x, y;
     if (cfg.fly) {
-      x = Phaser.Math.Clamp(this.player.x + Phaser.Math.Between(-220, 260), 60, this.worldW - 60);
+      // Cala dal soffitto a distanza onesta dal giocatore (mai addosso alla partenza),
+      // di solito davanti a lui verso il timpano.
+      const camW = this.cameras.main.width;
+      const ahead = Math.random() < 0.7 ? 1 : -1;
+      x = Phaser.Math.Clamp(this.player.x + ahead * Phaser.Math.Between(camW * 0.30, camW * 0.5), 60, this.worldW - 60);
       y = -24;                                   // parte sopra lo schermo
     } else if (cfg.boss) {
-      x = Phaser.Math.Clamp(this.player.x + 380, 400, this.worldW - 240);  // davanti, verso il timpano
+      x = Phaser.Math.Clamp(this.goalX - 260, 700, this.worldW - 200);  // fa la guardia al timpano in fondo
       y = restY;                                 // a livello del pavimento
     } else {
       x = this.pickGroundX();
@@ -820,7 +824,13 @@ class GameScene extends Phaser.Scene {
     const now = time;
 
     // Traguardo: raggiunto il timpano in fondo al condotto = livello completato.
-    if (this.player.x >= this.goalX) { this.levelComplete(); return; }
+    // Nei livelli boss il timpano resta "sbarrato" finche' il Tappo di Cerume e' vivo.
+    if (this.player.x >= this.goalX) {
+      const bossBlocking = this.levelKind === 'boss' &&
+        this.enemies.getChildren().some((e) => e.active && e.kind === 'boss');
+      if (!bossBlocking) { this.levelComplete(); return; }
+      if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard'), '#ffb04a'); }
+    }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
     if (onGround) this.jumpsLeft = p.doubleJump ? 2 : 1;
