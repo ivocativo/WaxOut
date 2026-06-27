@@ -3,14 +3,17 @@
 class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
-  // Sprite PNG disegnati a mano (assets/sprites/). Quelli non ancora pronti
-  // restano generati da codice in create().
+  // Sprite PNG disegnati a mano. Sono INCORPORATI come data URI (src/sprites_data.js)
+  // cosi' si caricano anche aprendo index.html da file:// (i browser bloccano i PNG
+  // esterni in locale). Fallback al file su disco se i dati incorporati mancano.
   preload() {
-    this.load.image('player_a', 'assets/sprites/hero_idle.png');
-    this.load.image('player_b', 'assets/sprites/hero_idle.png');   // walk = idle finche' non c'e' il frame di corsa
-    this.load.image('enemy_blob', 'assets/sprites/cerumino.png');
-    this.load.image('enemy_crust', 'assets/sprites/crosta.png');
-    this.load.image('wax_glob', 'assets/sprites/wax_glob.png');
+    const D = window.SPRITE_DATA || {};
+    const img = (key, name, file) => this.load.image(key, D[name] || ('assets/sprites/' + file));
+    img('player_a', 'hero_idle', 'hero_idle.png');
+    img('player_b', 'hero_idle', 'hero_idle.png');   // walk = idle finche' non c'e' il frame di corsa
+    img('enemy_blob', 'cerumino', 'cerumino.png');
+    img('enemy_crust', 'crosta', 'crosta.png');
+    img('wax_glob', 'wax_glob', 'wax_glob.png');
   }
 
   create() {

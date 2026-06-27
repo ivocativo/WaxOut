@@ -500,9 +500,14 @@ class GameScene extends Phaser.Scene {
     const margin = camW * 0.5 + 60;
     const ahead = Math.random() < 0.7 ? 1 : -1;
     let x = Phaser.Math.Clamp(this.player.x + ahead * Phaser.Math.Between(margin, margin + 240), 60, this.worldW - 60);
+    // Mai troppo vicino al giocatore: lo spawn "dietro" puo' schiacciarsi sul bordo
+    // del mondo proprio addosso a lui (es. alla partenza). In tal caso, spostalo davanti.
+    if (Math.abs(x - this.player.x) < 240) {
+      x = Phaser.Math.Clamp(this.player.x + margin, 60, this.worldW - 60);
+    }
     // Evita di farli sbucare dentro una membrana (resterebbero incastrati nei blocchi).
     for (const mx of (this.membraneXs || [])) {
-      if (Math.abs(x - mx) < 60) { x = Phaser.Math.Clamp(mx + 90 * ahead, 60, this.worldW - 60); break; }
+      if (Math.abs(x - mx) < 60) { x = Phaser.Math.Clamp(mx + 90, 60, this.worldW - 60); break; }
     }
     return x;
   }
