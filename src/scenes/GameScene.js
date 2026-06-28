@@ -103,6 +103,26 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.projectiles, this.platforms, popProj);
     this.physics.add.collider(this.projectiles, this.ground, popProj);
 
+    // Getto di acqua e sapone del giocatore: pulisce il cerume e colpisce i nemici a
+    // distanza. (Con overlap(gruppo, oggetto) Phaser puo' invertire gli argomenti:
+    // individuiamo sempre il proiettile-getto dal gruppo this.shots.)
+    this.makeSoapTexture();
+    this.shots = this.physics.add.group({ allowGravity: false });
+    const hitWax = (a, b) => {
+      const sh = this.shots.contains(a) ? a : b, bl = (sh === a) ? b : a;
+      this.damageBlock(bl, sh.dmg); this.popShot(sh);
+    };
+    const hitFoe = (a, b) => {
+      const sh = this.shots.contains(a) ? a : b, en = (sh === a) ? b : a;
+      if (en.spawning) return;
+      this.damageEnemy(en, sh.dmg); this.popShot(sh);
+    };
+    const hitSolid = (a, b) => this.popShot(this.shots.contains(a) ? a : b);
+    this.physics.add.overlap(this.shots, this.blocks, hitWax);
+    this.physics.add.overlap(this.shots, this.enemies, hitFoe);
+    this.physics.add.overlap(this.shots, this.platforms, hitSolid);
+    this.physics.add.overlap(this.shots, this.ground, hitSolid);
+
     if (!this.anims.exists('walk')) {
       this.anims.create({
         key: 'walk',
@@ -117,13 +137,15 @@ class GameScene extends Phaser.Scene {
     // Comandi a schermo per telefono/tablet (vuoti su PC).
     this.touch = window.TouchControls.attach(this);
 
-    // Su PC (mouse, niente touch): clic per attaccare. Su mobile usa il
-    // pulsante dedicato, così toccare il pad direzionale non fa attaccare.
+    // Tempi di ricarica di getto (a distanza) e coton fioc (corpo a corpo).
+    this.lastShot = 0;
+    this.pcFiring = false;
+
+    // Su PC (mouse, niente touch): tieni premuto il clic per spruzzare il getto.
+    // Su mobile si usa il pulsante "Spruzza" dedicato.
     if (!this.touch.enabled) {
-      this.input.on('pointerdown', () => {
-        window.Sfx.unlock();
-        if (!this.locked) this.tryAttack();
-      });
+      this.input.on('pointerdown', () => { window.Sfx.unlock(); this.pcFiring = true; });
+      this.input.on('pointerup', () => { this.pcFiring = false; });
     }
 
     // Nemici iniziali + spawner periodico (variano col tipo di livello)
@@ -533,31 +555,73 @@ class GameScene extends Phaser.Scene {
 
   // ---------- Combattimento ----------
 
-  tryAttack() {
+  // Texture procedurale per la pallina del getto (acqua e sapone): nessun file.
+  makeSoapTexture() {
+    if (this.textures.exists('soap')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x9fd8ff, 1); g.fillCircle(7, 7, 6);
+    g.fillStyle(0xffffff, 0.85); g.fillCircle(5, 5, 2.4);
+    g.generateTexture('soap', 14, 14);
+    g.destroy();
+  }
+
+  // Spruzza un getto di acqua e sapone nella direzione di mira (8 direzioni):
+  // pulisce il cerume e colpisce i nemici a distanza.
+  fireJet(adx, ady) {
     const now = this.time.now;
     const p = window.GameState.player;
-    if (now - this.lastAttack < p.attackCooldown) return;
-    this.lastAttack = now;
-    window.Sfx.hit();
+    if (now - this.lastShot < p.shotCooldown) return;
+    this.lastShot = now;
+    const d = Math.hypot(adx, ady) || 1;
+    const nx = adx / d, ny = ady / d;
+    const sp = 580;
+    const s = this.shots.create(this.player.x + nx * 18, this.player.y - 6 + ny * 14, 'soap').setDepth(9);
+    s.body.setAllowGravity(false);
+    s.body.setSize(10, 10, true);
+    s.setVelocity(nx * sp, ny * sp);
+    s.dmg = p.jetDamage;
+    window.Sfx.spray();
+    this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
+  }
 
+  popShot(s) {
+    if (!s || !s.active) return;
+    this.splat(s.x, s.y, 'soft');
+    s.destroy();
+  }
+
+  // Coton fioc automatico: se un nemico e' troppo vicino, da' una bastonata da solo.
+  autoMelee(now) {
+    const p = window.GameState.player;
+    if (now - this.lastAttack < p.attackCooldown) return;
+    const px = this.player.x, py = this.player.y;
+    let target = null;
+    this.enemies.getChildren().forEach((e) => {
+      if (!e.active || e.spawning) return;
+      if (Math.abs(e.x - px) < 52 && Math.abs(e.y - py) < 54) target = e;
+    });
+    if (!target) return;
+    this.lastAttack = now;
+    this.facing = Math.sign(target.x - px) || this.facing;
+    this.meleeSwing();
+  }
+
+  // Il colpo corpo a corpo vero e proprio (coton fioc, o martello se sbloccato).
+  meleeSwing() {
+    const p = window.GameState.player;
+    window.Sfx.hit();
     const isHammer = p.weapon === 'hammer';
     const baseRange = isHammer ? 64 : 50;
     const range = baseRange * p.attackRange;
     const halfH = isHammer ? 46 : 30;
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
     const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH, range, halfH * 2);
-
     this.showWeaponSwing(this.facing, isHammer);
-
     this.blocks.getChildren().forEach((b) => {
-      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) {
-        this.damageBlock(b, p.damage);
-      }
+      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) this.damageBlock(b, p.damage);
     });
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) {
-        this.damageEnemy(e, p.damage);
-      }
+      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) this.damageEnemy(e, p.damage);
     });
   }
 
@@ -784,11 +848,10 @@ class GameScene extends Phaser.Scene {
     if (now < this.dashUntil) vx = this.facing * p.moveSpeed * 2.4;
     this.player.setVelocityX(vx);
 
-    // Salto (con doppio salto)
+    // Salto (con doppio salto). Tasto DEDICATO: Spazio o pulsante a schermo.
+    // (Su/freccia su NON saltano piu': servono a mirare il getto verso l'alto.)
     const jumpPressed =
-      Phaser.Input.Keyboard.JustDown(k.W) ||
       Phaser.Input.Keyboard.JustDown(k.SPACE) ||
-      Phaser.Input.Keyboard.JustDown(k.UP) ||
       this.touch.jumpQueued;
     this.touch.jumpQueued = false;
     if (jumpPressed && this.jumpsLeft > 0) {
@@ -807,9 +870,19 @@ class GameScene extends Phaser.Scene {
       window.Sfx.dash();
     }
 
-    // Attacco
-    if (Phaser.Input.Keyboard.JustDown(k.J) || this.touch.attackQueued) { window.Sfx.unlock(); this.tryAttack(); }
-    this.touch.attackQueued = false;
+    // Mira del getto (8 direzioni): orizzontale = verso dove guardi; su/giu coi tasti
+    // (frecce su/giu o W/S, oppure pad a schermo). Da fermo si mira dritto su/giu.
+    const aimUp = k.UP.isDown || k.W.isDown || this.touch.aimUp;
+    const aimDown = k.DOWN.isDown || k.S.isDown || this.touch.aimDown;
+    let adx = this.facing, ady = 0;
+    if (aimUp) ady = -1; else if (aimDown) ady = 1;
+    if (ady !== 0 && !left && !right) adx = 0;
+
+    // Spruzza (tieni premuto): getto di acqua e sapone a ripetizione.
+    if (k.J.isDown || this.touch.sprayHeld || this.pcFiring) { window.Sfx.unlock(); this.fireJet(adx, ady); }
+
+    // Coton fioc automatico se un nemico e' troppo vicino.
+    this.autoMelee(now);
 
     // Animazione
     this.player.setFlipX(this.facing < 0);

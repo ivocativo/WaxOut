@@ -1,9 +1,10 @@
 // Comandi a schermo (touch) per giocare da telefono o tablet.
 // window.TouchControls.attach(scene) disegna i pulsanti fissi sullo schermo e
 // restituisce un oggetto-stato che GameScene legge nel suo update().
-//   - left / right : true mentre il dito tiene premuto il pad direzionale
-//   - jumpQueued / attackQueued / dashQueued : impulso singolo (consumato e
-//     azzerato da update dopo averlo letto)
+//   - left / right / aimUp / aimDown / sprayHeld : true mentre il dito tiene
+//     premuto il pulsante (movimento, mira verticale del getto, spruzzo continuo)
+//   - jumpQueued / dashQueued : impulso singolo (consumato e azzerato da update
+//     dopo averlo letto)
 //   - enabled : false su dispositivi senza touch (PC), così GameScene può
 //     riattivare il "clic per attaccare" del mouse.
 window.TouchControls = (function () {
@@ -30,15 +31,21 @@ window.TouchControls = (function () {
       g.fillTriangle(x - s, y, x + s * 0.7, y - s, x + s * 0.7, y + s);
     } else if (type === 'right') {
       g.fillTriangle(x + s, y, x - s * 0.7, y - s, x - s * 0.7, y + s);
-    } else if (type === 'up') {
+    } else if (type === 'up') {                       // mira in alto
       g.fillTriangle(x, y - s, x - s, y + s * 0.7, x + s, y + s * 0.7);
-    } else if (type === 'attack') {
-      g.fillPoints([
-        new Phaser.Geom.Point(x, y - s * 1.15),
-        new Phaser.Geom.Point(x + s * 0.85, y),
-        new Phaser.Geom.Point(x, y + s * 1.15),
-        new Phaser.Geom.Point(x - s * 0.85, y),
-      ], true);
+    } else if (type === 'down') {                     // mira in basso
+      g.fillTriangle(x, y + s, x - s, y - s * 0.7, x + s, y - s * 0.7);
+    } else if (type === 'jump') {                     // salto: freccia su + base
+      g.fillTriangle(x, y - s * 1.1, x - s * 0.85, y, x + s * 0.85, y);
+      g.fillRect(x - s * 0.45, y, s * 0.9, s * 0.9);
+      g.fillRect(x - s * 0.9, y + s * 0.9, s * 1.8, s * 0.45);
+    } else if (type === 'spray') {                    // spruzzo: gocce che si aprono a ventaglio
+      g.fillCircle(x - s * 0.7, y + s * 0.5, s * 0.34);
+      g.fillCircle(x, y + s * 0.8, s * 0.30);
+      g.fillCircle(x + s * 0.7, y + s * 0.5, s * 0.34);
+      g.fillCircle(x - s * 0.3, y - s * 0.2, s * 0.26);
+      g.fillCircle(x + s * 0.3, y - s * 0.2, s * 0.26);
+      g.fillCircle(x, y - s * 0.9, s * 0.22);
     } else if (type === 'dash') {
       g.fillTriangle(x - s, y - s, x, y, x - s, y + s);
       g.fillTriangle(x, y - s, x + s, y, x, y + s);
@@ -65,19 +72,19 @@ window.TouchControls = (function () {
     const state = {
       enabled: false,
       left: false, right: false,
-      jumpQueued: false, attackQueued: false, dashQueued: false,
+      aimUp: false, aimDown: false,        // mira verticale del getto
+      sprayHeld: false,                     // tenuto premuto = spruzza in continuo
+      jumpQueued: false, dashQueued: false, // impulsi singoli
     };
     if (!isTouchDevice(scene)) return state;
     state.enabled = true;
 
     // Assicura abbastanza "puntatori" per piu dita contemporanee
-    // (muovi + salta + attacca). Idempotente tra un restart e l'altro.
-    const need = 4 - scene.input.manager.pointersTotal;
+    // (muovi + mira + salta + spruzza). Idempotente tra un restart e l'altro.
+    const need = 5 - scene.input.manager.pointersTotal;
     if (need > 0) scene.input.addPointer(need);
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
-    const r = 52;
-    const bottom = H - r - 18;
 
     function holdBtn(arc, key) {
       arc.on('pointerdown', () => { window.Sfx.unlock(); state[key] = true; press(arc, true); });
@@ -90,17 +97,23 @@ window.TouchControls = (function () {
       arc.on('pointerout', () => press(arc, false));
     }
 
-    // Sinistra: direzioni
-    holdBtn(button(scene, r + 22, bottom, r, 'left'), 'left');
-    holdBtn(button(scene, r * 3 + 40, bottom, r, 'right'), 'right');
+    // SINISTRA: pad a croce. Sinistra/Destra muovono; Su/Giu mirano il getto
+    // (combinati col movimento danno le diagonali).
+    const dr = 40;                          // raggio dei tasti del pad
+    const dcx = 116, dcy = H - 112;         // centro della croce
+    holdBtn(button(scene, dcx - 58, dcy, dr, 'left'), 'left');
+    holdBtn(button(scene, dcx + 58, dcy, dr, 'right'), 'right');
+    holdBtn(button(scene, dcx, dcy - 64, dr, 'up'), 'aimUp');
+    holdBtn(button(scene, dcx, dcy + 64, dr, 'down'), 'aimDown');
 
-    // Destra: azioni
-    tapBtn(button(scene, W - r - 22, bottom, r, 'attack'), 'attackQueued');
-    tapBtn(button(scene, W - r * 3 - 40, bottom + 6, r, 'up'), 'jumpQueued');
+    // DESTRA: Spruzza (tieni premuto) + Salto (dedicato).
+    const ar = 50;
+    holdBtn(button(scene, W - ar * 3 - 30, H - ar - 26, ar, 'spray'), 'sprayHeld');
+    tapBtn(button(scene, W - ar - 22, H - ar - 26, ar, 'jump'), 'jumpQueued');
 
-    // Scatto: solo se gia sbloccato
+    // Scatto: solo se gia sbloccato (sopra il Salto).
     if (window.GameState.player && window.GameState.player.dash) {
-      tapBtn(button(scene, W - r - 22, bottom - r * 2 - 16, r * 0.82, 'dash'), 'dashQueued');
+      tapBtn(button(scene, W - ar - 22, H - ar * 3 - 42, ar * 0.82, 'dash'), 'dashQueued');
     }
 
     return state;

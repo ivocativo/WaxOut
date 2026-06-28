@@ -239,6 +239,8 @@ window.Sfx = (function () {
     enemyDie() { slide(230, 50, 0.24, 'sawtooth', 0.06); noise(0.12, 0.05, 800); },
     // sputo: "ptu!"
     spit() { slide(600, 260, 0.06, 'triangle', 0.045); noise(0.06, 0.035, 1500); },
+    // getto di acqua e sapone: "pfff" pulito e arioso
+    spray() { noise(0.1, 0.045, 3200); slide(760, 520, 0.07, 'triangle', 0.02); },
     // cerume raccolto: "bloop" allegro
     pick() { slide(500, 860, 0.1, 'sine', 0.05); },
     // livello completato: piccola fanfara

@@ -62,11 +62,14 @@ window.GameState = {
       damage: 26 + lv('dmg') * U.dmg.per,
       moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
-      attackCooldown: 360,  // ms
-      attackRange: 1,        // moltiplicatore portata
+      attackCooldown: 360,  // ms (coton fioc, corpo a corpo automatico)
+      attackRange: 1,        // moltiplicatore portata corpo a corpo
+      // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
+      jetDamage: 16 + lv('dmg') * U.dmg.per * 0.5,  // un po' sotto al corpo a corpo
+      shotCooldown: 200,     // ms tra uno spruzzo e l'altro
       doubleJump: lv('djump') > 0,
       dash: false,
-      weapon: 'swab',        // 'swab' | 'hammer'
+      weapon: 'swab',        // 'swab' | 'hammer' (corpo a corpo)
     };
   },
 
