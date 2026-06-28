@@ -15,6 +15,7 @@ class GameScene extends Phaser.Scene {
     this.dashReady = 0;
     this.dashUntil = 0;
     this.jumpsLeft = 1;
+    this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // Ogni livello si parte a vita piena
     window.GameState.player.hp = window.GameState.player.maxHp;
@@ -226,11 +227,16 @@ class GameScene extends Phaser.Scene {
       this.membranes.push(info);
       this.membraneXs.push(mx);
     }
+    this.buildMounds();          // cumuli di cerume su pavimento e soffitto
     this.buildPlatforms();
     this.buildGoal();
 
     this.totalBlocks = this.blocks.countActive(true);
     this.blocksLeft = this.totalBlocks;
+    // Cerume totale del livello (per la percentuale "pulito" — vedi HUD).
+    this.totalWax = 0;
+    this.blocks.getChildren().forEach((b) => { if (b.active) this.totalWax += b.waxValue; });
+    this.cleanedWax = 0;
     this.drawWax();
   }
 
@@ -278,6 +284,64 @@ class GameScene extends Phaser.Scene {
       }
     }
     return { x: mx, type: type, rows: rows };
+  }
+
+  // Crea un singolo blocco di cerume alla colonna/riga date (riga 0 = pavimento, su = verso il soffitto).
+  addWaxBlock(col, row, lvl, type) {
+    const B = window.CONFIG.BLOCK;
+    const x = col * B + B / 2;
+    const y = this.groundTop - row * B - B / 2;
+    let key, hp, bitKey, wax;
+    if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
+    else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
+    else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
+    const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
+    b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
+    b.col = col; b.row = row; b.waxType = type;
+    b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
+    b.refreshBody();
+    return b;
+  }
+
+  // Sparge cumuli di cerume lungo il condotto: pilette sul pavimento (da scavalcare o
+  // pulire) e stalattiti appese al soffitto (si puliscono mirando il getto in alto).
+  // La quantita' cresce col livello: piu' avanti = piu' sporco.
+  buildMounds() {
+    const lvl = window.GameState.level;
+    const floorCount = Phaser.Math.Clamp(3 + lvl, 3, 14);
+    const ceilCount = Phaser.Math.Clamp(2 + Math.floor(lvl * 0.8), 2, 12);
+    const minX = 320, maxX = this.worldW - 360;
+    for (let i = 0; i < floorCount; i++) this.buildFloorMound(Phaser.Math.Between(minX, maxX), lvl);
+    for (let i = 0; i < ceilCount; i++) this.buildCeilingMound(Phaser.Math.Between(minX, maxX), lvl);
+  }
+
+  // Piletta sul pavimento: base larga che si restringe verso l'alto (scavalcabile).
+  buildFloorMound(mx, lvl) {
+    const B = window.CONFIG.BLOCK;
+    const baseCol = Math.round(mx / B);
+    const w = Phaser.Math.Between(2, 3);
+    const h = Phaser.Math.Between(1, 2);
+    for (let r = 0; r < h; r++) {
+      const span = Math.max(1, w - r);
+      for (let c = 0; c < span; c++) {
+        const type = (r === 0) ? 'dirt' : (lvl >= 4 && Math.random() < 0.2 ? 'hard' : 'soft');
+        this.addWaxBlock(baseCol + c, r, lvl, type);
+      }
+    }
+  }
+
+  // Stalattite appesa al soffitto: larga in alto, a punta verso il basso.
+  buildCeilingMound(mx, lvl) {
+    const B = window.CONFIG.BLOCK;
+    const topRow = Math.floor((window.CONFIG.HEIGHT - window.CONFIG.GROUND_H) / B) - 1;
+    const baseCol = Math.round(mx / B);
+    const w = Phaser.Math.Between(2, 3);
+    const depth = Phaser.Math.Between(1, 2 + Math.floor(lvl / 3));
+    for (let d = 0; d < depth; d++) {
+      const span = w - d;
+      if (span <= 0) break;
+      for (let c = 0; c < span; c++) this.addWaxBlock(baseCol + c, topRow - d, lvl, 'soft');
+    }
   }
 
   // Pedane sospese: una "rampa" davanti a ogni membrana bassa (per scavalcarla con un
@@ -635,6 +699,7 @@ class GameScene extends Phaser.Scene {
       this.burst(b.bitKey, b.x, b.y, 14);
       this.splat(b.x, b.y, b.waxType);
       window.GameState.wax += b.waxValue;
+      this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito"
       b.destroy();
       this.blocksLeft = this.blocks.countActive(true);
       this.drawWax();
@@ -689,6 +754,14 @@ class GameScene extends Phaser.Scene {
   burst(key, x, y, n) { window.GameGfx.burst(this, key, x, y, n); }
 
   // ---------- Esiti del livello ----------
+
+  // Sei arrivato al timpano ma non hai pulito abbastanza: avviso (non piu' di una
+  // volta ogni 4s) che dice quanta percentuale serve.
+  cleanHint(now) {
+    if (this._cleanHintAt && now - this._cleanHintAt < 4000) return;
+    this._cleanHintAt = now;
+    this.showBanner(window.I18n.t('game_clean_more', { pct: Math.round(this.cleanGoal * 100) }), '#9be870');
+  }
 
   levelComplete() {
     if (this.locked) return;
@@ -782,8 +855,8 @@ class GameScene extends Phaser.Scene {
     const T = window.I18n;
     this.hpText.setText(T.t('hud_hp', { hp: Math.ceil(p.hp), max: p.maxHp }));
     this.levelText.setText(T.t('hud_level', { n: window.GameState.level }));
-    const pct = this.goalX ? Phaser.Math.Clamp(Math.round((this.player.x / this.goalX) * 100), 0, 100) : 0;
-    this.blockText.setText(T.t('hud_goal', { pct: pct }));
+    const pct = this.totalWax ? Phaser.Math.Clamp(Math.round((this.cleanedWax / this.totalWax) * 100), 0, 100) : 100;
+    this.blockText.setText(T.t('hud_clean', { pct: pct }));
     this.waxText.setText(T.t('hud_wax', { n: window.GameState.wax }));
   }
 
@@ -827,13 +900,19 @@ class GameScene extends Phaser.Scene {
     const k = this.keys;
     const now = time;
 
-    // Traguardo: raggiunto il timpano in fondo al condotto = livello completato.
+    // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
     // Nei livelli boss il timpano resta "sbarrato" finche' il Tappo di Cerume e' vivo.
     if (this.player.x >= this.goalX) {
+      const cleanPct = this.totalWax ? (this.cleanedWax / this.totalWax) : 1;
       const bossBlocking = this.levelKind === 'boss' &&
         this.enemies.getChildren().some((e) => e.active && e.kind === 'boss');
-      if (!bossBlocking) { this.levelComplete(); return; }
-      if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard'), '#ffb04a'); }
+      if (cleanPct < this.cleanGoal) {
+        this.cleanHint(now);                       // sei al timpano ma manca cerume da pulire
+      } else if (bossBlocking) {
+        if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard'), '#ffb04a'); }
+      } else {
+        this.levelComplete(); return;
+      }
     }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
