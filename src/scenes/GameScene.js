@@ -30,7 +30,10 @@ class GameScene extends Phaser.Scene {
     // dimensione della "finestra" visibile; il mondo fisico e' molto piu' ampio.
     this.worldW = Phaser.Math.Clamp(2400 + levelNum * 220, 2400, 5200);
     if (this.levelKind === 'swarm') this.worldW += 300;
-    this.physics.world.setBounds(0, 0, this.worldW, H);
+    // Il "fondo" del mondo fisico coincide con la SUPERFICIE del pavimento (H-gh):
+    // rete di sicurezza: chi ha collideWorldBounds (giocatore e nemici) non puo' mai
+    // cadere sotto il pavimento, qualunque cosa accada al suo corpo fisico.
+    this.physics.world.setBounds(0, 0, this.worldW, H - window.CONFIG.GROUND_H);
 
     this.drawBackground();
 
