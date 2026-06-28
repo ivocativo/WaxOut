@@ -78,6 +78,10 @@ class MenuScene extends Phaser.Scene {
     langBtn.on('pointerout', () => langBtn.setStyle({ backgroundColor: '#ffd166' }));
     langBtn.on('pointerdown', () => { window.Sfx.unlock(); T.next(); this.scene.restart(); });
 
+    // Controlli audio: volume (cicla pieno/basso/muto) e musica on/off, in alto a sinistra.
+    window.Sfx.addAudioButton(this, 28, 26);
+    window.Sfx.addMusicButton(this, 68, 26);
+
     this.input.keyboard.once('keydown-ENTER', begin);
     this.input.keyboard.once('keydown-SPACE', begin);
     this.input.keyboard.once('keydown-N', openShop);

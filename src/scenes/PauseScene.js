@@ -28,6 +28,10 @@ class PauseScene extends Phaser.Scene {
     this.mkButton(W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel());
     this.mkButton(W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu());
 
+    // Controlli audio: volume (cicla pieno/basso/muto) e musica on/off.
+    window.Sfx.addAudioButton(this, W / 2 - 26, H / 2 + 162);
+    window.Sfx.addMusicButton(this, W / 2 + 26, H / 2 + 162);
+
     // Scorciatoie da tastiera
     this.input.keyboard.on('keydown-ESC', () => this.resumeGame());
     this.input.keyboard.on('keydown-P', () => this.resumeGame());
