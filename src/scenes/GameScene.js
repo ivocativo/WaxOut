@@ -74,7 +74,10 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.setDeadzone(160, 120);
 
     // I nemici a terra collidono col pavimento e col muro; i Moscerini volano sopra a tutto.
-    const notFlyer = (e) => e.kind !== 'fly';
+    // NB: con collider(gruppo, oggettoSingolo) Phaser INVERTE l'ordine degli argomenti
+    // nella callback (passa l'oggetto singolo per primo), percio' individuiamo il nemico
+    // controllando quale dei due appartiene al gruppo enemies.
+    const notFlyer = (a, b) => (this.enemies.contains(a) ? a : b).kind !== 'fly';
     this.physics.add.collider(this.enemies, this.ground, null, notFlyer);
     this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
     this.physics.add.collider(this.enemies, this.platforms, null, notFlyer);
@@ -90,9 +93,15 @@ class GameScene extends Phaser.Scene {
       this.hurtPlayer(proj.dmg, proj.x);
       this.popProjectile(proj);
     });
-    this.physics.add.collider(this.projectiles, this.blocks, (proj) => this.popProjectile(proj));
-    this.physics.add.collider(this.projectiles, this.platforms, (proj) => this.popProjectile(proj));
-    this.physics.add.collider(this.projectiles, this.ground, (proj) => this.popProjectile(proj));
+    // Quando una pallina tocca muro/pedana/pavimento si spappola. ATTENZIONE: con
+    // collider(gruppo, oggettoSingolo) Phaser inverte gli argomenti, percio' col
+    // pavimento la callback riceveva (pavimento, proiettile) e il codice DISTRUGGEVA
+    // IL PAVIMENTO invece del proiettile (il pavimento "spariva" quando una pallina
+    // a parabola lunga cadeva a terra). Individuiamo sempre il proiettile dal gruppo.
+    const popProj = (a, b) => this.popProjectile(this.projectiles.contains(a) ? a : b);
+    this.physics.add.collider(this.projectiles, this.blocks, popProj);
+    this.physics.add.collider(this.projectiles, this.platforms, popProj);
+    this.physics.add.collider(this.projectiles, this.ground, popProj);
 
     if (!this.anims.exists('walk')) {
       this.anims.create({
