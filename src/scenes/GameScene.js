@@ -34,13 +34,18 @@ class GameScene extends Phaser.Scene {
 
     this.drawBackground();
 
-    // Pavimento del condotto (lungo tutto il mondo). Il rettangolo si estende molto
-    // sotto il bordo del mondo: cosi' anche quando la telecamera "trema" (al colpo)
-    // non compare mai un buco di colore diverso sotto al pavimento. La SUPERFICIE
-    // (parte alta del corpo fisico) resta a H-gh, dove il giocatore appoggia.
+    // Pavimento del condotto (lungo tutto il mondo). Disegnato con GRAPHICS (come lo
+    // sfondo) e non con un grande Shape rettangolare: su alcune GPU i rettangoli Shape
+    // molto larghi non venivano disegnati e il pavimento "spariva". Si estende sotto il
+    // bordo del mondo cosi' il tremolio della camera non scopre mai un buco.
     const gh = window.CONFIG.GROUND_H;
-    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2 + 90, this.worldW, gh + 180, C.ground).setDepth(4);
-    this.add.rectangle(this.worldW / 2, H - gh, this.worldW, 5, C.groundDark).setDepth(4);
+    const groundGfx = this.add.graphics().setDepth(4);
+    groundGfx.fillStyle(C.ground, 1);
+    groundGfx.fillRect(0, H - gh, this.worldW, gh + 200);
+    groundGfx.fillStyle(C.groundDark, 1);
+    groundGfx.fillRect(0, H - gh, this.worldW, 5);          // linea di superficie
+    // Corpo fisico del pavimento (invisibile): la superficie d'appoggio resta a H-gh.
+    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh).setVisible(false);
     this.physics.add.existing(this.ground, true);
 
     // Gruppi
