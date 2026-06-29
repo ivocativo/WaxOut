@@ -5,7 +5,8 @@ window.CONFIG = {
   WIDTH: 960,
   HEIGHT: 540,
   GRAVITY: 1100,
-  GROUND_H: 46,         // altezza del "pavimento" del condotto
+  GROUND_H: 180,        // altezza del "pavimento" del condotto (alto: tiene l'azione
+                        // sopra le dita sui comandi touch e riempie il canale)
   BLOCK: 32,            // lato di un blocco del muro (px display)
   PIXEL_SCALE_PLAYER: 3,
   PIXEL_SCALE_ENEMY: 3,

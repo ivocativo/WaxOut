@@ -245,18 +245,19 @@ class GameScene extends Phaser.Scene {
   // 'short' = bassa, scavalcabile con un salto (o sfondabile, ha pochi HP).
   buildMembrane(mx, lvl, idx, type) {
     const B = window.CONFIG.BLOCK;
-    const H = window.CONFIG.HEIGHT;
     const groundTop = this.groundTop;
 
     let rows, thick;
     if (type === 'short') {
-      rows = Phaser.Math.Between(3, 4);                   // scavalcabile con un salto
+      rows = Phaser.Math.Between(2, 3);                   // scavalcabile con un salto
       thick = 1;
     } else {
       thick = (lvl >= 5) ? 2 : 1;                         // ai livelli alti qualcuna piu' spessa
-      const fullRows = Math.floor((H - 90) / B);          // dal pavimento quasi al soffitto
+      // Dal pavimento quasi al soffitto: l'altezza e' relativa al CANALE (groundTop),
+      // non all'intero schermo, cosi' non sfonda il soffitto col pavimento piu' alto.
+      const fullRows = Math.floor((groundTop - 16) / B);
       const topGap = Math.random() < 0.4 ? Phaser.Math.Between(1, 2) : 0;
-      rows = Math.max(4, fullRows - topGap);
+      rows = Math.max(3, fullRows - topGap);
     }
     const baseCol = Math.round(mx / B);
 
