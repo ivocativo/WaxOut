@@ -12,45 +12,79 @@ window.GameGfx = {
 
   // Condotto uditivo "a tunnel": parete scura + ellissi concentriche verso la luce del
   // timpano (in fondo a destra), anelli di profondita', pieghe carnose e alone che respira.
+  // Palette "carnosa profonda" (8 tinte, stile Death Trash ma calda): dal buio
+  // esterno alla luce del timpano. Usata col dithering per un look PIXEL ART.
+  BG_PALETTE: ['#2a1320', '#4e2030', '#7a2f3c', '#a3454a', '#c0625a', '#d6896f', '#e6ac8b', '#f3cca9'],
+
+  // Sfondo del condotto in PIXEL ART: genera una texture a bassa risoluzione (poi
+  // ingrandita a pixel netti) con un tunnel carnoso verso il timpano (a destra),
+  // sfumato col DITHERING ordinato (Bayer 4x4), pieghe lungo i bordi, gocce e pori.
   drawBackground(scene) {
-    const WW = scene.worldW, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
-    const g = scene.add.graphics().setDepth(-10);
+    const WW = scene.worldW, H = window.CONFIG.HEIGHT;
+    const F = 4;                                   // 1 pixel-texture = F pixel a schermo
+    const bw = Math.ceil(WW / F), bh = Math.ceil(H / F);
+    const pal = this.BG_PALETTE.map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+    const N = pal.length;
+    const bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+    const hash = (x, y) => { const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return n - Math.floor(n); };
 
-    // Il timpano (luce) e' in fondo a destra: il condotto schiarisce mentre avanzi.
-    const cx = WW - 220, cy = H * 0.46;
+    // Timpano (luce) in fondo a destra; il tunnel converge li'.
+    const cx = bw - 46, cy = bh * 0.44, rx = bw * 1.0, ry = bh * 1.12;
 
-    // Parete scura del condotto (base). Si estende oltre i bordi alto/basso del mondo
-    // cosi' il tremolio della telecamera non scopre mai aree vuote.
-    g.fillStyle(0x5e3528, 1);
-    g.fillRect(0, -180, WW, H + 360);
-
-    // Gradiente "a tunnel": ellissi concentriche dal buio (ingresso, sinistra) alla
-    // luce calda in fondo (timpano, destra). La piu' grande copre tutto il mondo.
-    const cols = [0x6e3f30, 0x7c4736, 0x8d5340, 0xa5654b, 0xbb7657, 0xd08c67, 0xe2a578, 0xf0c293, 0xf8d8b0];
-    const n = cols.length;
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);                       // 0 = esterno/buio, 1 = interno/luce
-      const rx = (WW * 1.08) * (1 - t) + 130 * t;
-      const ry = (H * 1.15) * (1 - t) + 50 * t;
-      g.fillStyle(cols[i], 1);
-      g.fillEllipse(cx, cy, rx, ry);
+    // Pieghe carnose lungo soffitto e pavimento, ripetute per tutta la lunghezza.
+    const folds = [];
+    for (let fx = 30; fx < bw; fx += Phaser.Math.Between(34, 60)) {
+      const top = Math.random() < 0.5;
+      folds.push({ x: fx, y: top ? 0 : bh, rx: Phaser.Math.Between(20, 40), ry: Phaser.Math.Between(16, 30), d: 0.4 + Math.random() * 0.25 });
     }
 
-    // Anelli di profondita del condotto (sottili e scuri).
-    g.lineStyle(6, 0x4f2c20, 0.12);
-    for (let i = 1; i <= 6; i++) g.strokeEllipse(cx, cy, WW * 0.16 * i, H * 0.22 * i);
+    const key = 'bgTex';
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    const tex = scene.textures.createCanvas(key, bw, bh);
+    const ctx = tex.getContext();
+    const imgData = ctx.createImageData(bw, bh);
+    const d = imgData.data;
 
-    // Pieghe carnose lungo i bordi, ripetute per tutta la lunghezza.
-    g.fillStyle(0x5a3322, 0.14);
-    for (let x = 120; x < WW; x += 280) {
-      g.fillEllipse(x, 64, 360, 70);
-      g.fillEllipse(x + 140, H - 64, 360, 70);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const ndx = (x - cx) / rx, ndy = (y - cy) / ry;
+        let depth = Math.sqrt(ndx * ndx + ndy * ndy);
+        if (depth > 1) depth = 1;
+        for (let f = 0; f < folds.length; f++) {
+          const L = folds[f];
+          if (Math.abs(x - L.x) > L.rx + 2) continue;   // salta le pieghe lontane (perf)
+          const gx = (x - L.x) / L.rx, gy = (y - L.y) / L.ry, gr = Math.sqrt(gx * gx + gy * gy);
+          if (gr < 1) { depth += L.d * (1 - gr) * 0.7; if (gr > 0.84) depth += 0.28; }
+        }
+        depth += (hash(x, y) - 0.5) * 0.05;
+        if (depth > 1) depth = 1; else if (depth < 0) depth = 0;
+        const t = (1 - depth) * (N - 1);
+        const i = Math.floor(t), frac = t - i;
+        let idx = i + (frac > (bayer[y & 3][x & 3] + 0.5) / 16 ? 1 : 0);
+        const pr = hash(x * 1.7 + 3.1, y * 2.3 + 1.7);
+        if (pr < 0.05) idx -= 1; else if (pr > 0.985) idx += 1;   // pori scuri / riflessi
+        if (idx < 0) idx = 0; else if (idx > N - 1) idx = N - 1;
+        const c = pal[idx], o = (y * bw + x) * 4;
+        d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
     }
 
-    // Alone luminoso del timpano che "respira".
-    scene.bgGlow = scene.add.ellipse(cx, cy, 240, H * 0.5, 0xfbe2bf, 0.22).setDepth(-9);
+    // Gocce di cerume che colano dal soffitto, sparse lungo il condotto.
+    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= bw || y >= bh) return; const o = (y * bw + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255; };
+    for (let dx = 40; dx < bw; dx += Phaser.Math.Between(60, 130)) {
+      const len = Phaser.Math.Between(6, 16), mid = Math.round((N - 1) * 0.6);
+      for (let yy = 0; yy < len; yy++) { put(dx, yy, pal[mid]); if (yy > 2) put(dx + 1, yy, pal[Math.max(0, mid - 2)]); }
+      put(dx, len, pal[Math.min(N - 1, mid + 2)]); put(dx - 1, len, pal[Math.max(0, mid - 1)]); put(dx, len + 1, pal[Math.max(0, mid - 2)]);
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    tex.refresh();
+    scene.add.image(0, 0, key).setOrigin(0, 0).setScale(F).setDepth(-10);
+
+    // Alone luminoso del timpano che "respira" (in coordinate del mondo).
+    scene.bgGlow = scene.add.ellipse(cx * F, cy * F, 240, H * 0.5, 0xf3cca9, 0.16).setDepth(-9);
     scene.tweens.add({
-      targets: scene.bgGlow, scaleX: 1.16, scaleY: 1.16, alpha: 0.34,
+      targets: scene.bgGlow, scaleX: 1.16, scaleY: 1.16, alpha: 0.28,
       duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.inOut',
     });
   },
