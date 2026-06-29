@@ -1,8 +1,10 @@
 // Comandi a schermo (touch) per giocare da telefono o tablet.
 // window.TouchControls.attach(scene) disegna i pulsanti fissi sullo schermo e
 // restituisce un oggetto-stato che GameScene legge nel suo update().
-//   - left / right / aimUp / aimDown / sprayHeld : true mentre il dito tiene
-//     premuto il pulsante (movimento, mira verticale del getto, spruzzo continuo)
+//   - left / right / aimUp / aimDown : direzione corrente (movimento + mira a 8
+//     vie). Su mobile sono pilotati dallo STICK analogico virtuale (un solo dito
+//     da' anche le diagonali); da tastiera dai tasti.
+//   - sprayHeld : true mentre si tiene premuto il tasto Spruzza (getto continuo)
 //   - jumpQueued / dashQueued : impulso singolo (consumato e azzerato da update
 //     dopo averlo letto)
 //   - enabled : false su dispositivi senza touch (PC), così GameScene può
@@ -97,14 +99,50 @@ window.TouchControls = (function () {
       arc.on('pointerout', () => press(arc, false));
     }
 
-    // SINISTRA: pad a croce. Sinistra/Destra muovono; Su/Giu mirano il getto
-    // (combinati col movimento danno le diagonali).
-    const dr = 40;                          // raggio dei tasti del pad
-    const dcx = 116, dcy = H - 112;         // centro della croce
-    holdBtn(button(scene, dcx - 58, dcy, dr, 'left'), 'left');
-    holdBtn(button(scene, dcx + 58, dcy, dr, 'right'), 'right');
-    holdBtn(button(scene, dcx, dcy - 64, dr, 'up'), 'aimUp');
-    holdBtn(button(scene, dcx, dcy + 64, dr, 'down'), 'aimDown');
+    // SINISTRA: STICK analogico virtuale (muovi + mira a 8 vie con una sola spinta
+    // del pollice, anche in diagonale). Piu' fedele al cabinato Metal Slug e risolve
+    // l'impossibilita' di fare le diagonali con un solo dito del vecchio pad a frecce.
+    // Il pomello segue il dito (sensazione analogica); la direzione viene "agganciata"
+    // a 8 vie e tradotta negli stessi flag left/right/aimUp/aimDown letti da GameScene.
+    const baseX = 122, baseY = H - 108, R = 66, knobR = 34, DEAD = 0.36;
+    const ring = scene.add.circle(baseX, baseY, R, 0xfff7e8, 0.10).setScrollFactor(0).setDepth(DEPTH);
+    ring.setStrokeStyle(3, 0xfff7e8, 0.45);
+    const knob = scene.add.circle(baseX, baseY, knobR, 0xfff7e8, 0.34).setScrollFactor(0).setDepth(DEPTH + 1);
+    knob.setStrokeStyle(2, 0xfff7e8, 0.65);
+    // Zona di presa generosa attorno alla base (anche se il dito parte un po' fuori).
+    const zone = scene.add.zone(baseX, baseY, R * 2.7, R * 2.7).setScrollFactor(0).setDepth(DEPTH - 1).setInteractive();
+    let stickId = null;
+
+    function clearDirs() { state.left = state.right = state.aimUp = state.aimDown = false; }
+    function applyVec(dx, dy) {
+      const mag = Math.hypot(dx, dy);
+      clearDirs();
+      if (mag < R * DEAD) return;                       // zona morta centrale
+      let a = Math.atan2(dy, dx) * 180 / Math.PI;       // 0 = destra; y verso il basso
+      if (a < 0) a += 360;
+      const sec = Math.round(a / 45) % 8;               // 8 settori
+      if (sec === 0) { state.right = true; }                              // E
+      else if (sec === 1) { state.right = true; state.aimDown = true; }   // SE
+      else if (sec === 2) { state.aimDown = true; }                       // S
+      else if (sec === 3) { state.left = true; state.aimDown = true; }    // SO
+      else if (sec === 4) { state.left = true; }                          // O
+      else if (sec === 5) { state.left = true; state.aimUp = true; }      // NO
+      else if (sec === 6) { state.aimUp = true; }                         // N
+      else { state.right = true; state.aimUp = true; }                    // NE
+    }
+    function moveKnob(px, py) {
+      const dx = px - baseX, dy = py - baseY;
+      const len = Math.hypot(dx, dy) || 0.0001;
+      const cl = Math.min(len, R);
+      knob.setPosition(baseX + (dx / len) * cl, baseY + (dy / len) * cl);
+      applyVec(dx, dy);
+    }
+    function releaseStick() { stickId = null; knob.setPosition(baseX, baseY); clearDirs(); }
+
+    zone.on('pointerdown', (pointer) => { window.Sfx.unlock(); stickId = pointer.id; moveKnob(pointer.x, pointer.y); });
+    scene.input.on('pointermove', (pointer) => { if (stickId === pointer.id) moveKnob(pointer.x, pointer.y); });
+    scene.input.on('pointerup', (pointer) => { if (stickId === pointer.id) releaseStick(); });
+    scene.input.on('pointerupoutside', (pointer) => { if (stickId === pointer.id) releaseStick(); });
 
     // DESTRA: Spruzza (tieni premuto) + Salto (dedicato).
     const ar = 50;
