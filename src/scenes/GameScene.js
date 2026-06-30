@@ -395,7 +395,6 @@ class GameScene extends Phaser.Scene {
 
   // Il timpano in fondo a destra: traguardo del livello. Raggiungerlo = vittoria.
   buildGoal() {
-    const C = window.CONFIG.COLORS;
     const H = window.CONFIG.HEIGHT;
     const gh = window.CONFIG.GROUND_H;
     this.goalX = this.worldW - 150;
@@ -403,10 +402,11 @@ class GameScene extends Phaser.Scene {
     const cy = (H - gh) * 0.5;
     const ah = (H - gh) * 0.92;
 
-    this.add.ellipse(cx, cy, 150, ah, C.eardrum, 0.5).setDepth(2);
-    this.add.ellipse(cx, cy, 112, ah * 0.78, 0xf3b2ad, 0.5).setDepth(2);
-    const core = this.add.ellipse(cx, cy, 72, ah * 0.55, 0xfbe2bf, 0.55).setDepth(3);
-    this.tweens.add({ targets: core, scaleX: 1.15, scaleY: 1.08, alpha: 0.82, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // Timpano: sprite pixel-art (membrana), ingrandito ad altezza condotto, che "respira".
+    const ed = this.add.image(cx, cy, 'eardrum').setDepth(3);
+    const es = (ah * 0.95) / ed.height;
+    ed.setScale(es);
+    this.tweens.add({ targets: ed, scaleX: es * 1.05, scaleY: es * 1.03, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // Indizio "vai a destra" che fluttua davanti al timpano.
     const arrow = this.add.text(this.goalX - 70, cy, '>>', {
@@ -896,6 +896,7 @@ class GameScene extends Phaser.Scene {
   // ---------- Loop ----------
 
   update(time) {
+    window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
     if (this.locked) { this.player.setVelocityX(0); return; }
     const p = window.GameState.player;
     const k = this.keys;

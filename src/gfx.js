@@ -10,83 +10,31 @@ window.GameGfx = {
 
   // ---------- Sfondo ----------
 
-  // Condotto uditivo "a tunnel": parete scura + ellissi concentriche verso la luce del
-  // timpano (in fondo a destra), anelli di profondita', pieghe carnose e alone che respira.
-  // Palette "carnosa profonda" (8 tinte, stile Death Trash ma calda): dal buio
-  // esterno alla luce del timpano. Usata col dithering per un look PIXEL ART.
-  BG_PALETTE: ['#2a1320', '#4e2030', '#7a2f3c', '#a3454a', '#c0625a', '#d6896f', '#e6ac8b', '#f3cca9'],
-
-  // Sfondo del condotto in PIXEL ART: genera una texture a bassa risoluzione (poi
-  // ingrandita a pixel netti) con un tunnel carnoso verso il timpano (a destra),
-  // sfumato col DITHERING ordinato (Bayer 4x4), pieghe lungo i bordi, gocce e pori.
+  // Sfondo del condotto: FONDALE dipinto (immagine generata, parete di carne) che
+  // riempie lo schermo e scorre lento (parallax). updateBackground() (da
+  // GameScene.update) lo fa scorrere con la telecamera.
   drawBackground(scene) {
-    const WW = scene.worldW, H = window.CONFIG.HEIGHT;
-    const F = 4;                                   // 1 pixel-texture = F pixel a schermo
-    const bw = Math.ceil(WW / F), bh = Math.ceil(H / F);
-    const pal = this.BG_PALETTE.map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
-    const N = pal.length;
-    const bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
-    const hash = (x, y) => { const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return n - Math.floor(n); };
+    const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
+    // Fondale dipinto: scala MORBIDA (non a blocchi) anche se il gioco e' pixelArt.
+    const tex = scene.textures.get('bg_flesh_01');
+    if (tex && tex.setFilter) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    const srcH = tex.getSourceImage().height || H;
+    const scale = H / srcH;                       // riempi l'altezza dello schermo
 
-    // Timpano (luce) in fondo a destra; il tunnel converge li'.
-    const cx = bw - 46, cy = bh * 0.44, rx = bw * 1.0, ry = bh * 1.12;
+    const bg = scene.add.tileSprite(0, 0, W, H, 'bg_flesh_01').setOrigin(0, 0).setScrollFactor(0).setDepth(-14);
+    bg.tileScaleX = scale; bg.tileScaleY = scale;
+    scene.bgLayers = [{ s: bg, f: 0.25 }];        // parallax lento
+    this.updateBackground(scene);
+  },
 
-    // Pieghe carnose lungo soffitto e pavimento, ripetute per tutta la lunghezza.
-    const folds = [];
-    for (let fx = 30; fx < bw; fx += Phaser.Math.Between(34, 60)) {
-      const top = Math.random() < 0.5;
-      folds.push({ x: fx, y: top ? 0 : bh, rx: Phaser.Math.Between(20, 40), ry: Phaser.Math.Between(16, 30), d: 0.4 + Math.random() * 0.25 });
+  // Scorre il fondale in base alla telecamera (effetto parallax).
+  updateBackground(scene) {
+    if (!scene.bgLayers) return;
+    const sx = scene.cameras.main.scrollX;
+    for (let i = 0; i < scene.bgLayers.length; i++) {
+      const L = scene.bgLayers[i];
+      L.s.tilePositionX = (sx * L.f) / L.s.tileScaleX;
     }
-
-    const key = 'bgTex';
-    if (scene.textures.exists(key)) scene.textures.remove(key);
-    const tex = scene.textures.createCanvas(key, bw, bh);
-    const ctx = tex.getContext();
-    const imgData = ctx.createImageData(bw, bh);
-    const d = imgData.data;
-
-    for (let y = 0; y < bh; y++) {
-      for (let x = 0; x < bw; x++) {
-        const ndx = (x - cx) / rx, ndy = (y - cy) / ry;
-        let depth = Math.sqrt(ndx * ndx + ndy * ndy);
-        if (depth > 1) depth = 1;
-        for (let f = 0; f < folds.length; f++) {
-          const L = folds[f];
-          if (Math.abs(x - L.x) > L.rx + 2) continue;   // salta le pieghe lontane (perf)
-          const gx = (x - L.x) / L.rx, gy = (y - L.y) / L.ry, gr = Math.sqrt(gx * gx + gy * gy);
-          if (gr < 1) { depth += L.d * (1 - gr) * 0.7; if (gr > 0.84) depth += 0.28; }
-        }
-        depth += (hash(x, y) - 0.5) * 0.05;
-        if (depth > 1) depth = 1; else if (depth < 0) depth = 0;
-        const t = (1 - depth) * (N - 1);
-        const i = Math.floor(t), frac = t - i;
-        let idx = i + (frac > (bayer[y & 3][x & 3] + 0.5) / 16 ? 1 : 0);
-        const pr = hash(x * 1.7 + 3.1, y * 2.3 + 1.7);
-        if (pr < 0.05) idx -= 1; else if (pr > 0.985) idx += 1;   // pori scuri / riflessi
-        if (idx < 0) idx = 0; else if (idx > N - 1) idx = N - 1;
-        const c = pal[idx], o = (y * bw + x) * 4;
-        d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
-      }
-    }
-
-    // Gocce di cerume che colano dal soffitto, sparse lungo il condotto.
-    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= bw || y >= bh) return; const o = (y * bw + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255; };
-    for (let dx = 40; dx < bw; dx += Phaser.Math.Between(60, 130)) {
-      const len = Phaser.Math.Between(6, 16), mid = Math.round((N - 1) * 0.6);
-      for (let yy = 0; yy < len; yy++) { put(dx, yy, pal[mid]); if (yy > 2) put(dx + 1, yy, pal[Math.max(0, mid - 2)]); }
-      put(dx, len, pal[Math.min(N - 1, mid + 2)]); put(dx - 1, len, pal[Math.max(0, mid - 1)]); put(dx, len + 1, pal[Math.max(0, mid - 2)]);
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-    tex.refresh();
-    scene.add.image(0, 0, key).setOrigin(0, 0).setScale(F).setDepth(-10);
-
-    // Alone luminoso del timpano che "respira" (in coordinate del mondo).
-    scene.bgGlow = scene.add.ellipse(cx * F, cy * F, 240, H * 0.5, 0xf3cca9, 0.16).setDepth(-9);
-    scene.tweens.add({
-      targets: scene.bgGlow, scaleX: 1.16, scaleY: 1.16, alpha: 0.28,
-      duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.inOut',
-    });
   },
 
   // ---------- Muro di cerume ----------

@@ -14,6 +14,12 @@ class BootScene extends Phaser.Scene {
     img('enemy_blob', 'cerumino', 'cerumino.png');
     img('enemy_crust', 'crosta', 'crosta.png');
     img('wax_glob', 'wax_glob', 'wax_glob.png');
+
+    // Timpano (sprite pixel-art, usato in buildGoal).
+    this.load.image('eardrum', 'assets/sprites/eardrum.png');
+
+    // Fondale dipinto (immagine AI) per lo sfondo del condotto.
+    this.load.image('bg_flesh_01', 'assets/backgrounds/bg_flesh_01.jpg');
   }
 
   create() {
