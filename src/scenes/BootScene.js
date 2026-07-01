@@ -15,20 +15,23 @@ class BootScene extends Phaser.Scene {
     img('enemy_crust', 'crosta', 'crosta.png');
     img('wax_glob', 'wax_glob', 'wax_glob.png');
 
-    // Timpano (sprite pixel-art, usato in buildGoal).
-    this.load.image('eardrum', 'assets/sprites/eardrum.png');
-
-    // Fondale dipinto (immagine AI) per lo sfondo del condotto.
-    this.load.image('bg_flesh_01', 'assets/backgrounds/bg_flesh_01.jpg');
-
-    // PROTUBERANZE (scenografia in primo piano, ancorate a pavimento/soffitto).
-    // Oggi sono BOZZE SEGNAPOSTO: verranno sostituite dalle immagini AI vere
-    // (stesso wiring, basta cambiare i file qui e l'elenco in GameGfx.PROTUBERANCES).
-    [['prot_cluster', 'flesh_cluster.png'], ['prot_cluster_b', 'flesh_cluster_b.png'],
-     ['prot_lobe', 'flesh_lobe.png'], ['prot_tube', 'flesh_tube_b.png']]
-      .forEach(([key, file]) => this.load.image(key, 'assets/sprites/' + file));
-    // Protuberanze VERE (immagini AI Leonardo, sfondo nero gia' ritagliato a PNG trasparente).
-    this.load.image('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');
+    // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
+    // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
+    // PNG/JPG esterni in locale). Ripiego al file su disco se il dato incorporato manca.
+    // Per aggiornarle: sostituisci il PNG e rilancia tools/embed_assets.ps1.
+    const A = window.ASSET_DATA || {};
+    const aimg = (key, file) => this.load.image(key, A[key] || file);
+    aimg('eardrum', 'assets/sprites/eardrum.png');
+    // Fondale gia' pixelato+posterizzato (tools/bake_bg_pixel.ps1); niente elaborazione
+    // canvas a runtime (che si romperebbe da file://).
+    aimg('bg_flesh_px', 'assets/backgrounds/bg_flesh_01_px.png');
+    // PROTUBERANZE: prot_coral_stalk = immagine AI vera; le altre sono BOZZE segnaposto
+    // (da rimpiazzare con altre immagini AI: cambia il PNG e ri-incorpora).
+    aimg('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');
+    aimg('prot_cluster', 'assets/sprites/flesh_cluster.png');
+    aimg('prot_cluster_b', 'assets/sprites/flesh_cluster_b.png');
+    aimg('prot_lobe', 'assets/sprites/flesh_lobe.png');
+    aimg('prot_tube', 'assets/sprites/flesh_tube_b.png');
   }
 
   create() {

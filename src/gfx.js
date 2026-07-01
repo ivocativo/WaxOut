@@ -13,57 +13,24 @@ window.GameGfx = {
   // Sfondo del condotto: FONDALE dipinto (immagine generata, parete di carne) che
   // riempie lo schermo e scorre lento (parallax). updateBackground() (da
   // GameScene.update) lo fa scorrere con la telecamera.
-  // Manopole (regolabili al volo in preview via window.__BG_PX / window.__BG_ZOOM):
-  //  PX   = quanto "sgranare": l'immagine viene prima RImpicciolita di PX volte e poi
-  //         ringrandita a pixel netti (NEAREST) -> vera pixel art. Piu' alto = pixeloni.
-  //  ZOOM = quanto zoomare dentro l'immagine. >1 mostra solo un SETTORE: cosi' ogni
-  //         livello inquadra una zona diversa della stessa immagine (piu' sfondi con 1 file).
-  BG_PX: 6,
+  // Manopola dello ZOOM (regolabile al volo in preview via window.__BG_ZOOM): quanto
+  // zoomare dentro il fondale. >1 mostra solo un SETTORE dell'immagine, cosi' ogni
+  // livello inquadra una zona diversa della stessa immagine (piu' sfondi con 1 file).
+  // La GRANA (pixel + colori ridotti) e' gia' "cotta" nel PNG da tools/bake_bg_pixel.ps1.
   BG_ZOOM: 2.0,
-  BG_LEVELS: 6,   // colori per canale (posterizzazione): pochi = look pixel-art "a poster"
 
   drawBackground(scene) {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
-    const PX = window.__BG_PX || this.BG_PX;
     const ZOOM = window.__BG_ZOOM || this.BG_ZOOM;
-    const src = scene.textures.get('bg_flesh_01').getSourceImage();
-    const lowW = Math.max(2, Math.round(src.width / PX));
-    const lowH = Math.max(2, Math.round(src.height / PX));
-
-    // Texture pixelata: costruita UNA volta (riusata tra i livelli); ricostruita se cambia PX.
-    // Rimpicciolisco l'immagine con lo smoothing acceso (media morbida dei pixel) e poi la
-    // faro' ringrandire a blocchi netti dal filtro NEAREST del TileSprite.
-    const LEVELS = window.__BG_LEVELS || this.BG_LEVELS;
-    const pxKey = 'bg_px';
-    const existing = scene.textures.exists(pxKey) ? scene.textures.get(pxKey) : null;
-    if (existing && (existing._pxFactor !== PX || existing._levels !== LEVELS)) { scene.textures.remove(pxKey); }
-    if (!scene.textures.exists(pxKey)) {
-      const ct = scene.textures.createCanvas(pxKey, lowW, lowH);
-      const ctx = ct.getContext();
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(src, 0, 0, lowW, lowH);
-      // Posterizza: snappa ogni canale a pochi livelli -> colori piatti = look pixel-art
-      // (senza questo, i bloccotti sfumano tra loro e sembra solo sfocato). getImageData
-      // puo' fallire da file:// (canvas "tainted"): in quel caso resta solo la sgranatura.
-      if (LEVELS > 1 && LEVELS < 255) {
-        try {
-          const id = ctx.getImageData(0, 0, lowW, lowH);
-          const d = id.data, step = 255 / (LEVELS - 1);
-          for (let i = 0; i < d.length; i += 4) {
-            d[i] = Math.round(Math.round(d[i] / step) * step);
-            d[i + 1] = Math.round(Math.round(d[i + 1] / step) * step);
-            d[i + 2] = Math.round(Math.round(d[i + 2] / step) * step);
-          }
-          ctx.putImageData(id, 0, 0);
-        } catch (e) { /* file://: niente posterizzazione, pazienza */ }
-      }
-      ct.refresh();
-      ct._pxFactor = PX; ct._levels = LEVELS;
-    }
-    scene.textures.get(pxKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    // Fondale gia' pixelato+posterizzato: si usa direttamente a pixel netti (NEAREST),
+    // niente canvas/getImageData a runtime (che da file:// si romperebbero).
+    const tex = scene.textures.get('bg_flesh_px');
+    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    const low = tex.getSourceImage();
+    const lowW = low.width, lowH = low.height;
 
     const scale = (H / lowH) * ZOOM;              // riempi l'altezza, poi zooma
-    const bg = scene.add.tileSprite(0, 0, W, H, pxKey).setOrigin(0, 0).setScrollFactor(0).setDepth(-14);
+    const bg = scene.add.tileSprite(0, 0, W, H, 'bg_flesh_px').setOrigin(0, 0).setScrollFactor(0).setDepth(-14);
     bg.tileScaleX = scale; bg.tileScaleY = scale;
 
     // Settore diverso per livello: offset deterministico dal numero di livello (stesso
@@ -89,7 +56,7 @@ window.GameGfx = {
     }
   },
 
-  // ---------- Protuberanze (scenografia in primo piano) ----------
+  // ---------- Protuberanze (scenografia di SFONDO) ----------
 
   // Elenco delle immagini usabili come protuberanze, divise per superficie.
   // OGGI sono BOZZE SEGNAPOSTO (chiavi prot_*, caricate in BootScene): per passare
@@ -101,46 +68,54 @@ window.GameGfx = {
   },
 
   // Sparge escrescenze organiche ancorate a PAVIMENTO e SOFFITTO lungo tutto il
-  // condotto. Sono SOLO scenografia: stanno DAVANTI alle membrane ma DIETRO al
-  // personaggio (depth 7 < player 10), niente collisioni. Scorrono col mondo
-  // (scrollFactor 1), quindi rispetto al fondale lontano (parallax 0.25) sembrano
-  // molto piu' vicine -> effetto "primo piano". Quantita' e posizioni variano a ogni
-  // livello. Chiamata da GameScene.buildLevel dopo aver creato le membrane.
+  // condotto. Sono SCENOGRAFIA DI SFONDO (secondo/terzo piano): depth 2 = davanti solo
+  // al fondale lontano (-14) ma DIETRO a tutto il gameplay (timpano 3, pavimento 4,
+  // cerume/membrane 5-6, raccolte/nemici 7-9, personaggio 10) -> non coprono mai gli
+  // oggetti di gioco. Niente collisioni. Scorrono col mondo (scrollFactor 1), quindi
+  // rispetto al fondale (parallax 0.25) sembrano piu' vicine = effetto profondita'.
+  // Quantita' e posizioni variano a ogni livello. Chiamata da GameScene.buildLevel.
   drawProtuberances(scene) {
     const H = window.CONFIG.HEIGHT;
     const groundTop = scene.groundTop != null ? scene.groundTop : H - window.CONFIG.GROUND_H;
     const worldW = scene.worldW || window.CONFIG.WIDTH;
     const lvl = (window.GameState && window.GameState.level) || 1;
     const P = this.PROTUBERANCES;
-    const membXs = scene.membraneXs || [];
-    const DEPTH = 7;
 
     scene.protuberances = [];
-    const span = Math.max(1, worldW - 600);
     const floorN = Phaser.Math.Clamp(4 + Math.floor(lvl * 0.8), 4, 14);
     const ceilN = Phaser.Math.Clamp(3 + Math.floor(lvl * 0.6), 3, 11);
 
-    // Evita di piazzare una protuberanza proprio sopra a una membrana (la nasconderebbe).
-    const farFromMembrane = (x) => membXs.every((mx) => Math.abs(x - mx) > 100);
-    const pickX = () => {
-      for (let t = 0; t < 6; t++) {
-        const x = 300 + Phaser.Math.Between(0, span);
-        if (farFromMembrane(x)) return x;
-      }
-      return 300 + Phaser.Math.Between(0, span);
-    };
+    // Due PIANI di sfondo a velocita' di scorrimento diverse -> parallasse TRA le
+    // protuberanze stesse (non solo verso il fondale lontano). Entrambi restano dietro
+    // al gameplay (depth 1 e 2 < timpano 3). Il piano lontano scorre piu' lento, e' piu'
+    // piccolo e smorzato (tinta verso il fondale = profondita' atmosferica); il vicino e'
+    // piu' grande, pieno e quasi radicato al terreno.
+    const PLANES = [
+      { sf: 0.50, depth: 1, sizeMul: 0.72, alpha: 0.82, tint: 0xcf9d9d },  // lontano
+      { sf: 0.85, depth: 2, sizeMul: 1.00, alpha: 1.00, tint: 0xffffff },  // vicino
+    ];
+    const W = window.CONFIG.WIDTH;
+    const maxScroll = Math.max(1, worldW - W);
 
     const place = (key, anchor) => {
-      const x = pickX();
+      const plane = PLANES[Phaser.Math.Between(0, PLANES.length - 1)];
+      // Posiziono in "spazio-scroll": scelgo a che punto dell'attraversamento (s) e dove
+      // sullo schermo comparira', poi ricavo la x nel mondo (con scrollFactor sf<1 vale
+      // xMondo = xSchermo + s*sf). Cosi' anche il piano lento copre tutto il livello.
+      const s = Phaser.Math.Between(0, maxScroll);
+      const x = Phaser.Math.Between(40, W - 40) + s * plane.sf;
       // floor: appoggia in basso (un filo dentro al pavimento); ceiling: pende dall'alto.
       const y = anchor === 'floor' ? groundTop + 6 : -6;
-      const img = scene.add.image(x, y, key).setDepth(DEPTH);
+      const img = scene.add.image(x, y, key).setDepth(plane.depth);
+      img.setScrollFactor(plane.sf, 1);                     // sf<1 = parallasse orizzontale
       img.setOrigin(0.5, anchor === 'floor' ? 1 : 0);
-      // Scala mirata a un'ALTEZZA a schermo (px), calcolata dall'altezza nativa: cosi'
-      // funziona sia per le bozze piccole sia per le immagini AI grandi.
+      // Scala mirata a un'ALTEZZA a schermo (px) * fattore del piano: cosi' funziona sia
+      // per le bozze piccole sia per le immagini AI grandi, e i piani lontani sono piu' piccoli.
       const srcH = scene.textures.get(key).getSourceImage().height || 64;
-      const targetH = anchor === 'floor' ? Phaser.Math.Between(150, 300) : Phaser.Math.Between(120, 230);
+      const targetH = (anchor === 'floor' ? Phaser.Math.Between(150, 300) : Phaser.Math.Between(120, 230)) * plane.sizeMul;
       img.setScale(targetH / srcH);
+      img.setAlpha(plane.alpha);
+      if (plane.tint !== 0xffffff) img.setTint(plane.tint);
       if (Math.random() < 0.5) img.setFlipX(true);          // varieta'
       if (anchor === 'ceiling') img.setFlipY(true);         // pendono verso il basso
       scene.protuberances.push(img);
