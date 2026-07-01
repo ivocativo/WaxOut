@@ -20,6 +20,15 @@ class BootScene extends Phaser.Scene {
 
     // Fondale dipinto (immagine AI) per lo sfondo del condotto.
     this.load.image('bg_flesh_01', 'assets/backgrounds/bg_flesh_01.jpg');
+
+    // PROTUBERANZE (scenografia in primo piano, ancorate a pavimento/soffitto).
+    // Oggi sono BOZZE SEGNAPOSTO: verranno sostituite dalle immagini AI vere
+    // (stesso wiring, basta cambiare i file qui e l'elenco in GameGfx.PROTUBERANCES).
+    [['prot_cluster', 'flesh_cluster.png'], ['prot_cluster_b', 'flesh_cluster_b.png'],
+     ['prot_lobe', 'flesh_lobe.png'], ['prot_tube', 'flesh_tube_b.png']]
+      .forEach(([key, file]) => this.load.image(key, 'assets/sprites/' + file));
+    // Protuberanze VERE (immagini AI Leonardo, sfondo nero gia' ritagliato a PNG trasparente).
+    this.load.image('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');
   }
 
   create() {

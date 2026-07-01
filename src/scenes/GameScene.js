@@ -230,6 +230,7 @@ class GameScene extends Phaser.Scene {
     this.buildMounds();          // cumuli di cerume su pavimento e soffitto
     this.buildPlatforms();
     this.buildGoal();
+    window.GameGfx.drawProtuberances(this);   // scenografia organica (pavimento + soffitto)
 
     this.totalBlocks = this.blocks.countActive(true);
     this.blocksLeft = this.totalBlocks;
