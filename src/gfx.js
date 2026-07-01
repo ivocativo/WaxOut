@@ -58,13 +58,13 @@ window.GameGfx = {
 
   // ---------- Protuberanze (scenografia di SFONDO) ----------
 
-  // Elenco delle immagini usabili come protuberanze, divise per superficie.
-  // OGGI sono BOZZE SEGNAPOSTO (chiavi prot_*, caricate in BootScene): per passare
-  // alle immagini AI vere basta caricare i nuovi PNG con queste stesse chiavi (o
-  // aggiungerne di nuove qui). 'h' = altezza nativa, serve solo come riferimento.
+  // Immagini AI usabili come protuberanze, divise per superficie. Per aggiungerne:
+  // ritaglia il PNG (tools/cutout_protuberance.ps1), incorporalo (tools/embed_assets.ps1),
+  // caricalo in BootScene e aggiungi la chiave qui. Le immagini di SOFFITTO vanno
+  // generate gia' orientate per pendere dall'alto (niente flip verticale nel codice).
   PROTUBERANCES: {
-    floor:   ['prot_coral_stalk', 'prot_cluster', 'prot_cluster_b', 'prot_lobe', 'prot_tube'],
-    ceiling: ['prot_cluster', 'prot_cluster_b', 'prot_lobe'],
+    floor:   ['prot_coral_stalk', 'prot_coral_branch'],
+    ceiling: ['prot_web', 'prot_drip'],
   },
 
   // Sparge escrescenze organiche ancorate a PAVIMENTO e SOFFITTO lungo tutto il
@@ -116,8 +116,9 @@ window.GameGfx = {
       img.setScale(targetH / srcH);
       img.setAlpha(plane.alpha);
       if (plane.tint !== 0xffffff) img.setTint(plane.tint);
-      if (Math.random() < 0.5) img.setFlipX(true);          // varieta'
-      if (anchor === 'ceiling') img.setFlipY(true);         // pendono verso il basso
+      if (Math.random() < 0.5) img.setFlipX(true);          // varieta' (solo orizzontale)
+      // NB: le immagini di soffitto (prot_web/prot_drip...) sono gia' orientate per pendere
+      // dall'alto (origin 0.5,0), quindi NON si ribaltano verticalmente.
       scene.protuberances.push(img);
     };
 

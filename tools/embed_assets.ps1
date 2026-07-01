@@ -10,10 +10,9 @@ $manifest = [ordered]@{
   'bg_flesh_px'     = 'assets/backgrounds/bg_flesh_01_px.png'
   'eardrum'         = 'assets/sprites/eardrum.png'
   'prot_coral_stalk'= 'assets/protuberances/prot_coral_stalk.png'
-  'prot_cluster'    = 'assets/sprites/flesh_cluster.png'
-  'prot_cluster_b'  = 'assets/sprites/flesh_cluster_b.png'
-  'prot_lobe'       = 'assets/sprites/flesh_lobe.png'
-  'prot_tube'       = 'assets/sprites/flesh_tube_b.png'
+  'prot_coral_branch'= 'assets/protuberances/prot_coral_branch.png'
+  'prot_drip'       = 'assets/protuberances/prot_drip.png'
+  'prot_web'        = 'assets/protuberances/prot_web.png'
 }
 
 $sb = New-Object System.Text.StringBuilder

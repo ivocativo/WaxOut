@@ -25,13 +25,11 @@ class BootScene extends Phaser.Scene {
     // Fondale gia' pixelato+posterizzato (tools/bake_bg_pixel.ps1); niente elaborazione
     // canvas a runtime (che si romperebbe da file://).
     aimg('bg_flesh_px', 'assets/backgrounds/bg_flesh_01_px.png');
-    // PROTUBERANZE: prot_coral_stalk = immagine AI vera; le altre sono BOZZE segnaposto
-    // (da rimpiazzare con altre immagini AI: cambia il PNG e ri-incorpora).
-    aimg('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');
-    aimg('prot_cluster', 'assets/sprites/flesh_cluster.png');
-    aimg('prot_cluster_b', 'assets/sprites/flesh_cluster_b.png');
-    aimg('prot_lobe', 'assets/sprites/flesh_lobe.png');
-    aimg('prot_tube', 'assets/sprites/flesh_tube_b.png');
+    // PROTUBERANZE (immagini AI vere, provvisorie ma in stile). Pavimento e soffitto.
+    aimg('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');   // colonna (pavimento)
+    aimg('prot_coral_branch', 'assets/protuberances/prot_coral_branch.png'); // rovi ramificati (pavimento)
+    aimg('prot_drip', 'assets/protuberances/prot_drip.png');                 // colata che gocciola (soffitto)
+    aimg('prot_web', 'assets/protuberances/prot_web.png');                   // fascia di muco (soffitto)
   }
 
   create() {
