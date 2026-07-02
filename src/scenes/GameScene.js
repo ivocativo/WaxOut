@@ -679,12 +679,25 @@ class GameScene extends Phaser.Scene {
     return target;
   }
 
-  // Bastonata verso il nemico vicino (rispetta la cadenza dell'arma corpo a corpo).
-  doMelee(now, foe) {
+  // Cerca un BLOCCO di cerume a portata di mazza (per bastonarlo e ripulirlo più in fretta
+  // che col getto quando gli sei addosso). Ritorna il blocco più vicino davanti a te, o null.
+  meleeWaxNear() {
+    const px = this.player.x, py = this.player.y;
+    let best = null, bd = 1e9;
+    this.blocks.getChildren().forEach((b) => {
+      if (!b.active) return;
+      const dx = Math.abs(b.x - px), dy = Math.abs(b.y - py);
+      if (dx < 46 && dy < 44) { const d = dx + dy; if (d < bd) { bd = d; best = b; } }
+    });
+    return best;
+  }
+
+  // Bastonata verso il bersaglio vicino (nemico O blocco di cerume). Rispetta la cadenza.
+  doMelee(now, target) {
     const p = window.GameState.player;
     if (now - this.lastAttack < p.attackCooldown) return;
     this.lastAttack = now;
-    this.facing = Math.sign(foe.x - this.player.x) || this.facing;
+    this.facing = Math.sign(target.x - this.player.x) || this.facing;
     this.meleeSwing();
   }
 
@@ -1111,7 +1124,11 @@ class GameScene extends Phaser.Scene {
     // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In
     // aria GIU' resta la mira verso il basso del getto (gestita più sotto).
     const downHeld = k.DOWN.isDown || k.S.isDown || this.touch.aimDown;
-    this.crouching = onGround && downHeld;
+    // L'accovacciamento resta valido per un attimo dopo aver perso il contatto col suolo
+    // (dossi/bordi mentre ci si muove), COSI' il getto non passa a "mira in giù" sparando
+    // nel pavimento. NON vale durante un vero salto (velocità decisa verso l'alto).
+    this.crouching = downHeld && (onGround ||
+      ((now - this.lastGroundAt) < 140 && this.player.body.velocity.y > -50));
 
     // Movimento (tastiera o pad a schermo); accovacciato ci si muove piano.
     const left = k.A.isDown || k.LEFT.isDown || this.touch.left;
@@ -1173,8 +1190,12 @@ class GameScene extends Phaser.Scene {
     const attackHeld = k.J.isDown || this.touch.sprayHeld || this.pcFiring;
     if (attackHeld) {
       window.Sfx.unlock();
+      // Priorità: nemico vicino -> bastonata; altrimenti cerume a portata -> bastonata
+      // (pulizia ravvicinata più veloce del getto); altrimenti getto a distanza.
       const foe = this.meleeTargetNear();
+      const wax = foe ? null : this.meleeWaxNear();
       if (foe) this.doMelee(now, foe);
+      else if (wax) this.doMelee(now, wax);
       else this.fireJet(adx, ady);
     }
 
