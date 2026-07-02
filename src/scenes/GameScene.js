@@ -510,6 +510,11 @@ class GameScene extends Phaser.Scene {
       e.spitEvery = cfg.spitEvery;
       e.nextSpit = this.time.now + Phaser.Math.Between(700, cfg.spitEvery);
     }
+    if (cfg.fly) {
+      e.diveState = 'hover';                                    // stato IA volo (vedi flyAI)
+      e.diveReadyAt = this.time.now + Phaser.Math.Between(1000, 1800);
+      e.bobPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);    // sfasa l'ondeggio tra i moscerini
+    }
 
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
     if (cfg.fly) this.dropFromCeiling(e, targetScale);
@@ -791,6 +796,8 @@ class GameScene extends Phaser.Scene {
       e.knockUntil = this.time.now + (heavy ? 260 : 190);
       // Un colpo INTERROMPE l'attacco in carica/affondo del nemico (ricompensa il colpire per primo).
       if (e.atkState && e.atkState !== 'idle') { e.atkState = 'idle'; e.atkReadyAt = this.time.now + 500; if (e._baseScale) e.setScale(e._baseScale); }
+      // Idem per il moscerino: un colpo lo butta fuori dalla carica/picchiata.
+      if (e.kind === 'fly' && e.diveState && e.diveState !== 'hover') { e.diveState = 'recover'; e.diveReadyAt = this.time.now + 900; e.clearTint(); }
     }
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
@@ -922,6 +929,63 @@ class GameScene extends Phaser.Scene {
     }
     // Altrimenti avanza lento verso il giocatore.
     e.setVelocityX(dir * e.speed);
+  }
+
+  // IA del MOSCERINO (volante): si LIBRA sopra il giocatore ondeggiando e avvicinandosi in
+  // orizzontale; quando è pronto e più o meno sopra di te, si CARICA (fermo a mezz'aria,
+  // lampeggia ~0,35s) e poi PICCHIA verso la tua posizione (schivabile), infine RISALE alla
+  // quota di volo e ricomincia. Stati in e.diveState: hover|wind|dive|recover.
+  flyAI(e, now) {
+    const px = this.player.x, py = this.player.y;
+    const hoverY = Phaser.Math.Clamp(py - 150, 46, this.groundTop - 110);
+
+    // CARICA: fermo a mezz'aria, lampeggia; poi parte la picchiata verso il bersaglio bloccato.
+    if (e.diveState === 'wind') {
+      e.setVelocity(0, -8);
+      e.setTint((Math.floor(now / 60) % 2) ? 0xffe066 : 0xffffff);
+      if (now >= e.diveTimer) {
+        e.clearTint();
+        const dx = e.diveTX - e.x, dy = e.diveTY - e.y, d = Math.hypot(dx, dy) || 1;
+        const sp = Math.max(360, e.speed * 3.2);   // picchiata scattante (schivabile grazie al telegrafo)
+        e.setVelocity((dx / d) * sp, (dy / d) * sp);
+        e.setFlipX(dx < 0);
+        e.diveState = 'dive';
+        e.diveTimer = now + 800;   // durata massima della picchiata
+      }
+      return;
+    }
+
+    // PICCHIATA: prosegue dritta finché non arriva al bersaglio / tocca il basso / scade.
+    if (e.diveState === 'dive') {
+      if (now >= e.diveTimer || e.y >= this.groundTop - 24 ||
+          (Math.abs(e.x - e.diveTX) < 18 && Math.abs(e.y - e.diveTY) < 18)) {
+        e.diveState = 'recover';
+      }
+      return;
+    }
+
+    // RISALITA: torna su alla quota di volo, poi si rimette a librarsi (con attesa).
+    if (e.diveState === 'recover') {
+      e.setVelocity((px - e.x) * 0.6, -e.speed * 0.95);
+      e.setFlipX((px - e.x) < 0);
+      if (e.y <= hoverY + 16) { e.diveState = 'hover'; e.diveReadyAt = now + Phaser.Math.Between(1400, 2200); }
+      return;
+    }
+
+    // HOVER (default): si libra sopra di te ondeggiando e avvicinandosi in orizzontale.
+    const targetY = hoverY + Math.sin(now * 0.006 + (e.bobPhase || 0)) * 12;
+    e.setVelocity(
+      Phaser.Math.Clamp(px - e.x, -e.speed, e.speed) * 0.9,
+      Phaser.Math.Clamp((targetY - e.y) * 4, -e.speed, e.speed)
+    );
+    e.setFlipX((px - e.x) < 0);
+    // Pronto e più o meno sopra il giocatore → carica la picchiata (mira dove sei ORA).
+    if (now >= (e.diveReadyAt || 0) && Math.abs(px - e.x) < 130) {
+      e.diveState = 'wind';
+      e.diveTimer = now + 350;
+      e.diveTX = px; e.diveTY = py + 6;
+      e.setVelocity(0, 0);
+    }
   }
 
   hurtPlayer(dmg, sourceX) {
@@ -1228,12 +1292,7 @@ class GameScene extends Phaser.Scene {
           const onScreen = e.x > cam.scrollX - 60 && e.x < cam.scrollX + cam.width + 60;
           this.spitEnemyAI(e, now, onScreen);
         } else if (e.kind === 'fly') {
-          // Volante: punta il giocatore in linea d'aria (leggermente sopra la sua testa).
-          const dx = this.player.x - e.x;
-          const dy = (this.player.y - 14) - e.y;
-          const d = Math.hypot(dx, dy) || 1;
-          e.setVelocity((dx / d) * e.speed, (dy / d) * e.speed);
-          e.setFlipX(dx < 0);
+          this.flyAI(e, now);   // moscerino: si libra sopra di te e PICCHIA (telegrafato)
         } else if (e.guard && Math.abs(this.player.x - e.homeX) > e.guardRange) {
           // Guardiano in attesa: il giocatore e' lontano, resta a presidiare la membrana.
           if (Math.abs(e.homeX - e.x) > 8) e.setVelocityX(Math.sign(e.homeX - e.x) * e.speed * 0.5);
