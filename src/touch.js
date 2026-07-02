@@ -77,6 +77,7 @@ window.TouchControls = (function () {
       aimUp: false, aimDown: false,        // mira verticale del getto
       sprayHeld: false,                     // tenuto premuto = spruzza in continuo
       jumpQueued: false, dashQueued: false, // impulsi singoli
+      jumpHeld: false,                      // tenuto premuto (per il salto ad altezza variabile)
     };
     if (!isTouchDevice(scene)) return state;
     state.enabled = true;
@@ -147,7 +148,12 @@ window.TouchControls = (function () {
     // DESTRA: Spruzza (tieni premuto) + Salto (dedicato).
     const ar = 50;
     holdBtn(button(scene, W - ar * 3 - 30, H - ar - 26, ar, 'spray'), 'sprayHeld');
-    tapBtn(button(scene, W - ar - 22, H - ar - 26, ar, 'jump'), 'jumpQueued');
+    // Salto: impulso (jumpQueued) per far partire il salto + stato "tenuto" (jumpHeld)
+    // per il salto ad altezza variabile (rilasci presto = saltino, tieni = salto pieno).
+    const jumpBtn = button(scene, W - ar - 22, H - ar - 26, ar, 'jump');
+    jumpBtn.on('pointerdown', () => { window.Sfx.unlock(); state.jumpQueued = true; state.jumpHeld = true; press(jumpBtn, true); });
+    jumpBtn.on('pointerup', () => { state.jumpHeld = false; press(jumpBtn, false); });
+    jumpBtn.on('pointerout', () => { state.jumpHeld = false; press(jumpBtn, false); });
 
     // Scatto: solo se gia sbloccato (sopra il Salto).
     if (window.GameState.player && window.GameState.player.dash) {

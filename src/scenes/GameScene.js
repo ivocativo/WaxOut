@@ -11,10 +11,17 @@ class GameScene extends Phaser.Scene {
     this.locked = false;
     this.facing = 1;
     this.lastAttack = 0;
+    this.lastShot = 0;
     this.invulnUntil = 0;
     this.dashReady = 0;
     this.dashUntil = 0;
     this.jumpsLeft = 1;
+    // "Game feel" del salto: buffer (salto premuto poco prima di atterrare), coyote
+    // (salto ancora valido un attimo dopo esser usciti da un bordo) e taglio (rilascio
+    // presto = salto piu' basso). Vedi update().
+    this.jumpBufferedAt = -9999;
+    this.lastGroundAt = -9999;
+    this.canCutJump = false;
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // Ogni livello si parte a vita piena
@@ -646,6 +653,9 @@ class GameScene extends Phaser.Scene {
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = p.jetDamage;
+    // Lampo alla "bocca" del getto (feedback visivo di sparo).
+    const flash = this.add.circle(this.player.x + nx * 20, this.player.y - 6 + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
+    this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
     window.Sfx.spray();
     this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
   }
@@ -656,19 +666,24 @@ class GameScene extends Phaser.Scene {
     s.destroy();
   }
 
-  // Coton fioc automatico: se un nemico e' troppo vicino, da' una bastonata da solo.
-  autoMelee(now) {
-    const p = window.GameState.player;
-    if (now - this.lastAttack < p.attackCooldown) return;
+  // Cerca un nemico a distanza da bastonata (per l'attacco "intelligente": se c'e' un
+  // nemico vicino il tasto attacco fa la mazzata invece del getto). Ritorna il nemico o null.
+  meleeTargetNear() {
     const px = this.player.x, py = this.player.y;
     let target = null;
     this.enemies.getChildren().forEach((e) => {
       if (!e.active || e.spawning) return;
-      if (Math.abs(e.x - px) < 52 && Math.abs(e.y - py) < 54) target = e;
+      if (Math.abs(e.x - px) < 58 && Math.abs(e.y - py) < 56) target = e;
     });
-    if (!target) return;
+    return target;
+  }
+
+  // Bastonata verso il nemico vicino (rispetta la cadenza dell'arma corpo a corpo).
+  doMelee(now, foe) {
+    const p = window.GameState.player;
+    if (now - this.lastAttack < p.attackCooldown) return;
     this.lastAttack = now;
-    this.facing = Math.sign(target.x - px) || this.facing;
+    this.facing = Math.sign(foe.x - this.player.x) || this.facing;
     this.meleeSwing();
   }
 
@@ -683,12 +698,28 @@ class GameScene extends Phaser.Scene {
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
     const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH, range, halfH * 2);
     this.showWeaponSwing(this.facing, isHammer);
+    let hitEnemy = false, hitAny = false;
     this.blocks.getChildren().forEach((b) => {
-      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) this.damageBlock(b, p.damage);
+      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, p.damage); hitAny = true; }
     });
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) this.damageEnemy(e, p.damage);
+      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage); hitEnemy = true; hitAny = true; }
     });
+    // IMPATTO: quando la mazzata CONNETTE, micro-pausa (hit-stop) + tremolio -> peso.
+    // Piu' forte sui nemici e col martello; leggero sul solo cerume.
+    if (hitAny) {
+      this.cameras.main.shake(hitEnemy ? 90 : 55, hitEnemy ? 0.006 : 0.0035);
+      this.hitStop(isHammer ? 70 : (hitEnemy ? 55 : 32));
+    }
+  }
+
+  // "Hit-stop": congela brevemente la fisica all'impatto per dare peso ai colpi. Non si
+  // accumula (se gia' in pausa, ignora) e riprende sempre dopo ms.
+  hitStop(ms) {
+    if (this._hitStopUntil && this.time.now < this._hitStopUntil) return;
+    this._hitStopUntil = this.time.now + ms;
+    this.physics.world.pause();
+    this.time.delayedCall(ms, () => this.physics.world.resume());
   }
 
   // Animazione dell'arma all'attacco: vedi GameGfx in src/gfx.js.
@@ -730,6 +761,8 @@ class GameScene extends Phaser.Scene {
         this.burst(e.bitKey, e.x, e.y, 28);
         this.showBanner(window.I18n.t('game_boss_dead', { wax: e.waxValue }), '#ffd166');
       } else {
+        this.cameras.main.shake(80, 0.006);
+        this.hitStop(60);
         this.burst(e.bitKey, e.x, e.y, 14);
       }
       e.destroy();
@@ -919,7 +952,7 @@ class GameScene extends Phaser.Scene {
     }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
-    if (onGround) this.jumpsLeft = p.doubleJump ? 2 : 1;
+    if (onGround) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
     // Movimento (tastiera o pad a schermo)
     const left = k.A.isDown || k.LEFT.isDown || this.touch.left;
@@ -930,17 +963,27 @@ class GameScene extends Phaser.Scene {
     if (now < this.dashUntil) vx = this.facing * p.moveSpeed * 2.4;
     this.player.setVelocityX(vx);
 
-    // Salto (con doppio salto). Tasto DEDICATO: Spazio o pulsante a schermo.
-    // (Su/freccia su NON saltano piu': servono a mirare il getto verso l'alto.)
-    const jumpPressed =
-      Phaser.Input.Keyboard.JustDown(k.SPACE) ||
-      this.touch.jumpQueued;
+    // --- Salto con "game feel": buffer + altezza variabile ---
+    // Tasto DEDICATO: Spazio o pulsante a schermo. (Su/W NON saltano: mirano il getto.)
+    const BUFFER = 130;
+    const jumpEdge = Phaser.Input.Keyboard.JustDown(k.SPACE) || this.touch.jumpQueued;
     this.touch.jumpQueued = false;
-    if (jumpPressed && this.jumpsLeft > 0) {
+    if (jumpEdge) this.jumpBufferedAt = now;                 // "ricorda" il salto premuto
+    const jumpHeld = k.SPACE.isDown || this.touch.jumpHeld;
+    const wantJump = (now - this.jumpBufferedAt) <= BUFFER;  // salto in coda (anche premuto un attimo prima di atterrare)
+    if (wantJump && this.jumpsLeft > 0) {
       this.player.setVelocityY(-p.jumpVelocity);
       this.jumpsLeft--;
+      this.jumpBufferedAt = -9999;   // consuma il buffer (niente doppio salto involontario)
+      this.canCutJump = true;        // da qui in poi il rilascio puo' accorciare il salto
       window.Sfx.jump();
     }
+    // Altezza variabile: se rilasci mentre stai ancora salendo, tronca la salita (saltino).
+    if (this.canCutJump && !jumpHeld && this.player.body.velocity.y < 0) {
+      this.player.setVelocityY(this.player.body.velocity.y * 0.45);
+      this.canCutJump = false;
+    }
+    if (this.player.body.velocity.y >= 0) this.canCutJump = false;
 
     // Scatto
     const dashPressed = Phaser.Input.Keyboard.JustDown(k.SHIFT) || this.touch.dashQueued;
@@ -960,11 +1003,16 @@ class GameScene extends Phaser.Scene {
     if (aimUp) ady = -1; else if (aimDown) ady = 1;
     if (ady !== 0 && !left && !right) adx = 0;
 
-    // Spruzza (tieni premuto): getto di acqua e sapone a ripetizione.
-    if (k.J.isDown || this.touch.sprayHeld || this.pcFiring) { window.Sfx.unlock(); this.fireJet(adx, ady); }
-
-    // Coton fioc automatico se un nemico e' troppo vicino.
-    this.autoMelee(now);
+    // Attacco UNICO e "intelligente" (tieni premuto: J / pulsante Spruzza / clic).
+    // Se un nemico e' a distanza ravvicinata parte la BASTONATA (coton fioc) al posto
+    // del getto; altrimenti spara il getto (pulisce il cerume e colpisce da lontano).
+    const attackHeld = k.J.isDown || this.touch.sprayHeld || this.pcFiring;
+    if (attackHeld) {
+      window.Sfx.unlock();
+      const foe = this.meleeTargetNear();
+      if (foe) this.doMelee(now, foe);
+      else this.fireJet(adx, ady);
+    }
 
     // Animazione
     this.player.setFlipX(this.facing < 0);
