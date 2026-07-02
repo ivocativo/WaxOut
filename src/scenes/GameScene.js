@@ -597,14 +597,14 @@ class GameScene extends Phaser.Scene {
 
   // Una pallina di cerume sputata da un nemico: vola in PARABOLA (cade per gravità)
   // mirando alla posizione attuale del giocatore. Curva = più realistica e schivabile.
-  spitAt(e) {
+  spitAt(e, aimOff) {
     const g = window.CONFIG.GRAVITY;
     const dir = Math.sign(this.player.x - e.x) || 1;
     const sx = e.x + dir * 12, sy = e.y - 6;
-    const dx = this.player.x - sx;
+    const dx = (this.player.x + (aimOff || 0)) - sx;
     const dy = (this.player.y - 8) - sy;
     const dist = Math.hypot(dx, dy);
-    const T = Phaser.Math.Clamp(dist / 260, 0.5, 1.0);  // tempo di volo stimato
+    const T = Phaser.Math.Clamp(dist / 230, 0.65, 1.25);  // tempo di volo (piu' lungo = pallina piu' lenta)
     const vx = dx / T;
     const vy = (dy - 0.5 * g * T * T) / T;               // soluzione balistica
     const proj = this.projectiles.create(sx, sy, 'wax_glob').setDepth(9);
@@ -648,13 +648,14 @@ class GameScene extends Phaser.Scene {
     const d = Math.hypot(adx, ady) || 1;
     const nx = adx / d, ny = ady / d;
     const sp = 580;
-    const s = this.shots.create(this.player.x + nx * 18, this.player.y - 6 + ny * 14, 'soap').setDepth(9);
+    const oy = this.crouching ? 14 : -6;   // accovacciato: il getto parte all'altezza dei piedi
+    const s = this.shots.create(this.player.x + nx * 18, this.player.y + oy + ny * 14, 'soap').setDepth(9);
     s.body.setAllowGravity(false);
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = p.jetDamage;
     // Lampo alla "bocca" del getto (feedback visivo di sparo).
-    const flash = this.add.circle(this.player.x + nx * 20, this.player.y - 6 + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
+    const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
     window.Sfx.spray();
     this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
@@ -695,21 +696,22 @@ class GameScene extends Phaser.Scene {
     const baseRange = isHammer ? 64 : 50;
     const range = baseRange * p.attackRange;
     const halfH = isHammer ? 46 : 30;
+    const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
-    const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH, range, halfH * 2);
+    const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH + cy, range, halfH * 2);
     this.showWeaponSwing(this.facing, isHammer);
     let hitEnemy = false, hitAny = false;
     this.blocks.getChildren().forEach((b) => {
       if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, p.damage); hitAny = true; }
     });
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage); hitEnemy = true; hitAny = true; }
+      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage, true); hitEnemy = true; hitAny = true; }
     });
     // IMPATTO: quando la mazzata CONNETTE, micro-pausa (hit-stop) + tremolio -> peso.
     // Piu' forte sui nemici e col martello; leggero sul solo cerume.
     if (hitAny) {
-      this.cameras.main.shake(hitEnemy ? 90 : 55, hitEnemy ? 0.006 : 0.0035);
-      this.hitStop(isHammer ? 70 : (hitEnemy ? 55 : 32));
+      this.cameras.main.shake(hitEnemy ? 130 : 60, hitEnemy ? 0.010 : 0.004);
+      this.hitStop(isHammer ? 95 : (hitEnemy ? 78 : 40));
     }
   }
 
@@ -743,16 +745,40 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  damageEnemy(e, dmg) {
+  // heavy = colpo PESANTE (bastonata corpo a corpo): flash piu' lungo, "pop" di reazione
+  // piu' marcato e rinculo maggiore. Senza heavy (es. pallina del getto) l'impatto c'e'
+  // ma piu' contenuto, cosi' il corpo a corpo "pesa" piu' del getto.
+  damageEnemy(e, dmg, heavy) {
+    // CROSTA = corazzata anti-getto: il GETTO (non heavy) la scalfisce appena e rimbalza
+    // con un "clang"; solo il CORPO A CORPO (heavy) la abbatte come si deve.
+    const armored = (e.kind === 'crust' && !heavy);
+    if (armored) dmg = Math.max(2, Math.round(dmg * 0.3));   // il getto la scalfisce: poco ma visibile
     e.hp -= dmg;
-    e.setTintFill(0xffffff);
-    this.time.delayedCall(70, () => { if (e.active) e.clearTint(); });
-    const dir = Math.sign(e.x - this.player.x) || 1;
-    // Il Boss è massiccio: subisce molta meno spinta degli altri.
-    const kbX = e.kind === 'boss' ? 70 : 190;
-    const kbY = e.kind === 'boss' ? -60 : -150;
-    e.setVelocity(dir * kbX, kbY);
-    e.knockUntil = this.time.now + 200;
+
+    e.setTintFill(armored ? 0xbfe0ff : 0xffffff);
+    this.time.delayedCall(armored ? 55 : (heavy ? 95 : 75), () => { if (e.active) e.clearTint(); });
+
+    if (armored) {
+      // Guscio che respinge: scintilla + "clang", niente pop nè rinculo (sembra invulnerabile davanti).
+      window.Sfx.crack();
+      this.splat(e.x + (this.player.x < e.x ? -12 : 12), e.y - 4, 'hard');
+    } else {
+      // Pop di reazione: il nemico "sussulta" quando viene colpito (impatto visibile).
+      if (e.kind !== 'boss') {
+        const bs = e._baseScale || (e._baseScale = e.scaleX);
+        e.setScale(bs * (heavy ? 1.22 : 1.13));
+        this.time.delayedCall(85, () => { if (e.active && e._baseScale) e.setScale(e._baseScale); });
+      }
+      const dir = Math.sign(e.x - this.player.x) || 1;
+      // Il Boss è massiccio: subisce molta meno spinta. La bastonata (heavy) spinge di piu' del getto.
+      const boss = e.kind === 'boss';
+      const kbX = boss ? (heavy ? 100 : 70) : (heavy ? 300 : 215);
+      const kbY = boss ? (heavy ? -70 : -60) : (heavy ? -205 : -150);
+      e.setVelocity(dir * kbX, kbY);
+      e.knockUntil = this.time.now + (heavy ? 260 : 190);
+      // Un colpo INTERROMPE l'attacco in carica/affondo del nemico (ricompensa il colpire per primo).
+      if (e.atkState && e.atkState !== 'idle') { e.atkState = 'idle'; e.atkReadyAt = this.time.now + 500; if (e._baseScale) e.setScale(e._baseScale); }
+    }
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
       window.GameState.wax += e.waxValue;
@@ -761,12 +787,128 @@ class GameScene extends Phaser.Scene {
         this.burst(e.bitKey, e.x, e.y, 28);
         this.showBanner(window.I18n.t('game_boss_dead', { wax: e.waxValue }), '#ffd166');
       } else {
-        this.cameras.main.shake(80, 0.006);
-        this.hitStop(60);
-        this.burst(e.bitKey, e.x, e.y, 14);
+        this.cameras.main.shake(110, 0.009);
+        this.hitStop(85);
+        this.burst(e.bitKey, e.x, e.y, 18);
       }
       e.destroy();
     }
+  }
+
+  // IA dei nemici a terra "melee" (cerumino, crosta): oltre a camminare verso il
+  // giocatore, quando gli e' vicino esegue un AFFONDO TELEGRAFATO:
+  //   idle (cammina) -> windup (si accovaccia + lampeggia ~0,42s = telegrafo) ->
+  //   lunge (balzo verso il giocatore ~0,32s) -> recupero prima del prossimo affondo.
+  // Cosi' lo scontro diventa "leggi e reagisci": puoi schivare (salto/scatto) o
+  // colpirlo durante la carica per interromperlo (vedi damageEnemy).
+  groundEnemyAI(e, now) {
+    const dx = this.player.x - e.x;
+    const dir = Math.sign(dx) || (e.lungeDir || 1);
+
+    if (e.atkState === 'windup') {
+      e.setVelocityX(0);
+      e.setTint((Math.floor(now / 90) % 2) ? 0xffe066 : 0xffffff);  // lampeggia = "sta per saltare"
+      if (now >= e.windupUntil) {                       // fine carica -> parte l'affondo
+        e.atkState = 'lunge';
+        e.lungeUntil = now + 320;
+        e.clearTint();
+        if (e._baseScale) e.setScale(e._baseScale);
+        e.setVelocity(e.lungeDir * (e.speed * 3.0 + 120), -190);
+      }
+      return;
+    }
+    if (e.atkState === 'lunge') {
+      e.setFlipX(e.lungeDir < 0);
+      if (now >= e.lungeUntil) {                         // atterrato/finito -> recupero
+        e.atkState = 'idle';
+        e.atkReadyAt = now + 750;
+        e.setVelocityX(0);
+      }
+      return;                                            // durante il balzo mantiene lo slancio
+    }
+
+    // idle: se il giocatore e' vicino ed e' pronto, inizia la carica; altrimenti cammina.
+    const near = Math.abs(dx) < 155 && Math.abs(this.player.y - e.y) < 72;
+    if (near && now >= (e.atkReadyAt || 0) && (e.body.blocked.down || e.body.touching.down)) {
+      e.atkState = 'windup';
+      e.windupUntil = now + 420;
+      e.lungeDir = dir;
+      e.setVelocityX(0);
+      e.setTint(0xffe066);                               // telegrafo: lampeggia caldo
+      const bs = e._baseScale || (e._baseScale = e.scaleX);
+      e.setScale(bs * 1.22, bs * 0.8);                   // si accovaccia (carica il balzo)
+      e.setFlipX(dir < 0);
+      return;
+    }
+    e.setVelocityX(dir * e.speed);
+    e.setFlipX(dir < 0);
+  }
+
+  // IA del BOSS (Tappo di Cerume): avanza lento e SPUTA con telegrafo (breve carica
+  // lampeggiante prima del lancio). A META' VITA si INFURIA: sputo piu' frequente e a
+  // VENTAGLIO (3 vie) ed evoca ogni tanto un cerumino. Chiamato dal loop nemici.
+  bossAI(e, now) {
+    const dir = Math.sign(this.player.x - e.x) || 1;
+    e.setVelocityX(dir * e.speed);
+    e.setFlipX(dir < 0);
+
+    const enraged = e.hp <= e.maxHp * 0.5;
+    if (enraged && !e._enraged) {                 // passaggio di fase
+      e._enraged = true;
+      this.cameras.main.shake(200, 0.01);
+      this.showBanner(window.I18n.t('game_boss_enrage'), '#ff7043');
+      e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
+      e._summonAt = now + 2500;
+    }
+
+    // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
+    if (now >= (e.nextSpit || 0)) {
+      if (!e.spitWindupAt) e.spitWindupAt = now;
+      e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : 0xffffff);
+      if (now - e.spitWindupAt >= 320) {
+        e.clearTint(); e.spitWindupAt = 0;
+        if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
+        else this.spitAt(e, 0);
+        e.nextSpit = now + e.spitEvery;
+      }
+    }
+
+    // In furia: evoca uno sgherro ogni tanto (se non ce ne sono già troppi).
+    if (enraged && now >= (e._summonAt || Number.MAX_SAFE_INTEGER)) {
+      if (this.enemies.countActive(true) < 4) this.spawnEnemy('blob');
+      e._summonAt = now + 5000;
+    }
+  }
+
+  // IA del GORGOGLIANTE (nemico azzurrino a distanza): avanza lento verso il giocatore;
+  // quando è pronto e il giocatore è NELL'INQUADRATURA, si CARICA (si comprime + lampeggia
+  // ~0,3s) e poi ESPELLE la pallina. Fuori campo NON spara (range d'attacco limitato).
+  spitEnemyAI(e, now, onScreen) {
+    const dir = Math.sign(this.player.x - e.x) || 1;
+    e.setFlipX(dir < 0);
+
+    // Carica in corso: fermo, si comprime, poi lancia.
+    if (e.spitWindupAt) {
+      e.setVelocityX(0);
+      const bs = e._baseScale || (e._baseScale = e.scaleX);
+      const t = Phaser.Math.Clamp((now - e.spitWindupAt) / 300, 0, 1);
+      e.setScale(bs * (1 + 0.18 * t), bs * (1 - 0.16 * t));           // si comprime (carica)
+      e.setTint((Math.floor(now / 70) % 2) ? 0x9fe0ff : 0xffffff);
+      if (now - e.spitWindupAt >= 300) {
+        e.setScale(bs); e.clearTint(); e.spitWindupAt = 0;
+        this.spitAt(e);                                              // espelle
+        e.nextSpit = now + e.spitEvery;
+      }
+      return;
+    }
+    // Pronto e giocatore in vista: inizia la carica.
+    if (onScreen && now >= (e.nextSpit || 0)) {
+      e.spitWindupAt = now;
+      e.setVelocityX(0);
+      return;
+    }
+    // Altrimenti avanza lento verso il giocatore.
+    e.setVelocityX(dir * e.speed);
   }
 
   hurtPlayer(dmg, sourceX) {
@@ -879,6 +1021,7 @@ class GameScene extends Phaser.Scene {
 
   updateHud() {
     const p = window.GameState.player;
+    const W = window.CONFIG.WIDTH;
     const x = 18, y = 40, w = 200, h = 18;
     this.hudG.clear();
     this.hudG.fillStyle(0x000000, 0.5); this.hudG.fillRect(x - 2, y - 2, w + 4, h + 4);
@@ -886,6 +1029,16 @@ class GameScene extends Phaser.Scene {
     const ratio = Phaser.Math.Clamp(p.hp / p.maxHp, 0, 1);
     const col = ratio > 0.5 ? 0x4caf50 : (ratio > 0.25 ? 0xe0a020 : 0xe74c3c);
     this.hudG.fillStyle(col, 1); this.hudG.fillRect(x, y, w * ratio, h);
+
+    // Barra HP del BOSS (solo se un Tappo di Cerume è in campo): larga, centrata in alto.
+    const boss = this.enemies && this.enemies.getChildren().find((b) => b.active && b.kind === 'boss');
+    if (boss) {
+      const bw = 380, bx = (W - bw) / 2, by = 64, bh = 14;
+      const br = Phaser.Math.Clamp(boss.hp / boss.maxHp, 0, 1);
+      this.hudG.fillStyle(0x000000, 0.55); this.hudG.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+      this.hudG.fillStyle(0x3a1414, 1); this.hudG.fillRect(bx, by, bw, bh);
+      this.hudG.fillStyle(br > 0.5 ? 0xd23a3a : 0xff7043, 1); this.hudG.fillRect(bx, by, bw * br, bh);   // arancione = infuriato
+    }
 
     const T = window.I18n;
     this.hpText.setText(T.t('hud_hp', { hp: Math.ceil(p.hp), max: p.maxHp }));
@@ -954,14 +1107,23 @@ class GameScene extends Phaser.Scene {
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
     if (onGround) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
-    // Movimento (tastiera o pad a schermo)
+    // ACCOVACCIAMENTO (stile Metal Slug): tieni GIU' a terra -> ti abbassi, così getto e
+    // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In
+    // aria GIU' resta la mira verso il basso del getto (gestita più sotto).
+    const downHeld = k.DOWN.isDown || k.S.isDown || this.touch.aimDown;
+    this.crouching = onGround && downHeld;
+
+    // Movimento (tastiera o pad a schermo); accovacciato ci si muove piano.
     const left = k.A.isDown || k.LEFT.isDown || this.touch.left;
     const right = k.D.isDown || k.RIGHT.isDown || this.touch.right;
     let vx = 0;
     if (left) { vx = -p.moveSpeed; this.facing = -1; }
     else if (right) { vx = p.moveSpeed; this.facing = 1; }
+    if (this.crouching) vx *= 0.45;
     if (now < this.dashUntil) vx = this.facing * p.moveSpeed * 2.4;
     this.player.setVelocityX(vx);
+    // Posa accovacciata: sprite schiacciato (segnaposto in attesa di un frame dedicato).
+    this.player.setScale(1.5, this.crouching ? 1.02 : 1.5);
 
     // --- Salto con "game feel": buffer + altezza variabile ---
     // Tasto DEDICATO: Spazio o pulsante a schermo. (Su/W NON saltano: mirano il getto.)
@@ -1002,6 +1164,8 @@ class GameScene extends Phaser.Scene {
     let adx = this.facing, ady = 0;
     if (aimUp) ady = -1; else if (aimDown) ady = 1;
     if (ady !== 0 && !left && !right) adx = 0;
+    // Accovacciato: si spara ORIZZONTALE (basso), non verso il pavimento.
+    if (this.crouching) { ady = 0; adx = this.facing; }
 
     // Attacco UNICO e "intelligente" (tieni premuto: J / pulsante Spruzza / clic).
     // Se un nemico e' a distanza ravvicinata parte la BASTONATA (coton fioc) al posto
@@ -1034,14 +1198,15 @@ class GameScene extends Phaser.Scene {
         return;
       }
 
-      // Sputatori (Gorgogliante e Boss): lanciano una pallina ogni tanto.
-      if (e.nextSpit !== undefined && now >= e.nextSpit && now >= e.knockUntil) {
-        this.spitAt(e);
-        e.nextSpit = now + e.spitEvery;
-      }
-
       if (now >= e.knockUntil) {
-        if (e.kind === 'fly') {
+        if (e.kind === 'boss') {
+          this.bossAI(e, now);
+        } else if (e.kind === 'spit') {
+          // Gorgogliante: spara SOLO se è nell'inquadratura (range d'attacco limitato).
+          const cam = this.cameras.main;
+          const onScreen = e.x > cam.scrollX - 60 && e.x < cam.scrollX + cam.width + 60;
+          this.spitEnemyAI(e, now, onScreen);
+        } else if (e.kind === 'fly') {
           // Volante: punta il giocatore in linea d'aria (leggermente sopra la sua testa).
           const dx = this.player.x - e.x;
           const dy = (this.player.y - 14) - e.y;
@@ -1053,11 +1218,15 @@ class GameScene extends Phaser.Scene {
           if (Math.abs(e.homeX - e.x) > 8) e.setVelocityX(Math.sign(e.homeX - e.x) * e.speed * 0.5);
           else e.setVelocityX(0);
           e.setFlipX(this.player.x < e.x);
-        } else {
-          // A terra: cammina verso il giocatore.
+        } else if (e.kind === 'crust') {
+          // Crosta (corazzata lenta): avanza camminando verso il giocatore. Niente
+          // affondo (è una parete inesorabile), va abbattuta col corpo a corpo.
           const dir = Math.sign(this.player.x - e.x);
           e.setVelocityX(dir * e.speed);
           e.setFlipX(dir < 0);
+        } else {
+          // Cerumino (blob): cammina + AFFONDO telegrafato.
+          this.groundEnemyAI(e, now);
         }
       }
 

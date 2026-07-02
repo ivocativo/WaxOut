@@ -43,6 +43,7 @@ window.I18n = (function () {
       game_clean_more: 'CLEAN MORE WAX!  ({pct}% needed)',
       game_boss_guard: 'DEFEAT THE WAX PLUG TO BREAK THROUGH!',
       game_boss_dead: 'WAX PLUG DESTROYED!  +{wax}',
+      game_boss_enrage: 'THE WAX PLUG IS ENRAGED!',
       // --- Livello completato ---
       done_title: 'LEVEL {n} COMPLETE!',
       done_sub: 'Ear canal cleaned!',
@@ -130,6 +131,7 @@ window.I18n = (function () {
       game_clean_more: 'PULISCI ANCORA!  (serve {pct}%)',
       game_boss_guard: 'SCONFIGGI IL TAPPO DI CERUME PER PASSARE!',
       game_boss_dead: 'TAPPO DI CERUME DISTRUTTO!  +{wax}',
+      game_boss_enrage: 'IL TAPPO DI CERUME SI E\' INFURIATO!',
       // --- Livello completato ---
       done_title: 'LIVELLO {n} COMPLETATO!',
       done_sub: 'Condotto ripulito!',

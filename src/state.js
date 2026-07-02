@@ -67,7 +67,7 @@ window.GameState = {
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
       jetDamage: 16 + lv('dmg') * U.dmg.per * 0.5,  // un po' sotto al corpo a corpo
-      shotCooldown: 200,     // ms tra uno spruzzo e l'altro
+      shotCooldown: 340,     // ms tra uno spruzzo e l'altro (getto base "lento": non spam)
       doubleJump: lv('djump') > 0,
       dash: false,
       weapon: 'swab',        // 'swab' | 'hammer' (corpo a corpo)
