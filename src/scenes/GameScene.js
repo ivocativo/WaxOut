@@ -1,3 +1,41 @@
+// Effetto "METABALL" per il cerume: preso il livello dei globi, ne sfoca l'alpha su un
+// intorno e applica una SOGLIA netta (smoothstep) -> i globi vicini si fondono in una
+// massa liquida con bordo pulito, e i contorni interni si ammorbidiscono. La rgb viene
+// mediata sull'intorno (cosi' i "buchi" tra i globi prendono il colore vicino). Soglia e
+// raggio regolabili al volo via window.__WAX_THRESH / window.__WAX_SPREAD.
+const WAX_METABALL_FRAG = [
+  'precision mediump float;',
+  'uniform sampler2D uMainSampler;',
+  'uniform vec2 uSize;',
+  'uniform float uThresh;',
+  'uniform float uSpread;',
+  'varying vec2 outTexCoord;',
+  'void main(){',
+  '  vec2 px = uSpread / uSize;',
+  '  float a = 0.0; vec3 col = vec3(0.0); float cw = 0.0;',
+  '  for(int y=-2;y<=2;y++){',
+  '    for(int x=-2;x<=2;x++){',
+  '      vec2 o = vec2(float(x), float(y)) * px;',
+  '      vec4 t = texture2D(uMainSampler, outTexCoord + o);',
+  '      a += t.a; col += t.rgb * t.a; cw += t.a;',
+  '    }',
+  '  }',
+  '  a /= 25.0;',
+  '  vec3 c = cw > 0.001 ? col / cw : vec3(0.85, 0.6, 0.15);',
+  '  float edge = smoothstep(uThresh - 0.09, uThresh + 0.09, a);',
+  '  gl_FragColor = vec4(c * edge, edge);',   // alpha PREMOLTIPLICATO (Phaser): trasparente = rgb 0
+  '}',
+].join('\n');
+
+const WaxMetaballFX = (Phaser.Renderer && Phaser.Renderer.WebGL) ? class extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
+  constructor(game) { super({ game: game, name: 'WaxMeta', fragShader: WAX_METABALL_FRAG }); }
+  onPreRender() {
+    this.set2f('uSize', this.renderer.width, this.renderer.height);
+    this.set1f('uThresh', window.__WAX_THRESH || 0.42);
+    this.set1f('uSpread', window.__WAX_SPREAD || 2.4);
+  }
+} : null;
+
 // GameScene: gameplay principale di un livello.
 class GameScene extends Phaser.Scene {
   constructor() { super('GameScene'); }
@@ -212,17 +250,14 @@ class GameScene extends Phaser.Scene {
 
     // Riempimento continuo (base scura) DIETRO agli sprite di cerume: chiude i vuoti tra un
     // pezzo e l'altro così la massa sembra unica. Gli sprite-chunk (depth 6) ci vanno sopra.
-    this.waxGfx = this.add.graphics().setDepth(5);
-    // TUTTO il cerume (base + globi + gocce) in UN livello, sfocato UNA volta sola: i contorni
-    // tra i singoli globi si fondono in una massa continua. Sfocatura LEGGERA per non perdere
-    // i riflessi lucidi. (Phaser postFX blur, WebGL.)
+    this.waxGfx = this.add.graphics().setDepth(5);   // base scura DIETRO (fuori dal livello metaball)
+    // Livello dei globi di cerume + effetto METABALL (fonde i globi in una massa liquida con
+    // bordi netti). Regolabile al volo: window.__WAX_THRESH (soglia) / window.__WAX_SPREAD (raggio).
     this.waxLayer = this.add.layer().setDepth(6);
-    this.waxLayer.add(this.waxGfx);
-    // Due effetti sul livello cerume: (1) SFOCATURA leggera fonde i contorni tra i globi;
-    // (2) PIXELLATURA leggera lo rende coerente col resto pixel-art. Tarabili: waxBlur.strength
-    // (più alto = più fuso) e waxPix.amount (più alto = pixeloni più grossi).
-    this.waxBlur = this.waxLayer.postFX.addBlur(1, 0.7, 0.7, 0.18, 0xffffff, 6);
-    this.waxPix = this.waxLayer.postFX.addPixelate(1);
+    if (WaxMetaballFX && this.renderer.pipelines) {
+      if (!this.game.__waxPipe) { this.renderer.pipelines.addPostPipeline('WaxMeta', WaxMetaballFX); this.game.__waxPipe = true; }
+      this.waxLayer.setPostPipeline('WaxMeta');
+    }
 
     // Quante membrane lungo il corridoio: cresce col livello.
     let count = Phaser.Math.Clamp(2 + Math.floor(lvl / 2), 2, 6);
@@ -471,6 +506,10 @@ class GameScene extends Phaser.Scene {
       if (this.waxLayer) this.waxLayer.add(img);   // nel livello sfocato -> globi fusi
       b.waxImg = img;
       b.waxOX = ox;
+      // dati per l'animazione "fluida" (ondeggio) in animateWax()
+      b.waxSeed = seed;
+      b.waxBaseX = b.x + ox; b.waxBaseY = b.y + oy;
+      b.waxBaseS = img.scaleX;
       // Goccia sotto lo sporto basso (niente blocco sotto): effetto colata.
       if (b.row > 0 && !occ.has(b.col + ',' + (b.row - 1))) {
         const dk = DR[Math.floor(h(seed + 6) * DR.length) % DR.length];
@@ -480,6 +519,7 @@ class GameScene extends Phaser.Scene {
         d.setTint(this._waxTint(b.waxType, 1));
         if (this.waxLayer) this.waxLayer.add(d);
         b.waxDrip = d;
+        b.waxDripBaseS = d.scaleY;
       }
     });
     this.drawWaxBase();
@@ -510,6 +550,25 @@ class GameScene extends Phaser.Scene {
       for (let i = 1; i < arr.length; i++) { if (arr[i].row === arr[i - 1].row + 1) run.push(arr[i]); else { flush(); run = [arr[i]]; } }
       flush();
     });
+  }
+
+  // Animazione "fluida" del cerume: la superficie ONDEGGIA dolcemente (sinusoidi sfasate per
+  // pezzo) e le gocce COLANO (si allungano/ritirano). Con la fusione del waxLayer la massa
+  // sembra un liquido vivo invece di un blocco fermo. Chiamata da update().
+  animateWax(time) {
+    if (!this.blocks) return;
+    const t = time * 0.001;
+    const kids = this.blocks.getChildren();
+    for (let i = 0; i < kids.length; i++) {
+      const b = kids[i];
+      if (!b.active || !b.waxImg) continue;
+      const s = b.waxSeed;
+      b.waxImg.x = b.waxBaseX + Math.sin(t * 1.1 + s * 1.7) * 1.0;   // sway orizzontale
+      b.waxImg.y = b.waxBaseY + Math.sin(t * 1.7 + s) * 1.5;         // ondeggio verticale
+      b.waxImg.scaleX = b.waxBaseS * (1 + Math.sin(t * 2.1 + s) * 0.02);
+      b.waxImg.scaleY = b.waxBaseS * (1 + Math.cos(t * 1.9 + s) * 0.02);
+      if (b.waxDrip) b.waxDrip.scaleY = b.waxDripBaseS * (1 + (Math.sin(t * 1.4 + s) * 0.5 + 0.5) * 0.4);
+    }
   }
 
   // Disegno del muro di cerume (vecchio, a palle) e splat di feedback: vedi GameGfx in src/gfx.js.
@@ -1253,6 +1312,7 @@ class GameScene extends Phaser.Scene {
 
   update(time) {
     window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
+    this.animateWax(time);                    // cerume "fluido": ondeggia e cola
     if (this.locked) { this.player.setVelocityX(0); return; }
     const p = window.GameState.player;
     const k = this.keys;
