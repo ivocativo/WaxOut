@@ -210,8 +210,19 @@ class GameScene extends Phaser.Scene {
     const lvl = window.GameState.level;
     this.groundTop = H - gh;
 
-    // Disegno del cerume come massa unica gommosa (sopra i blocchi, che restano invisibili).
-    this.waxGfx = this.add.graphics().setDepth(6);
+    // Riempimento continuo (base scura) DIETRO agli sprite di cerume: chiude i vuoti tra un
+    // pezzo e l'altro così la massa sembra unica. Gli sprite-chunk (depth 6) ci vanno sopra.
+    this.waxGfx = this.add.graphics().setDepth(5);
+    // TUTTO il cerume (base + globi + gocce) in UN livello, sfocato UNA volta sola: i contorni
+    // tra i singoli globi si fondono in una massa continua. Sfocatura LEGGERA per non perdere
+    // i riflessi lucidi. (Phaser postFX blur, WebGL.)
+    this.waxLayer = this.add.layer().setDepth(6);
+    this.waxLayer.add(this.waxGfx);
+    // Due effetti sul livello cerume: (1) SFOCATURA leggera fonde i contorni tra i globi;
+    // (2) PIXELLATURA leggera lo rende coerente col resto pixel-art. Tarabili: waxBlur.strength
+    // (più alto = più fuso) e waxPix.amount (più alto = pixeloni più grossi).
+    this.waxBlur = this.waxLayer.postFX.addBlur(1, 0.7, 0.7, 0.18, 0xffffff, 6);
+    this.waxPix = this.waxLayer.postFX.addPixelate(1);
 
     // Quante membrane lungo il corridoio: cresce col livello.
     let count = Phaser.Math.Clamp(2 + Math.floor(lvl / 2), 2, 6);
@@ -245,7 +256,7 @@ class GameScene extends Phaser.Scene {
     this.totalWax = 0;
     this.blocks.getChildren().forEach((b) => { if (b.active) this.totalWax += b.waxValue; });
     this.cleanedWax = 0;
-    this.drawWax();
+    this.buildWaxSprites();
   }
 
   // Una membrana di cerume: una colonna di blocchi dal pavimento verso l'alto che
@@ -423,7 +434,85 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: arrow, x: this.goalX - 36, alpha: 0.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
 
-  // Disegno del muro di cerume e splat di feedback: vedi GameGfx in src/gfx.js.
+  // Colore del cerume per TIPO (ricolora lo sprite ambra) e scurito col danno (k = vita 0..1).
+  _waxTint(type, k) {
+    const base = { soft: 0xffffff, hard: 0xd59a2e, dirt: 0x9a7040 }[type] || 0xffffff;
+    if (k >= 1) return base;
+    const f = 0.5 + 0.5 * Phaser.Math.Clamp(k, 0, 1);   // fino a metà luminosità quando quasi distrutto
+    const r = (base >> 16) & 255, g = (base >> 8) & 255, b = base & 255;
+    return ((r * f | 0) << 16) | ((g * f | 0) << 8) | (b * f | 0);
+  }
+
+  // Costruisce il MURO DI CERUME coi pezzi/sprite AI: uno sprite-chunk per ogni blocco fisico
+  // (variante deterministica, ricolorato per tipo, largo così si sovrappone ai vicini = massa
+  // continua, non palline). Sotto le sporgenze (nessun blocco sotto) aggiunge una goccia/colata.
+  // I blocchi restano la fisica/gameplay invisibile; questi sprite sono solo il "vestito".
+  buildWaxSprites() {
+    const B = window.CONFIG.BLOCK;
+    const CH = ['wax_a', 'wax_b', 'wax_c', 'wax_d'];
+    const DR = ['wax_drip_a', 'wax_drip_b'];
+    const h = (n) => { const x = Math.abs(Math.sin(n) * 43758.5453); return x - Math.floor(x); };  // hash deterministico
+    const blocks = this.blocks.getChildren().filter((b) => b.active);
+    const occ = new Set(blocks.map((b) => b.col + ',' + b.row));
+    blocks.forEach((b) => {
+      if (b.waxImg) { b.waxImg.destroy(); b.waxImg = null; }
+      if (b.waxDrip) { b.waxDrip.destroy(); b.waxDrip = null; }
+      const seed = b.col * 13.1 + b.row * 7.7;
+      const key = CH[Math.floor(h(seed) * CH.length) % CH.length];
+      const src = this.textures.get(key).getSourceImage();
+      // "Traballamento" organico: offset/scala/rotazione variabili -> cumulo irregolare, non colonna dritta.
+      const ox = (h(seed + 1) - 0.5) * B * 0.55;
+      const oy = (h(seed + 2) - 0.5) * B * 0.35;
+      const img = this.add.image(b.x + ox, b.y + oy, key).setDepth(6);
+      img.setScale((B * 2.2) / src.width * (0.82 + h(seed + 3) * 0.45));   // grandi + sovrapposti = fusi
+      img.setAngle((h(seed + 4) - 0.5) * 26);
+      if (h(seed + 5) < 0.5) img.setFlipX(true);
+      img.setTint(this._waxTint(b.waxType, 1));
+      if (this.waxLayer) this.waxLayer.add(img);   // nel livello sfocato -> globi fusi
+      b.waxImg = img;
+      b.waxOX = ox;
+      // Goccia sotto lo sporto basso (niente blocco sotto): effetto colata.
+      if (b.row > 0 && !occ.has(b.col + ',' + (b.row - 1))) {
+        const dk = DR[Math.floor(h(seed + 6) * DR.length) % DR.length];
+        const dsrc = this.textures.get(dk).getSourceImage();
+        const d = this.add.image(b.x + ox, b.y + B * 0.3, dk).setOrigin(0.5, 0).setDepth(6);
+        d.setScale((B * 1.2) / dsrc.width);
+        d.setTint(this._waxTint(b.waxType, 1));
+        if (this.waxLayer) this.waxLayer.add(d);
+        b.waxDrip = d;
+      }
+    });
+    this.drawWaxBase();
+  }
+
+  // Riempimento continuo (base scura) dietro agli sprite: chiude i vuoti tra un pezzo e l'altro
+  // così la massa sembra UNICA. Ridisegnato quando un blocco viene distrutto (la massa si ritira).
+  drawWaxBase() {
+    const g = this.waxGfx;
+    if (!g) return;
+    const C = window.CONFIG.COLORS, B = window.CONFIG.BLOCK;
+    g.clear();
+    const blocks = this.blocks.getChildren().filter((b) => b.active);
+    if (!blocks.length) return;
+    const BASE = { soft: C.waxSoftDark, hard: C.waxHardDark, dirt: C.dirtDark };
+    const byCol = {};
+    blocks.forEach((b) => { (byCol[b.col] || (byCol[b.col] = [])).push(b); });
+    Object.keys(byCol).forEach((col) => {
+      const arr = byCol[col].sort((a, b) => a.row - b.row);
+      let run = [arr[0]];
+      const flush = () => {
+        const top = run[run.length - 1], bot = run[0];
+        const x = bot.x, w = B * 1.7, tY = top.y - B / 2, bY = bot.y + B / 2;
+        g.fillStyle(BASE[top.waxType], 1);
+        g.fillRect(x - w / 2, tY, w, bY - tY);
+        g.fillEllipse(x, tY, w, w * 0.6);
+      };
+      for (let i = 1; i < arr.length; i++) { if (arr[i].row === arr[i - 1].row + 1) run.push(arr[i]); else { flush(); run = [arr[i]]; } }
+      flush();
+    });
+  }
+
+  // Disegno del muro di cerume (vecchio, a palle) e splat di feedback: vedi GameGfx in src/gfx.js.
   drawWax() { window.GameGfx.drawWax(this); }
   splat(x, y, type) { window.GameGfx.splat(this, x, y, type); }
 
@@ -753,13 +842,16 @@ class GameScene extends Phaser.Scene {
       this.splat(b.x, b.y, b.waxType);
       window.GameState.wax += b.waxValue;
       this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito"
+      if (b.waxImg) b.waxImg.destroy();
+      if (b.waxDrip) b.waxDrip.destroy();
       b.destroy();
       this.blocksLeft = this.blocks.countActive(true);
-      this.drawWax();
+      this.drawWaxBase();   // la massa si ritira dove hai pulito
     } else {
       window.Sfx.crack();
       this.burst(b.bitKey, b.x, b.y, 3);
-      this.drawWax();
+      // Il pezzo si scurisce man mano che lo consumi.
+      if (b.waxImg) b.waxImg.setTint(this._waxTint(b.waxType, Phaser.Math.Clamp(b.hp / b.maxHp, 0, 1)));
     }
   }
 

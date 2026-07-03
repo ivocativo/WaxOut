@@ -30,6 +30,9 @@ class BootScene extends Phaser.Scene {
     aimg('prot_coral_branch', 'assets/protuberances/prot_coral_branch.png'); // rovi ramificati (pavimento)
     aimg('prot_drip', 'assets/protuberances/prot_drip.png');                 // colata che gocciola (soffitto)
     aimg('prot_web', 'assets/protuberances/prot_web.png');                   // fascia di muco (soffitto)
+    // CERUME (sprite AI): pezzi/chunk per il muro + gocce/colate. Ricolorati per tipo in gioco.
+    ['wax_a', 'wax_b', 'wax_c', 'wax_d', 'wax_drip_a', 'wax_drip_b']
+      .forEach((k) => aimg(k, 'assets/wax/' + k + '.png'));
   }
 
   create() {

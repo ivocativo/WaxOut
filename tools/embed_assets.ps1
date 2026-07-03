@@ -13,6 +13,12 @@ $manifest = [ordered]@{
   'prot_coral_branch'= 'assets/protuberances/prot_coral_branch.png'
   'prot_drip'       = 'assets/protuberances/prot_drip.png'
   'prot_web'        = 'assets/protuberances/prot_web.png'
+  'wax_a'           = 'assets/wax/wax_a.png'
+  'wax_b'           = 'assets/wax/wax_b.png'
+  'wax_c'           = 'assets/wax/wax_c.png'
+  'wax_d'           = 'assets/wax/wax_d.png'
+  'wax_drip_a'      = 'assets/wax/wax_drip_a.png'
+  'wax_drip_b'      = 'assets/wax/wax_drip_b.png'
 }
 
 $sb = New-Object System.Text.StringBuilder
