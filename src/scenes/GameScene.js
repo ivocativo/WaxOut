@@ -9,14 +9,17 @@ const WAX_METABALL_FRAG = [
   'uniform vec2 uSize;',
   'uniform float uThresh;',
   'uniform float uSpread;',
+  'uniform float uPix;',
   'varying vec2 outTexCoord;',
   'void main(){',
+  '  vec2 grid = max(uPix, 1.0) / uSize;',
+  '  vec2 uv = (floor(outTexCoord / grid) + 0.5) * grid;',   // centro "pixelato"
   '  vec2 px = uSpread / uSize;',
   '  float a = 0.0; vec3 col = vec3(0.0); float cw = 0.0;',
   '  for(int y=-2;y<=2;y++){',
   '    for(int x=-2;x<=2;x++){',
   '      vec2 o = vec2(float(x), float(y)) * px;',
-  '      vec4 t = texture2D(uMainSampler, outTexCoord + o);',
+  '      vec4 t = texture2D(uMainSampler, uv + o);',
   '      a += t.a; col += t.rgb * t.a; cw += t.a;',
   '    }',
   '  }',
@@ -32,7 +35,8 @@ const WaxMetaballFX = (Phaser.Renderer && Phaser.Renderer.WebGL) ? class extends
   onPreRender() {
     this.set2f('uSize', this.renderer.width, this.renderer.height);
     this.set1f('uThresh', window.__WAX_THRESH || 0.42);
-    this.set1f('uSpread', window.__WAX_SPREAD || 2.4);
+    this.set1f('uSpread', window.__WAX_SPREAD || 1.6);   // meno sfocatura (raggio fusione ridotto)
+    this.set1f('uPix', window.__WAX_PIX || 3.0);          // più pixellosità
   }
 } : null;
 
@@ -555,20 +559,44 @@ class GameScene extends Phaser.Scene {
   // Animazione "fluida" del cerume: la superficie ONDEGGIA dolcemente (sinusoidi sfasate per
   // pezzo) e le gocce COLANO (si allungano/ritirano). Con la fusione del waxLayer la massa
   // sembra un liquido vivo invece di un blocco fermo. Chiamata da update().
+  // Ondeggio del cerume SOLO QUANDO COLPITO: ogni pezzo colpito (e i vicini, vedi
+  // wobbleWaxNear) riceve un impulso che oscilla e DECADE, poi torna fermo. Niente
+  // movimento costante. Chiamata in update().
   animateWax(time) {
     if (!this.blocks) return;
-    const t = time * 0.001;
+    const now = time, DUR = 520;
     const kids = this.blocks.getChildren();
     for (let i = 0; i < kids.length; i++) {
       const b = kids[i];
       if (!b.active || !b.waxImg) continue;
-      const s = b.waxSeed;
-      b.waxImg.x = b.waxBaseX + Math.sin(t * 1.1 + s * 1.7) * 1.0;   // sway orizzontale
-      b.waxImg.y = b.waxBaseY + Math.sin(t * 1.7 + s) * 1.5;         // ondeggio verticale
-      b.waxImg.scaleX = b.waxBaseS * (1 + Math.sin(t * 2.1 + s) * 0.02);
-      b.waxImg.scaleY = b.waxBaseS * (1 + Math.cos(t * 1.9 + s) * 0.02);
-      if (b.waxDrip) b.waxDrip.scaleY = b.waxDripBaseS * (1 + (Math.sin(t * 1.4 + s) * 0.5 + 0.5) * 0.4);
+      const img = b.waxImg;
+      if (b.waxHitAt) {
+        const e = now - b.waxHitAt;
+        if (e < DUR) {
+          const amp = 1 - e / DUR;                       // decade a zero
+          const w = Math.sin(e * 0.045 + b.waxSeed) * amp;
+          img.x = b.waxBaseX + w * 3.0;
+          img.y = b.waxBaseY + Math.cos(e * 0.038 + b.waxSeed) * amp * 4.0;
+          img.scaleX = b.waxBaseS * (1 + w * 0.07);
+          img.scaleY = b.waxBaseS * (1 - w * 0.07);
+          if (b.waxDrip) b.waxDrip.scaleY = b.waxDripBaseS * (1 + amp * 0.3);
+          continue;
+        }
+        b.waxHitAt = 0;                                  // finito -> riposo
+        img.x = b.waxBaseX; img.y = b.waxBaseY; img.scaleX = b.waxBaseS; img.scaleY = b.waxBaseS;
+        if (b.waxDrip) b.waxDrip.scaleY = b.waxDripBaseS;
+      }
     }
+  }
+
+  // Dà l'impulso di ondeggio ai pezzi di cerume vicini al punto colpito (onda d'urto locale).
+  wobbleWaxNear(x, y) {
+    if (!this.blocks) return;
+    const now = this.time.now, R = 74;
+    this.blocks.getChildren().forEach((o) => {
+      if (!o.active || !o.waxImg) return;
+      if (Math.abs(o.x - x) < R && Math.abs(o.y - y) < R) o.waxHitAt = now;
+    });
   }
 
   // Disegno del muro di cerume (vecchio, a palle) e splat di feedback: vedi GameGfx in src/gfx.js.
@@ -895,6 +923,7 @@ class GameScene extends Phaser.Scene {
 
   damageBlock(b, dmg) {
     b.hp -= dmg;
+    this.wobbleWaxNear(b.x, b.y);   // ondeggio locale al punto colpito
     if (b.hp <= 0) {
       window.Sfx.smash();
       this.burst(b.bitKey, b.x, b.y, 14);
