@@ -158,16 +158,24 @@ class GameScene extends Phaser.Scene {
     // individuiamo sempre il proiettile-getto dal gruppo this.shots.)
     this.makeSoapTexture();
     this.shots = this.physics.add.group({ allowGravity: false });
+    // Abilità PERFORANTE: la pallina non si spappola al primo colpo ma ne attraversa
+    // alcuni (pierceLeft). pierceGrace evita di ri-colpire lo stesso bersaglio mentre esce.
+    const consumeShot = (sh) => {
+      sh.pierceLeft = (sh.pierceLeft || 1) - 1;
+      if (sh.pierceLeft <= 0) this.popShot(sh);
+      else sh.pierceGrace = this.time.now + 80;
+    };
     const hitWax = (a, b) => {
       const sh = this.shots.contains(a) ? a : b, bl = (sh === a) ? b : a;
-      this.damageBlock(bl, sh.dmg); this.popShot(sh);
+      if (this.time.now < (sh.pierceGrace || 0)) return;
+      this.damageBlock(bl, sh.dmg); consumeShot(sh);
     };
     const hitFoe = (a, b) => {
       const sh = this.shots.contains(a) ? a : b, en = (sh === a) ? b : a;
-      if (en.spawning) return;
-      this.damageEnemy(en, sh.dmg); this.popShot(sh);
+      if (en.spawning || this.time.now < (sh.pierceGrace || 0)) return;
+      this.damageEnemy(en, sh.dmg); consumeShot(sh);
     };
-    const hitSolid = (a, b) => this.popShot(this.shots.contains(a) ? a : b);
+    const hitSolid = (a, b) => this.popShot(this.shots.contains(a) ? a : b);   // i muri fermano sempre
     this.physics.add.overlap(this.shots, this.blocks, hitWax);
     this.physics.add.overlap(this.shots, this.enemies, hitFoe);
     this.physics.add.overlap(this.shots, this.platforms, hitSolid);
@@ -859,17 +867,28 @@ class GameScene extends Phaser.Scene {
     this.lastShot = now;
     const d = Math.hypot(adx, ady) || 1;
     const nx = adx / d, ny = ady / d;
-    const sp = 580;
     const oy = this.crouching ? 14 : -6;   // accovacciato: il getto parte all'altezza dei piedi
+    // Abilità VENTAGLIO: 3 palline a ±angolo; altrimenti una sola.
+    if (p.jetSpread) {
+      const a0 = Math.atan2(ny, nx);
+      [-0.2, 0, 0.2].forEach((da) => this.spawnPellet(Math.cos(a0 + da), Math.sin(a0 + da), oy, p));
+    } else {
+      this.spawnPellet(nx, ny, oy, p);
+    }
+    window.Sfx.spray();
+  }
+
+  // Crea una singola pallina di getto (usata da fireJet, anche a ventaglio).
+  spawnPellet(nx, ny, oy, p) {
+    const sp = 580;
     const s = this.shots.create(this.player.x + nx * 18, this.player.y + oy + ny * 14, 'soap').setDepth(9);
     s.body.setAllowGravity(false);
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = p.jetDamage;
-    // Lampo alla "bocca" del getto (feedback visivo di sparo).
+    s.pierceLeft = p.jetPierce ? 3 : 1;    // abilità PERFORANTE
     const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
-    window.Sfx.spray();
     this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
   }
 
@@ -1015,6 +1034,13 @@ class GameScene extends Phaser.Scene {
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
       window.GameState.wax += e.waxValue;
+      // Abilità VITA RUBATA: uccidere cura un po' (piu' col boss).
+      const pl = window.GameState.player;
+      if (pl.lifesteal) {
+        const heal = e.kind === 'boss' ? 25 : 3;
+        pl.hp = Math.min(pl.maxHp, pl.hp + heal);
+        this.healFx(this.player.x, this.player.y);
+      }
       if (e.kind === 'boss') {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
@@ -1204,6 +1230,15 @@ class GameScene extends Phaser.Scene {
   hurtPlayer(dmg, sourceX) {
     const now = this.time.now;
     if (now < this.invulnUntil || this.locked) return;
+    // Abilità SCUDO: para il colpo se è "carico" (ricarica ogni 6s). Niente danno.
+    const pl = window.GameState.player;
+    if (pl.shield && now >= (this.shieldReadyAt || 0)) {
+      this.shieldReadyAt = now + 6000;
+      this.invulnUntil = now + 500;
+      window.Sfx.hit();
+      this.shieldFx();
+      return;
+    }
     this.invulnUntil = now + 900;
     window.GameState.player.hp -= dmg;
     window.Sfx.hurt();
@@ -1215,6 +1250,18 @@ class GameScene extends Phaser.Scene {
       window.GameState.player.hp = 0;
       this.gameOver();
     }
+  }
+
+  // Effetto "vita rubata": un lampo verde che sale dal giocatore.
+  healFx(x, y) {
+    const c = this.add.circle(x, y - 10, 7, 0x6bd66b, 0.9).setDepth(21);
+    this.tweens.add({ targets: c, y: y - 40, alpha: 0, scale: 1.6, duration: 420, ease: 'Quad.out', onComplete: () => c.destroy() });
+  }
+
+  // Effetto "scudo": un anello azzurro che si espande attorno al giocatore.
+  shieldFx() {
+    const ring = this.add.circle(this.player.x, this.player.y, 16, 0x8fd0ff, 0).setStrokeStyle(3, 0x8fd0ff, 0.9).setDepth(21);
+    this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => ring.destroy() });
   }
 
   // Esplosione di particelle (briciole): vedi GameGfx in src/gfx.js.

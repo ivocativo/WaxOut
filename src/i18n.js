@@ -93,6 +93,10 @@ window.I18n = (function () {
       up_doublejump_name: 'Double Jump', up_doublejump_desc: 'Jump twice',
       up_dash_name: 'Dash', up_dash_desc: 'Shift to dash',
       up_hammer_name: 'Earwax Hammer', up_hammer_desc: 'Area weapon\n+6 damage',
+      up_spread_name: 'Spread Jet', up_spread_desc: 'Jet fires 3 pellets',
+      up_pierce_name: 'Piercing Jet', up_pierce_desc: 'Pellets pass through',
+      up_lifesteal_name: 'Lifesteal', up_lifesteal_desc: 'Kills heal you',
+      up_shield_name: 'Soap Shield', up_shield_desc: 'Blocks a hit\nevery 6s',
       // --- Abilita (lista HUD) + armi ---
       ability_doublejump: 'double jump',
       ability_dash: 'dash',
@@ -181,6 +185,10 @@ window.I18n = (function () {
       up_doublejump_name: 'Salto Doppio', up_doublejump_desc: 'Salta due volte',
       up_dash_name: 'Scatto', up_dash_desc: 'Shift per scattare',
       up_hammer_name: 'Martello di Cerume', up_hammer_desc: 'Arma ad area\n+6 danno',
+      up_spread_name: 'Getto a Ventaglio', up_spread_desc: 'Il getto spara 3 palline',
+      up_pierce_name: 'Getto Perforante', up_pierce_desc: 'Le palline attraversano',
+      up_lifesteal_name: 'Vita Rubata', up_lifesteal_desc: 'Uccidere ti cura',
+      up_shield_name: 'Scudo di Sapone', up_shield_desc: 'Para un colpo\nogni 6s',
       // --- Abilita (lista HUD) + armi ---
       ability_doublejump: 'salto doppio',
       ability_dash: 'scatto',

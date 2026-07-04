@@ -71,6 +71,11 @@ window.GameState = {
       doubleJump: lv('djump') > 0,
       dash: false,
       weapon: 'swab',        // 'swab' | 'hammer' (corpo a corpo)
+      // Abilità di run (scelte all'UpgradeScene) che cambiano lo stile di gioco:
+      jetSpread: false,      // getto a ventaglio (3 palline)
+      jetPierce: false,      // palline perforanti
+      lifesteal: false,      // curi vita uccidendo
+      shield: false,         // para un colpo ogni tot
     };
   },
 

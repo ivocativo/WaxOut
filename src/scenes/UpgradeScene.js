@@ -37,15 +37,17 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'doublejump', rep: false, ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
       { id: 'dash', rep: false, ability: 'dash', apply: (s) => { s.dash = true; } },
       { id: 'hammer', rep: false, ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
+      // Abilità che cambiano lo stile di gioco (una volta sola ciascuna):
+      { id: 'spread', rep: false, ability: 'spread', apply: (s) => { s.jetSpread = true; } },
+      { id: 'pierce', rep: false, ability: 'pierce', apply: (s) => { s.jetPierce = true; } },
+      { id: 'lifesteal', rep: false, ability: 'lifesteal', apply: (s) => { s.lifesteal = true; } },
+      { id: 'shield', rep: false, ability: 'shield', apply: (s) => { s.shield = true; } },
     ];
 
-    const avail = ALL.filter((u) => {
-      if (u.rep) return true;
-      if (u.id === 'doublejump') return !p.doubleJump;
-      if (u.id === 'dash') return !p.dash;
-      if (u.id === 'hammer') return p.weapon !== 'hammer';
-      return true;
-    });
+    // Disponibili: gli stat ripetibili sempre; le abilità solo se non gia' possedute
+    // (ownedAbilities le traccia tutte, comprese doublejump/dash/hammer).
+    const owned = window.GameState.ownedAbilities;
+    const avail = ALL.filter((u) => u.rep || (u.ability ? owned.indexOf(u.ability) === -1 : true));
     Phaser.Utils.Array.Shuffle(avail);
     const choices = avail.slice(0, 3);
 
