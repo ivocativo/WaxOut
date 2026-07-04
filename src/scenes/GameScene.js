@@ -399,7 +399,8 @@ class GameScene extends Phaser.Scene {
     for (let d = 0; d < depth; d++) {
       const span = w - d;
       if (span <= 0) break;
-      for (let c = 0; c < span; c++) this.addWaxBlock(baseCol + c, topRow - d, lvl, 'soft');
+      // ceiling = true: questi blocchi sono "appesi al soffitto" -> NON cadono con la gravità.
+      for (let c = 0; c < span; c++) { const b = this.addWaxBlock(baseCol + c, topRow - d, lvl, 'soft'); b.ceiling = true; }
     }
   }
 
@@ -509,7 +510,7 @@ class GameScene extends Phaser.Scene {
       img.setTint(this._waxTint(b.waxType, 1));
       if (this.waxLayer) this.waxLayer.add(img);   // nel livello sfocato -> globi fusi
       b.waxImg = img;
-      b.waxOX = ox;
+      b.waxOX = ox; b.waxOY = oy;
       // dati per l'animazione "fluida" (ondeggio) in animateWax()
       b.waxSeed = seed;
       b.waxBaseX = b.x + ox; b.waxBaseY = b.y + oy;
@@ -597,6 +598,32 @@ class GameScene extends Phaser.Scene {
       if (!o.active || !o.waxImg) return;
       if (Math.abs(o.x - x) < R && Math.abs(o.y - y) < R) o.waxHitAt = now;
     });
+  }
+
+  // GRAVITÀ A CELLE: dopo aver pulito un blocco, i blocchi della colonna che stanno sopra
+  // SCENDONO a riempire i vuoti (verso il pavimento), così una membrana pulita alla base
+  // COLLASSA in un cumulo. I blocchi "da soffitto" (ceiling) NON cadono (restano appesi).
+  settleWaxColumn(col) {
+    const B = window.CONFIG.BLOCK;
+    const inCol = this.blocks.getChildren()
+      .filter((b) => b.active && b.col === col && !b.ceiling)
+      .sort((a, b) => a.row - b.row);
+    let target = 0, moved = false;
+    inCol.forEach((b) => {
+      if (b.row !== target) {                          // c'è un vuoto sotto: cade
+        b.row = target;
+        const newY = this.groundTop - target * B - B / 2;
+        b.y = newY; b.refreshBody();                   // fisica (collider) subito alla nuova quota
+        const newBaseY = newY + (b.waxOY || 0);
+        b.waxBaseY = newBaseY;
+        if (b.waxImg && !b.waxHitAt) this.tweens.add({ targets: b.waxImg, y: newBaseY, duration: 170, ease: 'Quad.in' });
+        else if (b.waxImg) b.waxImg.y = newBaseY;
+        if (b.waxDrip) this.tweens.add({ targets: b.waxDrip, y: newY + B * 0.3, duration: 170, ease: 'Quad.in' });
+        moved = true;
+      }
+      target++;
+    });
+    if (moved) this.drawWaxBase();
   }
 
   // Disegno del muro di cerume (vecchio, a palle) e splat di feedback: vedi GameGfx in src/gfx.js.
@@ -930,11 +957,13 @@ class GameScene extends Phaser.Scene {
       this.splat(b.x, b.y, b.waxType);
       window.GameState.wax += b.waxValue;
       this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito"
+      const dcol = b.col;
       if (b.waxImg) b.waxImg.destroy();
       if (b.waxDrip) b.waxDrip.destroy();
       b.destroy();
       this.blocksLeft = this.blocks.countActive(true);
-      this.drawWaxBase();   // la massa si ritira dove hai pulito
+      this.settleWaxColumn(dcol);   // i pezzi sopra scendono (collasso a cumulo)
+      this.drawWaxBase();           // la massa si ritira/ricompatta dove hai pulito
     } else {
       window.Sfx.crack();
       this.burst(b.bitKey, b.x, b.y, 3);
