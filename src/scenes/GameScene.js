@@ -980,6 +980,7 @@ class GameScene extends Phaser.Scene {
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = p.jetDamage;
     s.pierceLeft = p.jetPierce ? 3 : 1;    // abilità PERFORANTE
+    s.splash = p.jetSplash;                // abilità SCOPPIO DI SAPONE (area all'impatto)
     const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
     this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
@@ -988,7 +989,24 @@ class GameScene extends Phaser.Scene {
   popShot(s) {
     if (!s || !s.active) return;
     this.splat(s.x, s.y, 'soft');
+    if (s.splash) this.soapSplash(s.x, s.y);   // abilità: scoppio ad area all'impatto
     s.destroy();
+  }
+
+  // Scoppio di sapone (abilità SPLASH): quando una pallina finisce, fa un piccolo scoppio
+  // che pulisce il cerume e danneggia i nemici in un raggio ridotto. Danno = frazione del getto.
+  soapSplash(x, y) {
+    const R = 48;
+    const dmg = Math.max(4, Math.round(window.GameState.player.jetDamage * 0.6));
+    const ring = this.add.circle(x, y, R, 0xdff3ff, 0.35).setDepth(11).setScale(0.25);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 220, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    window.Sfx.spray();
+    this.enemies.getChildren().forEach((e) => {
+      if (e.active && !e.spawning && Math.hypot(e.x - x, e.y - y) < R) this.damageEnemy(e, dmg);
+    });
+    this.blocks.getChildren().forEach((b) => {
+      if (b.active && Math.hypot(b.x - x, b.y - y) < R) this.damageBlock(b, dmg);
+    });
   }
 
   // Cerca un nemico a distanza da bastonata (per l'attacco "intelligente": se c'e' un
@@ -1041,15 +1059,34 @@ class GameScene extends Phaser.Scene {
     this.blocks.getChildren().forEach((b) => {
       if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, p.damage); hitAny = true; }
     });
+    const hitSet = new Set();
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage, true); hitEnemy = true; hitAny = true; }
+      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage, true); hitEnemy = true; hitAny = true; hitSet.add(e); }
     });
+    // Abilità ONDA D'URTO: la bastonata colpisce ANCHE i nemici in un raggio attorno a te
+    // (danno ridotto), non solo quelli davanti. Ottima contro i gruppi.
+    if (p.meleeBlast) {
+      const R = 84, bd = Math.max(6, Math.round(p.damage * 0.55));
+      let blasted = false;
+      this.enemies.getChildren().forEach((e) => {
+        if (e.active && !e.spawning && !hitSet.has(e) && Math.hypot(e.x - this.player.x, e.y - this.player.y) < R) {
+          this.damageEnemy(e, bd, true); hitEnemy = true; hitAny = true; blasted = true;
+        }
+      });
+      if (hitAny) this.blastFx(R);   // anello d'urto quando la mazzata connette
+    }
     // IMPATTO: quando la mazzata CONNETTE, micro-pausa (hit-stop) + tremolio -> peso.
     // Piu' forte sui nemici e col martello; leggero sul solo cerume.
     if (hitAny) {
       this.cameras.main.shake(hitEnemy ? 130 : 60, hitEnemy ? 0.010 : 0.004);
       this.hitStop(isHammer ? 95 : (hitEnemy ? 78 : 40));
     }
+  }
+
+  // Anello dell'ONDA D'URTO: cerchio giallo che si espande attorno al giocatore.
+  blastFx(R) {
+    const ring = this.add.circle(this.player.x, this.player.y, R || 84, 0xffe08a, 0.18).setDepth(11).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 240, ease: 'Quad.out', onComplete: () => ring.destroy() });
   }
 
   // "Hit-stop": congela brevemente la fisica all'impatto per dare peso ai colpi. Non si
@@ -1552,6 +1589,21 @@ class GameScene extends Phaser.Scene {
     // Pozze di cerume scivoloso: rallentano il movimento mentre ci si cammina sopra a terra.
     const onSlime = onGround && this.slimeZones && this.slimeZones.some(
       (z) => this.player.x > z.x1 && this.player.x < z.x2);
+
+    // Abilità CALAMITA: i bonus di cerume vicini volano verso il giocatore (raccolta a distanza).
+    if (p.magnet && this.pickups) {
+      const R = 170;
+      this.pickups.getChildren().forEach((pk) => {
+        if (!pk.active) return;
+        const dx = this.player.x - pk.x, dy = this.player.y - pk.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < R) {
+          if (!pk._magnet) { pk._magnet = true; this.tweens.killTweensOf(pk); }   // stacca l'ondeggio
+          const pull = Phaser.Math.Clamp(140 + 340 * (1 - d / R), 140, 460);
+          pk.body.setVelocity((dx / d) * pull, (dy / d) * pull);
+        }
+      });
+    }
 
     // ACCOVACCIAMENTO (stile Metal Slug): tieni GIU' a terra -> ti abbassi, così getto e
     // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In

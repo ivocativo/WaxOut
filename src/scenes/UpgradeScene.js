@@ -42,12 +42,22 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'pierce', rep: false, ability: 'pierce', apply: (s) => { s.jetPierce = true; } },
       { id: 'lifesteal', rep: false, ability: 'lifesteal', apply: (s) => { s.lifesteal = true; } },
       { id: 'shield', rep: false, ability: 'shield', apply: (s) => { s.shield = true; } },
+      // Abilità NUOVE sbloccabili dai PROGETTI del negozio (locked: compaiono qui solo
+      // dopo essere state sbloccate — vedi window.BLUEPRINTS / ShopScene).
+      { id: 'magnet', rep: false, ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
+      { id: 'blast',  rep: false, ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
+      { id: 'splash', rep: false, ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
     ];
 
     // Disponibili: gli stat ripetibili sempre; le abilità solo se non gia' possedute
-    // (ownedAbilities le traccia tutte, comprese doublejump/dash/hammer).
+    // (ownedAbilities le traccia tutte). Le abilità "locked" compaiono solo se il relativo
+    // PROGETTO e' stato sbloccato al negozio (Meta.unlockLevel(id) > 0).
     const owned = window.GameState.ownedAbilities;
-    const avail = ALL.filter((u) => u.rep || (u.ability ? owned.indexOf(u.ability) === -1 : true));
+    const avail = ALL.filter((u) => {
+      if (u.rep) return true;
+      if (u.locked && window.Meta.unlockLevel(u.id) <= 0) return false;
+      return owned.indexOf(u.ability) === -1;
+    });
     Phaser.Utils.Array.Shuffle(avail);
     const choices = avail.slice(0, 3);
 

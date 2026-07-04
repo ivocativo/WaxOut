@@ -46,6 +46,16 @@ window.UNLOCKS = {
   djump: { per: 1,  base: 70, step: 0,  max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
 };
 
+// PROGETTI (blueprint): sblocchi PERMANENTI una-tantum che aggiungono ABILITA' NUOVE al
+// mazzo delle run (compaiono come carte all'UpgradeScene solo dopo essere state sbloccate
+// qui, col cerume in banca). A differenza di UNLOCKS non danno bonus di statistica: danno
+// CONTENUTO nuovo. 'ability' = id dell'abilità (deve combaciare con UpgradeScene.ALL).
+window.BLUEPRINTS = {
+  magnet: { cost: 40, ability: 'magnet' },
+  blast:  { cost: 70, ability: 'blast'  },
+  splash: { cost: 95, ability: 'splash' },
+};
+
 // Stato di progressione DELLA RUN corrente (azzerato a ogni nuova run).
 window.GameState = {
   level: 1,
@@ -78,6 +88,10 @@ window.GameState = {
       jetPierce: false,      // palline perforanti
       lifesteal: false,      // curi vita uccidendo
       shield: false,         // para un colpo ogni tot
+      // Abilità sbloccabili dai PROGETTI del negozio (window.BLUEPRINTS):
+      magnet: false,         // attira il cerume/pickup vicino
+      meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
+      jetSplash: false,      // le palline del getto scoppiano all'impatto (piccola area)
     };
   },
 
