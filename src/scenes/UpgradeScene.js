@@ -47,6 +47,7 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'magnet', rep: false, ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
       { id: 'blast',  rep: false, ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
       { id: 'splash', rep: false, ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
+      { id: 'companion', rep: false, ability: 'companion', locked: true, apply: (s) => { s.companion = true; } },
     ];
 
     // Disponibili: gli stat ripetibili sempre; le abilità solo se non gia' possedute

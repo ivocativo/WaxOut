@@ -64,6 +64,7 @@ class GameScene extends Phaser.Scene {
     this.jumpBufferedAt = -9999;
     this.lastGroundAt = -9999;
     this.canCutJump = false;
+    this.companion = null;  // bolla-aiutante (creata sotto se l'abilità è posseduta)
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // Ogni livello si parte a vita piena
@@ -140,6 +141,9 @@ class GameScene extends Phaser.Scene {
 
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
+
+    // Aiutante (abilità COMPANION): una bolla che ti orbita e spara ai nemici da sola.
+    if (window.GameState.player.companion) this.spawnCompanion();
 
     // Le palline sputate feriscono il giocatore e si spappolano contro muro/pavimento.
     this.physics.add.overlap(this.player, this.projectiles, (pl, proj) => {
@@ -1009,6 +1013,80 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // ---------- Aiutante (abilità COMPANION) ----------
+
+  // Texture della bolla-aiutante: una bolla di sapone azzurra con un occhietto.
+  makeBuddyTexture() {
+    if (this.textures.exists('buddy')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x8fd0ff, 0.95); g.fillCircle(9, 9, 8);      // corpo bolla
+    g.fillStyle(0xffffff, 0.9); g.fillCircle(6, 6, 2.6);     // riflesso
+    g.lineStyle(1, 0xffffff, 0.6); g.strokeCircle(9, 9, 8);
+    g.fillStyle(0x14161f, 1); g.fillCircle(11, 9, 1.8);      // occhietto
+    g.generateTexture('buddy', 18, 18);
+    g.destroy();
+  }
+
+  // Crea la bolla-aiutante che segue il giocatore (orbita) e spara ai nemici da sola.
+  spawnCompanion() {
+    this.makeBuddyTexture();
+    const c = this.add.image(this.player.x, this.player.y - 30, 'buddy').setDepth(11);
+    c._baseScale = 1.4;
+    c.setScale(c._baseScale);
+    c.orbit = 0;        // angolo dell'orbita (avanza nel tempo)
+    c.nextFire = 0;     // prossimo istante in cui può sparare
+    this.companion = c;
+  }
+
+  // Ogni frame: orbita morbida attorno al giocatore + fuoco automatico sul nemico più vicino.
+  updateCompanion(now) {
+    const c = this.companion;
+    if (!c || !c.active) return;
+    c.orbit += 0.05;
+    const R = 44;
+    const tx = this.player.x + Math.cos(c.orbit) * R;
+    const ty = this.player.y - 26 + Math.sin(c.orbit) * (R * 0.45);   // orbita ellittica, sopra la spalla
+    c.x += (tx - c.x) * 0.2;   // inseguimento morbido (lerp)
+    c.y += (ty - c.y) * 0.2;
+    if (now >= c.nextFire) {
+      const target = this.nearestEnemyInRange(c.x, c.y, 320);
+      if (target) { this.companionFire(c, target); c.nextFire = now + 750; }
+      else c.nextFire = now + 200;   // niente bersagli: ricontrolla presto
+    }
+  }
+
+  // Nemico attivo più vicino a (x,y) entro `range`, o null.
+  nearestEnemyInRange(x, y, range) {
+    let best = null, bd = range;
+    this.enemies.getChildren().forEach((e) => {
+      if (!e.active || e.spawning) return;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d < bd) { bd = d; best = e; }
+    });
+    return best;
+  }
+
+  // L'aiutante spara una pallina verso il bersaglio (riusa il gruppo this.shots: colpisce
+  // nemici e pulisce il cerume come il getto, ma con danno ridotto e senza perfora/scoppio).
+  companionFire(c, target) {
+    const p = window.GameState.player;
+    const dx = target.x - c.x, dy = target.y - c.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const nx = dx / d, ny = dy / d;
+    const sp = 520;
+    const s = this.shots.create(c.x + nx * 10, c.y + ny * 10, 'soap').setDepth(9).setScale(0.85);
+    s.body.setAllowGravity(false);
+    s.body.setSize(9, 9, true);
+    s.setVelocity(nx * sp, ny * sp);
+    s.dmg = Math.max(5, Math.round(p.jetDamage * 0.5));
+    s.pierceLeft = 1;
+    s.splash = false;
+    window.Sfx.spray();
+    this.time.delayedCall(900, () => { if (s.active) s.destroy(); });
+    // piccolo "scatto" del compagno quando spara
+    this.tweens.add({ targets: c, scale: c._baseScale * 0.82, duration: 60, yoyo: true });
+  }
+
   // Cerca un nemico a distanza da bastonata (per l'attacco "intelligente": se c'e' un
   // nemico vicino il tasto attacco fa la mazzata invece del getto). Ritorna il nemico o null.
   meleeTargetNear() {
@@ -1736,6 +1814,8 @@ class GameScene extends Phaser.Scene {
         this.hurtPlayer(e.contactDamage, e.x);
       }
     });
+
+    if (this.companion) this.updateCompanion(now);
 
     this.updateHud();
   }

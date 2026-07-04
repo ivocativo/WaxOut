@@ -63,7 +63,7 @@ class ShopScene extends Phaser.Scene {
     });
 
     // --- Colonna PROGETTI (blueprint: sblocchi una-tantum di abilità) ---
-    const bpIds = ['magnet', 'blast', 'splash'];
+    const bpIds = ['magnet', 'blast', 'splash', 'companion'];
     const BP = window.BLUEPRINTS;
     bpIds.forEach((id, i) => {
       const item = BP[id];

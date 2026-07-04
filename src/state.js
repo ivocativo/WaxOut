@@ -51,9 +51,10 @@ window.UNLOCKS = {
 // qui, col cerume in banca). A differenza di UNLOCKS non danno bonus di statistica: danno
 // CONTENUTO nuovo. 'ability' = id dell'abilità (deve combaciare con UpgradeScene.ALL).
 window.BLUEPRINTS = {
-  magnet: { cost: 40, ability: 'magnet' },
-  blast:  { cost: 70, ability: 'blast'  },
-  splash: { cost: 95, ability: 'splash' },
+  magnet:    { cost: 40,  ability: 'magnet'    },
+  blast:     { cost: 70,  ability: 'blast'     },
+  splash:    { cost: 95,  ability: 'splash'    },
+  companion: { cost: 130, ability: 'companion' },
 };
 
 // Stato di progressione DELLA RUN corrente (azzerato a ogni nuova run).
@@ -92,6 +93,7 @@ window.GameState = {
       magnet: false,         // attira il cerume/pickup vicino
       meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
       jetSplash: false,      // le palline del getto scoppiano all'impatto (piccola area)
+      companion: false,      // bolla-aiutante che ti orbita e spara ai nemici da sola
     };
   },
 

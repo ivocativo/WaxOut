@@ -81,6 +81,7 @@ window.I18n = (function () {
       bp_magnet_name: 'Wax Magnet', bp_magnet_desc: 'Pulls nearby wax to you',
       bp_blast_name: 'Shockwave', bp_blast_desc: 'Melee also hits around you',
       bp_splash_name: 'Soap Burst', bp_splash_desc: 'Jet splashes on impact',
+      bp_companion_name: 'Bubble Buddy', bp_companion_desc: 'Orbits you, auto-fires at foes',
       // --- Pausa ---
       pause_title: 'PAUSED',
       pause_hint: 'ESC or P to resume',
@@ -109,6 +110,7 @@ window.I18n = (function () {
       up_magnet_name: 'Wax Magnet', up_magnet_desc: 'Wax flies\nto you',
       up_blast_name: 'Shockwave', up_blast_desc: 'Melee hits\nall around',
       up_splash_name: 'Soap Burst', up_splash_desc: 'Jet splashes\non impact',
+      up_companion_name: 'Bubble Buddy', up_companion_desc: 'A bubble\nfights with you',
       // --- Abilita (lista HUD) + armi ---
       ability_doublejump: 'double jump',
       ability_dash: 'dash',
@@ -116,6 +118,7 @@ window.I18n = (function () {
       ability_magnet: 'magnet',
       ability_blast: 'shockwave',
       ability_splash: 'soap burst',
+      ability_companion: 'bubble buddy',
       weapon_swab: 'Cotton Swab',
       weapon_hammer: 'Earwax Hammer',
     },
@@ -188,6 +191,7 @@ window.I18n = (function () {
       bp_magnet_name: 'Calamita', bp_magnet_desc: 'Attira il cerume vicino',
       bp_blast_name: "Onda d'Urto", bp_blast_desc: 'La mazza colpisce intorno',
       bp_splash_name: 'Scoppio di Sapone', bp_splash_desc: "Il getto scoppia all'impatto",
+      bp_companion_name: 'Bolla Amica', bp_companion_desc: 'Ti orbita e spara ai nemici',
       // --- Pausa ---
       pause_title: 'PAUSA',
       pause_hint: 'ESC o P per riprendere',
@@ -216,6 +220,7 @@ window.I18n = (function () {
       up_magnet_name: 'Calamita', up_magnet_desc: 'Il cerume vola\nverso di te',
       up_blast_name: "Onda d'Urto", up_blast_desc: 'La mazza colpisce\ntutto intorno',
       up_splash_name: 'Scoppio di Sapone', up_splash_desc: "Il getto scoppia\nall'impatto",
+      up_companion_name: 'Bolla Amica', up_companion_desc: 'Una bolla\ncombatte con te',
       // --- Abilita (lista HUD) + armi ---
       ability_doublejump: 'salto doppio',
       ability_dash: 'scatto',
@@ -223,6 +228,7 @@ window.I18n = (function () {
       ability_magnet: 'calamita',
       ability_blast: "onda d'urto",
       ability_splash: 'scoppio',
+      ability_companion: 'bolla amica',
       weapon_swab: 'Cotton fioc',
       weapon_hammer: 'Martello di Cerume',
     },
