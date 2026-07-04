@@ -135,6 +135,9 @@ class GameScene extends Phaser.Scene {
     // Bonus di cerume raccoglibili sulle pedane.
     this.physics.add.overlap(this.player, this.pickups, (pl, pk) => this.grabPickup(pk));
 
+    // Ostacoli mobili: fanno danno da contatto (stessa hurtPlayer di un nemico), non si uccidono.
+    this.physics.add.overlap(this.player, this.movers, (pl, mv) => this.hurtPlayer(12 + Math.floor(window.GameState.level / 2), mv.x));
+
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
 
@@ -294,6 +297,7 @@ class GameScene extends Phaser.Scene {
     }
     this.buildMounds();          // cumuli di cerume su pavimento e soffitto
     this.buildPlatforms();
+    this.buildHazards();         // pozze scivolose + ostacoli mobili (dal lvl 2/3)
     this.buildGoal();
     window.GameGfx.drawProtuberances(this);   // scenografia organica (pavimento + soffitto)
 
@@ -417,7 +421,9 @@ class GameScene extends Phaser.Scene {
   }
 
   // Pedane sospese: una "rampa" davanti a ogni membrana bassa (per scavalcarla con un
-  // salto) + qualche pedana piu' in alto tra le membrane, a volte con un bonus di cerume.
+  // salto) + piu' pedane (basse E alte) tra le membrane, quasi sempre con un bonus di
+  // cerume sopra. Una volta a livello, sopra una pedana alta si nasconde uno SCRIGNO
+  // segreto (un'altra pedana ancora piu' su, raggiungibile con un salto extra).
   buildPlatforms() {
     this.membranes.forEach((m) => {
       if (m.type !== 'short') return;
@@ -427,29 +433,116 @@ class GameScene extends Phaser.Scene {
     });
 
     const xs = this.membraneXs;
+    let secretPlaced = false;
     for (let i = 0; i < xs.length - 1; i++) {
-      if (Math.random() < 0.45) continue;          // non in ogni intervallo
-      const midX = Math.round((xs[i] + xs[i + 1]) / 2);
-      const py = this.groundTop - Phaser.Math.Between(150, 215);
-      this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
-      if (Math.random() < 0.6) this.addWaxPickup(midX, py - 26);
+      const gapW = xs[i + 1] - xs[i];
+      // Pedana bassa: quasi sempre presente se il varco e' abbastanza largo.
+      if (gapW > 260 && Math.random() < 0.7) {
+        const lowX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.25, 0.4));
+        const py = this.groundTop - Phaser.Math.Between(90, 130);
+        this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
+        if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26);
+      }
+      // Pedana alta: premia chi sale a cercarla.
+      if (Math.random() < 0.55) {
+        const midX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.5, 0.75));
+        const py = this.groundTop - Phaser.Math.Between(150, 220);
+        this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
+        if (Math.random() < 0.7) this.addWaxPickup(midX, py - 26);
+        // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
+        // in alto — un salto in piu' rispetto al percorso ovvio. Una sola volta a livello.
+        if (!secretPlaced && Math.random() < 0.35) {
+          secretPlaced = true;
+          const sx = midX + Phaser.Math.Between(-20, 20);
+          const sy = py - Phaser.Math.Between(110, 130);
+          this.addPlatform(sx, sy, 70);
+          for (let k = -1; k <= 1; k++) this.addWaxPickup(sx + k * 20, sy - 28, k === 0);
+        }
+      }
     }
     // Rampa d'avvio prima della prima membrana.
     this.addPlatform(Math.max(200, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 150), 120);
   }
 
+  // Terreno accidentato: pozze di cerume scivoloso (rallentano se ci cammini sopra, dal
+  // lvl 2) e ostacoli mobili che vanno avanti e indietro e feriscono al contatto (dal
+  // lvl 3). Entrambi crescono di numero (e i mobili di velocita') col livello.
+  buildHazards() {
+    const lvl = window.GameState.level;
+    this.slimeZones = [];
+    const slimeCount = lvl >= 2 ? Phaser.Math.Clamp(1 + Math.floor(lvl / 3), 1, 4) : 0;
+    for (let i = 0; i < slimeCount; i++) this.addSlimeZone();
+
+    this.movers = this.physics.add.group({ allowGravity: false });
+    const moverCount = lvl >= 3 ? Phaser.Math.Clamp(Math.floor(lvl / 3), 1, 3) : 0;
+    for (let i = 0; i < moverCount; i++) this.addMovingHazard();
+  }
+
+  // Trova una fascia orizzontale libera (lontana da membrane e da altre pozze/ostacoli
+  // gia' piazzati) per un nuovo elemento largo `w`. Ritorna null se non trova posto.
+  pickHazardX(w, margin) {
+    margin = margin || 0;
+    for (let tries = 0; tries < 20; tries++) {
+      const x = Phaser.Math.Between(280, this.worldW - 320 - w);
+      const cx = x + w / 2;
+      const nearMembrane = this.membraneXs.some((mx) => Math.abs(mx - cx) < 150 + margin);
+      const nearZone = (this.slimeZones || []).some((z) => x < z.x2 + 60 && x + w > z.x1 - 60);
+      if (!nearMembrane && !nearZone) return x;
+    }
+    return null;
+  }
+
+  // Pozza di cerume scivoloso sul pavimento: solo visiva + una fascia x memorizzata in
+  // this.slimeZones, letta in update() per rallentare il giocatore mentre e' a terra.
+  addSlimeZone() {
+    const w = Phaser.Math.Between(90, 170);
+    const x = this.pickHazardX(w);
+    if (x == null) return;
+    const C = window.CONFIG.COLORS;
+    const cx = x + w / 2, y = this.groundTop;
+    const g = this.add.rectangle(cx, y - 4, w, 9, C.slime, 0.88).setDepth(4.5);
+    g.setStrokeStyle(1, C.slimeGloss, 0.5);
+    this.tweens.add({ targets: g, scaleY: 1.3, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.inOut' });
+    this.slimeZones.push({ x1: x, x2: x + w });
+  }
+
+  // Ostacolo mobile: una pallina di cerume indurito che va avanti e indietro tra due punti
+  // (a terra o sospesa in aria) e ferisce al contatto come un nemico (va schivato/scavalcato,
+  // non si puo' uccidere). Ruota su se stessa per leggibilita'.
+  addMovingHazard() {
+    const lvl = window.GameState.level;
+    const w = Phaser.Math.Between(220, 340);
+    const x = this.pickHazardX(w, 40);
+    if (x == null) return;
+    const floating = Math.random() < 0.5;
+    const y = floating ? this.groundTop - Phaser.Math.Between(110, 190) : this.groundTop - 22;
+    const m = this.movers.create(x + w / 2, y, 'wax_glob').setDepth(8).setScale(1.8).setTint(0xd6432f);
+    m.body.setAllowGravity(false);
+    m.body.setSize(14, 14, true);
+    m.range = { x1: x, x2: x + w };
+    m.dir = Math.random() < 0.5 ? 1 : -1;
+    m.speed = 65 + lvl * 4;
+  }
+
   // Pallina di cerume da raccogliere (premia chi sale sulle pedane). Ondeggia leggera.
-  addWaxPickup(x, y) {
+  // heal=true: pallina rosata che invece di cerume cura un po' di vita (rara, negli scrigni).
+  addWaxPickup(x, y, heal) {
     const p = this.pickups.create(x, y, 'wax_glob').setDepth(7);
     p.body.setAllowGravity(false);
     p.body.setSize(14, 14, true);
-    p.waxValue = 5;
+    if (heal) { p.isHeal = true; p.setTint(0xff8fae); p.waxValue = 2; p.healValue = 14; }
+    else p.waxValue = 5;
     this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut' });
   }
 
   grabPickup(pk) {
     if (!pk || !pk.active) return;
     window.GameState.wax += pk.waxValue;
+    if (pk.isHeal) {
+      const pl = window.GameState.player;
+      pl.hp = Math.min(pl.maxHp, pl.hp + pk.healValue);
+      this.healFx(pk.x, pk.y);
+    }
     window.Sfx.crack();
     this.burst('bit_wax', pk.x, pk.y, 6);
     pk.destroy();
@@ -1445,6 +1538,21 @@ class GameScene extends Phaser.Scene {
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
     if (onGround) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
+    // Ostacoli mobili: vanno avanti e indietro tra i due estremi memorizzati, ruotando su
+    // se stessi (leggibilita'). Il danno al contatto e' gestito dall'overlap in create().
+    if (this.movers) {
+      this.movers.getChildren().forEach((m) => {
+        if (!m.active) return;
+        if (m.x <= m.range.x1) m.dir = 1;
+        else if (m.x >= m.range.x2) m.dir = -1;
+        m.setVelocityX(m.dir * m.speed);
+        m.angle += 3.5 * m.dir;
+      });
+    }
+    // Pozze di cerume scivoloso: rallentano il movimento mentre ci si cammina sopra a terra.
+    const onSlime = onGround && this.slimeZones && this.slimeZones.some(
+      (z) => this.player.x > z.x1 && this.player.x < z.x2);
+
     // ACCOVACCIAMENTO (stile Metal Slug): tieni GIU' a terra -> ti abbassi, così getto e
     // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In
     // aria GIU' resta la mira verso il basso del getto (gestita più sotto).
@@ -1462,6 +1570,7 @@ class GameScene extends Phaser.Scene {
     if (left) { vx = -p.moveSpeed; this.facing = -1; }
     else if (right) { vx = p.moveSpeed; this.facing = 1; }
     if (this.crouching) vx *= 0.45;
+    if (onSlime) vx *= 0.5;
     if (now < this.dashUntil) vx = this.facing * p.moveSpeed * 2.4;
     this.player.setVelocityX(vx);
     // Posa accovacciata: sprite schiacciato (segnaposto in attesa di un frame dedicato).
