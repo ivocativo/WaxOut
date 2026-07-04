@@ -304,43 +304,47 @@ class GameScene extends Phaser.Scene {
   buildMembrane(mx, lvl, idx, type) {
     const B = window.CONFIG.BLOCK;
     const groundTop = this.groundTop;
+    const baseCol = Math.round(mx / B);
 
-    let rows, thick;
+    // Crea un blocco di cerume a (col, row) con tipo/HP giusti.
+    const mk = (col, row) => {
+      const x = col * B + B / 2, y = groundTop - row * B - B / 2;
+      let bt = 'soft';
+      if (row === 0) bt = 'dirt';
+      else if (type === 'full' && lvl >= 2 && (row + col) % 4 === 0) bt = 'hard';
+      let key, hp, bitKey, wax;
+      if (bt === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
+      else if (bt === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
+      else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
+      const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
+      b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
+      b.col = col; b.row = row; b.waxType = bt;
+      b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
+      b.refreshBody();
+    };
+
+    let rows;
     if (type === 'short') {
-      rows = Phaser.Math.Between(2, 3);                   // scavalcabile con un salto
-      thick = 1;
+      // Cumuletto basso scavalcabile: 1-2 colonne di 2-3 blocchi, con un pizzico di irregolarità.
+      rows = Phaser.Math.Between(2, 3);
+      for (let r = 0; r < rows; r++) mk(baseCol, r);
+      if (Math.random() < 0.7) for (let r = 0; r < rows - (Math.random() < 0.5 ? 1 : 0); r++) mk(baseCol + 1, r);
     } else {
-      thick = (lvl >= 5) ? 2 : 1;                         // ai livelli alti qualcuna piu' spessa
-      // Dal pavimento quasi al soffitto: l'altezza e' relativa al CANALE (groundTop),
-      // non all'intero schermo, cosi' non sfonda il soffitto col pavimento piu' alto.
+      // PROFILO ORGANICO: colonna centrale piena (barriera) + contrafforti laterali più
+      // bassi -> base larga che si assottiglia verso l'alto (accumulo di cerume, non stecco).
       const fullRows = Math.floor((groundTop - 16) / B);
       const topGap = Math.random() < 0.4 ? Phaser.Math.Between(1, 2) : 0;
       rows = Math.max(3, fullRows - topGap);
-    }
-    const baseCol = Math.round(mx / B);
-
-    for (let tcol = 0; tcol < thick; tcol++) {
-      const col = baseCol + tcol;
-      const x = col * B + B / 2;
-      for (let r = 0; r < rows; r++) {
-        const y = groundTop - r * B - B / 2;
-
-        // Base sporca, qualche blocco duro piu' in alto (solo sulle membrane piene).
-        let bt = 'soft';
-        if (r === 0) bt = 'dirt';
-        else if (type === 'full' && lvl >= 2 && (r + col) % 4 === 0) bt = 'hard';
-
-        let key, hp, bitKey, wax;
-        if (bt === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
-        else if (bt === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
-        else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
-
-        const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
-        b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
-        b.col = col; b.row = r; b.waxType = bt;
-        b.dripLen = Math.random() < 0.55 ? Phaser.Math.Between(8, 20) : 0;
-        b.refreshBody();
-      }
+      const profile = {};
+      profile[0] = rows;                                                    // guglia centrale (piena)
+      profile[-1] = Math.round(rows * Phaser.Math.FloatBetween(0.35, 0.62));
+      profile[1] = Math.round(rows * Phaser.Math.FloatBetween(0.35, 0.62));
+      profile[-2] = Phaser.Math.Between(1, 2);                              // base che si allarga
+      profile[2] = Phaser.Math.Between(1, 2);
+      Object.keys(profile).forEach((off) => {
+        const h = profile[off], col = baseCol + parseInt(off, 10);
+        for (let r = 0; r < h; r++) mk(col, r);
+      });
     }
     return { x: mx, type: type, rows: rows };
   }
