@@ -64,8 +64,9 @@ class GameScene extends Phaser.Scene {
     this.jumpBufferedAt = -9999;
     this.lastGroundAt = -9999;
     this.canCutJump = false;
-    this.companion = null;  // bolla-aiutante (creata sotto se l'abilità è posseduta)
+    this.companions = [];   // bolle-aiutante (create sotto, una per punto di companions)
     this.shieldAura = null; // alone dello scudo (creato al volo se l'abilità è posseduta)
+    this.secondLifeReady = true;   // Seconda Vita carica a inizio livello
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // Ogni livello si parte a vita piena
@@ -143,8 +144,9 @@ class GameScene extends Phaser.Scene {
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
 
-    // Aiutante (abilità COMPANION): una bolla che ti orbita e spara ai nemici da sola.
-    if (window.GameState.player.companion) this.spawnCompanion();
+    // Aiutante (abilità COMPANION, impilabile): N bolle che ti orbitano e sparano da sole.
+    const nc = window.GameState.player.companions | 0;
+    for (let i = 0; i < nc; i++) this.spawnCompanion(i, nc);
 
     // Le palline sputate feriscono il giocatore e si spappolano contro muro/pavimento.
     this.physics.add.overlap(this.player, this.projectiles, (pl, proj) => {
@@ -181,7 +183,9 @@ class GameScene extends Phaser.Scene {
     const hitFoe = (a, b) => {
       const sh = this.shots.contains(a) ? a : b, en = (sh === a) ? b : a;
       if (en.spawning || this.time.now < (sh.pierceGrace || 0)) return;
-      this.damageEnemy(en, sh.dmg); consumeShot(sh);
+      this.damageEnemy(en, sh.dmg);
+      if (sh.corrosive) this.applyCorrosion(en);   // abilità SAPONE CORROSIVO: danno nel tempo
+      consumeShot(sh);
     };
     const hitSolid = (a, b) => this.popShot(this.shots.contains(a) ? a : b);   // i muri fermano sempre
     this.physics.add.overlap(this.shots, this.blocks, hitWax);
@@ -542,7 +546,7 @@ class GameScene extends Phaser.Scene {
 
   grabPickup(pk) {
     if (!pk || !pk.active) return;
-    window.GameState.wax += pk.waxValue;
+    window.GameState.wax += Math.round(pk.waxValue * (window.GameState.player.waxMult || 1));   // Cerume Extra
     if (pk.isHeal) {
       const pl = window.GameState.player;
       pl.hp = Math.min(pl.maxHp, pl.hp + pk.healValue);
@@ -966,12 +970,13 @@ class GameScene extends Phaser.Scene {
     const d = Math.hypot(adx, ady) || 1;
     const nx = adx / d, ny = ady / d;
     const oy = this.crouching ? 14 : -6;   // accovacciato: il getto parte all'altezza dei piedi
-    // Abilità VENTAGLIO: 3 palline a ±angolo; altrimenti una sola.
-    if (p.jetSpread) {
-      const a0 = Math.atan2(ny, nx);
-      [-0.2, 0, 0.2].forEach((da) => this.spawnPellet(Math.cos(a0 + da), Math.sin(a0 + da), oy, p));
-    } else {
-      this.spawnPellet(nx, ny, oy, p);
+    // Abilità VENTAGLIO (impilabile): spara N palline a ventaglio (N = p.jetPellets).
+    const n = Math.max(1, p.jetPellets | 0);
+    const a0 = Math.atan2(ny, nx);
+    const step = 0.16;   // apertura tra una pallina e l'altra
+    for (let i = 0; i < n; i++) {
+      const da = (i - (n - 1) / 2) * step;   // simmetrico attorno alla direzione di mira
+      this.spawnPellet(Math.cos(a0 + da), Math.sin(a0 + da), oy, p);
     }
     window.Sfx.spray();
   }
@@ -986,6 +991,9 @@ class GameScene extends Phaser.Scene {
     s.dmg = p.jetDamage;
     s.pierceLeft = p.jetPierce ? 3 : 1;    // abilità PERFORANTE
     s.splash = p.jetSplash;                // abilità SCOPPIO DI SAPONE (area all'impatto)
+    s.homing = p.homing;                   // abilità MIRA GUIDATA (curva verso il nemico)
+    s.corrosive = p.corrosive;             // abilità SAPONE CORROSIVO (avvelena all'impatto)
+    if (p.corrosive) s.setTint(0x9be86b);  // pallina verde = corrosiva
     const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
     this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
@@ -1028,32 +1036,73 @@ class GameScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Crea la bolla-aiutante che segue il giocatore (orbita) e spara ai nemici da sola.
-  spawnCompanion() {
+  // Crea una bolla-aiutante (index-esima di `total`): segue il giocatore orbitando e spara
+  // da sola. Le bolle sono sfasate sull'orbita (phase) così restano equidistanti.
+  spawnCompanion(index, total) {
     this.makeBuddyTexture();
     const c = this.add.image(this.player.x, this.player.y - 30, 'buddy').setDepth(11);
     c._baseScale = 1.4;
     c.setScale(c._baseScale);
-    c.orbit = 0;        // angolo dell'orbita (avanza nel tempo)
-    c.nextFire = 0;     // prossimo istante in cui può sparare
-    this.companion = c;
+    c.phase = (index / Math.max(1, total)) * Math.PI * 2;   // posizione sull'anello
+    c.nextFire = index * 250;                               // fuoco sfalsato tra le bolle
+    this.companions.push(c);
   }
 
-  // Ogni frame: orbita morbida attorno al giocatore + fuoco automatico sul nemico più vicino.
-  updateCompanion(now) {
-    const c = this.companion;
-    if (!c || !c.active) return;
-    c.orbit += 0.05;
-    const R = 44;
-    const tx = this.player.x + Math.cos(c.orbit) * R;
-    const ty = this.player.y - 26 + Math.sin(c.orbit) * (R * 0.45);   // orbita ellittica, sopra la spalla
-    c.x += (tx - c.x) * 0.2;   // inseguimento morbido (lerp)
-    c.y += (ty - c.y) * 0.2;
-    if (now >= c.nextFire) {
-      const target = this.nearestEnemyInRange(c.x, c.y, 320);
-      if (target) { this.companionFire(c, target); c.nextFire = now + 750; }
-      else c.nextFire = now + 200;   // niente bersagli: ricontrolla presto
-    }
+  // Ogni frame: tutte le bolle orbitano (equidistanti) e sparano al nemico più vicino.
+  updateCompanions(now) {
+    const R = 46 + Math.min(14, this.companions.length * 2);   // anello un filo più largo con più bolle
+    this.companions.forEach((c) => {
+      if (!c || !c.active) return;
+      const ang = now * 0.004 + c.phase;
+      const tx = this.player.x + Math.cos(ang) * R;
+      const ty = this.player.y - 26 + Math.sin(ang) * (R * 0.45);   // orbita ellittica, sopra la spalla
+      c.x += (tx - c.x) * 0.2;   // inseguimento morbido (lerp)
+      c.y += (ty - c.y) * 0.2;
+      if (now >= c.nextFire) {
+        const target = this.nearestEnemyInRange(c.x, c.y, 320);
+        if (target) { this.companionFire(c, target); c.nextFire = now + 750; }
+        else c.nextFire = now + 200;   // niente bersagli: ricontrolla presto
+      }
+    });
+  }
+
+  // Abilità MIRA GUIDATA: ogni frame le palline "homing" curvano verso il nemico più vicino.
+  updateHomingShots(now) {
+    this.shots.getChildren().forEach((s) => {
+      if (!s.active || !s.homing) return;
+      const t = this.nearestEnemyInRange(s.x, s.y, 260);
+      if (!t) return;
+      const sp = Math.hypot(s.body.velocity.x, s.body.velocity.y) || 580;
+      const cur = Math.atan2(s.body.velocity.y, s.body.velocity.x);
+      const want = Math.atan2(t.y - s.y, t.x - s.x);
+      const na = cur + Phaser.Math.Angle.Wrap(want - cur) * 0.14;   // vira dolcemente
+      s.setVelocity(Math.cos(na) * sp, Math.sin(na) * sp);
+    });
+  }
+
+  // Abilità SAPONE CORROSIVO: marca il nemico perché perda vita nel tempo (~2s).
+  applyCorrosion(e) {
+    const now = this.time.now;
+    e.corrodeUntil = now + 2200;
+    e.corrodeNext = now + 350;
+    e.corrodeDmg = Math.max(2, Math.round(window.GameState.player.jetDamage * 0.22));
+  }
+
+  // Abilità SCATTO OFFENSIVO: durante lo scatto, i nemici e il cerume attraversati vengono
+  // colpiti (il giocatore è già invulnerabile mentre scatta, quindi ci passa attraverso).
+  updateDashStrike(now) {
+    if (now >= (this.dashUntil || 0)) return;
+    const p = window.GameState.player;
+    const pb = this.player.getBounds();
+    this.enemies.getChildren().forEach((e) => {
+      if (!e.active || e.spawning) return;
+      if (Phaser.Geom.Intersects.RectangleToRectangle(pb, e.getBounds())) {
+        if (!e._dashHitAt || now - e._dashHitAt > 300) { e._dashHitAt = now; this.damageEnemy(e, Math.round(p.damage * 0.9), true); }
+      }
+    });
+    this.blocks.getChildren().forEach((b) => {
+      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(pb, b.getBounds())) this.damageBlock(b, p.damage);
+    });
   }
 
   // Nemico attivo più vicino a (x,y) entro `range`, o null.
@@ -1187,8 +1236,8 @@ class GameScene extends Phaser.Scene {
       window.Sfx.smash();
       this.burst(b.bitKey, b.x, b.y, 14);
       this.splat(b.x, b.y, b.waxType);
-      window.GameState.wax += b.waxValue;
-      this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito"
+      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1));   // Cerume Extra
+      this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito" (valore GREZZO, il moltiplicatore non conta)
       const dcol = b.col;
       if (b.waxImg) b.waxImg.destroy();
       if (b.waxDrip) b.waxDrip.destroy();
@@ -1207,44 +1256,50 @@ class GameScene extends Phaser.Scene {
   // heavy = colpo PESANTE (bastonata corpo a corpo): flash piu' lungo, "pop" di reazione
   // piu' marcato e rinculo maggiore. Senza heavy (es. pallina del getto) l'impatto c'e'
   // ma piu' contenuto, cosi' il corpo a corpo "pesa" piu' del getto.
-  damageEnemy(e, dmg, heavy) {
+  damageEnemy(e, dmg, heavy, dot) {
     // CROSTA = corazzata anti-getto: il GETTO (non heavy) la scalfisce appena e rimbalza
-    // con un "clang"; solo il CORPO A CORPO (heavy) la abbatte come si deve.
-    const armored = (e.kind === 'crust' && !heavy);
+    // con un "clang"; solo il CORPO A CORPO (heavy) la abbatte come si deve. Il CORROSIVO (dot)
+    // ignora l'armatura (il sapone la mangia) e non fa rinculo/pop (e' un danno "silenzioso").
+    const armored = (e.kind === 'crust' && !heavy && !dot);
     if (armored) dmg = Math.max(2, Math.round(dmg * 0.3));   // il getto la scalfisce: poco ma visibile
     e.hp -= dmg;
 
-    e.setTintFill(armored ? 0xbfe0ff : 0xffffff);
-    this.time.delayedCall(armored ? 55 : (heavy ? 95 : 75), () => { if (e.active) e.clearTint(); });
-
-    if (armored) {
-      // Guscio che respinge: scintilla + "clang", niente pop nè rinculo (sembra invulnerabile davanti).
-      window.Sfx.crack();
-      this.splat(e.x + (this.player.x < e.x ? -12 : 12), e.y - 4, 'hard');
+    if (dot) {
+      e.setTintFill(0x9be86b);   // lampo verde = corrosione
+      this.time.delayedCall(70, () => { if (e.active) e.clearTint(); });
     } else {
-      // Pop di reazione: il nemico "sussulta" quando viene colpito (impatto visibile).
-      if (e.kind !== 'boss') {
-        const bs = e._baseScale || (e._baseScale = e.scaleX);
-        e.setScale(bs * (heavy ? 1.22 : 1.13));
-        this.time.delayedCall(85, () => { if (e.active && e._baseScale) e.setScale(e._baseScale); });
+      e.setTintFill(armored ? 0xbfe0ff : 0xffffff);
+      this.time.delayedCall(armored ? 55 : (heavy ? 95 : 75), () => { if (e.active) e.clearTint(); });
+
+      if (armored) {
+        // Guscio che respinge: scintilla + "clang", niente pop nè rinculo (sembra invulnerabile davanti).
+        window.Sfx.crack();
+        this.splat(e.x + (this.player.x < e.x ? -12 : 12), e.y - 4, 'hard');
+      } else {
+        // Pop di reazione: il nemico "sussulta" quando viene colpito (impatto visibile).
+        if (e.kind !== 'boss') {
+          const bs = e._baseScale || (e._baseScale = e.scaleX);
+          e.setScale(bs * (heavy ? 1.22 : 1.13));
+          this.time.delayedCall(85, () => { if (e.active && e._baseScale) e.setScale(e._baseScale); });
+        }
+        const dir = Math.sign(e.x - this.player.x) || 1;
+        // Il Boss è massiccio: subisce molta meno spinta. La bastonata (heavy) spinge di piu' del getto.
+        const boss = e.kind === 'boss';
+        const kbX = boss ? (heavy ? 100 : 70) : (heavy ? 300 : 215);
+        const kbY = boss ? (heavy ? -70 : -60) : (heavy ? -205 : -150);
+        e.setVelocity(dir * kbX, kbY);
+        e.knockUntil = this.time.now + (heavy ? 260 : 190);
+        // Un colpo INTERROMPE l'attacco in carica/affondo del nemico (ricompensa il colpire per primo).
+        if (e.atkState && e.atkState !== 'idle') { e.atkState = 'idle'; e.atkReadyAt = this.time.now + 500; if (e._baseScale) e.setScale(e._baseScale); }
+        // Idem per il moscerino: un colpo lo butta fuori dalla carica/picchiata.
+        if (e.kind === 'fly' && e.diveState && e.diveState !== 'hover') { e.diveState = 'recover'; e.diveReadyAt = this.time.now + 900; e.clearTint(); }
       }
-      const dir = Math.sign(e.x - this.player.x) || 1;
-      // Il Boss è massiccio: subisce molta meno spinta. La bastonata (heavy) spinge di piu' del getto.
-      const boss = e.kind === 'boss';
-      const kbX = boss ? (heavy ? 100 : 70) : (heavy ? 300 : 215);
-      const kbY = boss ? (heavy ? -70 : -60) : (heavy ? -205 : -150);
-      e.setVelocity(dir * kbX, kbY);
-      e.knockUntil = this.time.now + (heavy ? 260 : 190);
-      // Un colpo INTERROMPE l'attacco in carica/affondo del nemico (ricompensa il colpire per primo).
-      if (e.atkState && e.atkState !== 'idle') { e.atkState = 'idle'; e.atkReadyAt = this.time.now + 500; if (e._baseScale) e.setScale(e._baseScale); }
-      // Idem per il moscerino: un colpo lo butta fuori dalla carica/picchiata.
-      if (e.kind === 'fly' && e.diveState && e.diveState !== 'hover') { e.diveState = 'recover'; e.diveReadyAt = this.time.now + 900; e.clearTint(); }
     }
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
-      window.GameState.wax += e.waxValue;
-      // Abilità VITA RUBATA: uccidere cura un po' (piu' col boss).
       const pl = window.GameState.player;
+      window.GameState.wax += Math.round(e.waxValue * (pl.waxMult || 1));   // Cerume Extra
+      // Abilità VITA RUBATA: uccidere cura un po' (piu' col boss).
       if (pl.lifesteal) {
         const heal = e.kind === 'boss' ? 25 : 3;
         pl.hp = Math.min(pl.maxHp, pl.hp + heal);
@@ -1457,9 +1512,31 @@ class GameScene extends Phaser.Scene {
     this.player.setVelocity(dir * 240, -260);
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 90, yoyo: true, repeat: 4 });
     if (window.GameState.player.hp <= 0) {
+      // Abilità SECONDA VITA: sopravvivi a un colpo mortale (si ricarica tornando a vita piena).
+      if (pl.secondLife && this.secondLifeReady) {
+        this.secondLifeReady = false;
+        pl.hp = Math.max(1, Math.round(pl.maxHp * 0.35));
+        this.invulnUntil = now + 1300;
+        this.secondLifeFx();
+        return;
+      }
       window.GameState.player.hp = 0;
       this.gameOver();
     }
+  }
+
+  // Effetto SECONDA VITA: esplosione dorata + lampo, per far capire che sei "risorto".
+  secondLifeFx() {
+    const x = this.player.x, y = this.player.y;
+    window.Sfx.smash();
+    const ring = this.add.circle(x, y, 24, 0xffe08a, 0).setStrokeStyle(5, 0xffd166, 1).setDepth(23);
+    this.tweens.add({ targets: ring, scale: 3.4, alpha: 0, duration: 480, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    const flash = this.add.circle(x, y, 34, 0xffffff, 0.8).setDepth(23);
+    this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => flash.destroy() });
+    this.player.setTintFill(0xffe08a);
+    this.time.delayedCall(140, () => { if (this.player.active) this.player.clearTint(); });
+    this.cameras.main.shake(220, 0.012);
+    this.showBanner(window.I18n.t('game_second_life'), '#ffd166');
   }
 
   // Effetto "vita rubata": un lampo verde che sale dal giocatore.
@@ -1808,6 +1885,13 @@ class GameScene extends Phaser.Scene {
       if (!e.active) return;
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
 
+      // Sapone corrosivo: danno-nel-tempo ad intervalli finché la corrosione è attiva.
+      if (e.corrodeUntil && now < e.corrodeUntil && now >= (e.corrodeNext || 0)) {
+        e.corrodeNext = now + 350;
+        this.damageEnemy(e, e.corrodeDmg || 2, false, true);
+        if (!e.active) return;   // può morire dalla corrosione
+      }
+
       // Nemico rimasto troppo indietro (oltre una membrana gia' superata): non potra'
       // piu' raggiungere il giocatore, lo rimuoviamo cosi' lo spawner ne crea di nuovi
       // nella sezione attuale. Boss e guardiani sono esenti.
@@ -1848,8 +1932,12 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    if (this.companion) this.updateCompanion(now);
+    if (this.companions.length) this.updateCompanions(now);
+    if (p.homing) this.updateHomingShots(now);
+    if (p.dashStrike) this.updateDashStrike(now);
     this.updateShieldAura(now);
+    // Seconda Vita: si ricarica quando torni a vita piena.
+    if (p.secondLife && !this.secondLifeReady && p.hp >= p.maxHp) this.secondLifeReady = true;
 
     this.updateHud();
   }

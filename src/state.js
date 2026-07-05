@@ -85,15 +85,20 @@ window.GameState = {
       dash: false,
       weapon: 'swab',        // 'swab' | 'hammer' (corpo a corpo)
       // Abilità di run (scelte all'UpgradeScene) che cambiano lo stile di gioco:
-      jetSpread: false,      // getto a ventaglio (3 palline)
+      jetPellets: 1,         // n. palline sparate dal getto (Ventaglio: +1 a ogni pesca)
       jetPierce: false,      // palline perforanti
       lifesteal: false,      // curi vita uccidendo
       shield: false,         // para un colpo ogni tot
+      homing: false,         // Mira Guidata: le palline curvano verso il nemico piu' vicino
+      secondLife: false,     // Seconda Vita: sopravvivi a un colpo mortale (si ricarica a vita piena)
+      waxMult: 1,            // Cerume Extra: moltiplicatore del cerume raccolto (+0.5 a ogni pesca)
+      dashStrike: false,     // Scatto Offensivo: lo scatto danneggia i nemici e pulisce il cerume
+      corrosive: false,      // Sapone Corrosivo: le palline avvelenano il nemico (danno nel tempo)
       // Abilità sbloccabili dai PROGETTI del negozio (window.BLUEPRINTS):
       magnet: false,         // attira il cerume/pickup vicino
       meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
       jetSplash: false,      // le palline del getto scoppiano all'impatto (piccola area)
-      companion: false,      // bolla-aiutante che ti orbita e spara ai nemici da sola
+      companions: 0,         // n. bolle-aiutante (+1 a ogni pesca della carta)
     };
   },
 

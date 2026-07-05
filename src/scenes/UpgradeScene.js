@@ -38,25 +38,34 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'dash', rep: false, ability: 'dash', apply: (s) => { s.dash = true; } },
       { id: 'hammer', rep: false, ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
       // Abilità che cambiano lo stile di gioco (una volta sola ciascuna):
-      { id: 'spread', rep: false, ability: 'spread', apply: (s) => { s.jetSpread = true; } },
+      // Ventaglio: ora IMPILABILE — ogni pesca aggiunge una pallina al getto.
+      { id: 'spread', rep: false, stack: true, ability: 'spread', apply: (s) => { s.jetPellets += 1; } },
       { id: 'pierce', rep: false, ability: 'pierce', apply: (s) => { s.jetPierce = true; } },
       { id: 'lifesteal', rep: false, ability: 'lifesteal', apply: (s) => { s.lifesteal = true; } },
       { id: 'shield', rep: false, ability: 'shield', apply: (s) => { s.shield = true; } },
+      // Nuove abilità del pool di run (non richiedono sblocco al negozio):
+      { id: 'homing', rep: false, ability: 'homing', apply: (s) => { s.homing = true; } },
+      { id: 'secondlife', rep: false, ability: 'secondlife', apply: (s) => { s.secondLife = true; } },
+      { id: 'greed', rep: false, stack: true, ability: 'greed', apply: (s) => { s.waxMult += 0.5; } },
+      { id: 'dashstrike', rep: false, ability: 'dashstrike', apply: (s) => { s.dashStrike = true; if (!s.dash) s.dash = true; } },
+      { id: 'corrosive', rep: false, ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
       // Abilità NUOVE sbloccabili dai PROGETTI del negozio (locked: compaiono qui solo
       // dopo essere state sbloccate — vedi window.BLUEPRINTS / ShopScene).
       { id: 'magnet', rep: false, ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
       { id: 'blast',  rep: false, ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
       { id: 'splash', rep: false, ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
-      { id: 'companion', rep: false, ability: 'companion', locked: true, apply: (s) => { s.companion = true; } },
+      // Bolla-aiutante: IMPILABILE — ogni pesca aggiunge una bolla (richiede il Progetto sbloccato).
+      { id: 'companion', rep: false, stack: true, ability: 'companion', locked: true, apply: (s) => { s.companions += 1; } },
     ];
 
-    // Disponibili: gli stat ripetibili sempre; le abilità solo se non gia' possedute
-    // (ownedAbilities le traccia tutte). Le abilità "locked" compaiono solo se il relativo
-    // PROGETTO e' stato sbloccato al negozio (Meta.unlockLevel(id) > 0).
+    // Disponibili: gli stat ripetibili sempre; le "stack" (impilabili) ri-pescabili all'infinito;
+    // le abilità una-tantum solo se non gia' possedute (ownedAbilities le traccia tutte). Le
+    // abilità "locked" compaiono solo se il Progetto e' sbloccato al negozio (Meta.unlockLevel>0).
     const owned = window.GameState.ownedAbilities;
     const avail = ALL.filter((u) => {
       if (u.rep) return true;
       if (u.locked && window.Meta.unlockLevel(u.id) <= 0) return false;
+      if (u.stack) return true;
       return owned.indexOf(u.ability) === -1;
     });
     Phaser.Utils.Array.Shuffle(avail);
