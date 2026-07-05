@@ -65,6 +65,7 @@ class GameScene extends Phaser.Scene {
     this.lastGroundAt = -9999;
     this.canCutJump = false;
     this.companion = null;  // bolla-aiutante (creata sotto se l'abilità è posseduta)
+    this.shieldAura = null; // alone dello scudo (creato al volo se l'abilità è posseduta)
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // Ogni livello si parte a vita piena
@@ -1444,7 +1445,8 @@ class GameScene extends Phaser.Scene {
       this.shieldReadyAt = now + 6000;
       this.invulnUntil = now + 500;
       window.Sfx.hit();
-      this.shieldFx();
+      this.shieldBreakFx(sourceX);
+      if (this.shieldAura) this.shieldAura.setVisible(false);   // ora in ricarica: alone spento
       return;
     }
     this.invulnUntil = now + 900;
@@ -1466,10 +1468,41 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: c, y: y - 40, alpha: 0, scale: 1.6, duration: 420, ease: 'Quad.out', onComplete: () => c.destroy() });
   }
 
-  // Effetto "scudo": un anello azzurro che si espande attorno al giocatore.
-  shieldFx() {
-    const ring = this.add.circle(this.player.x, this.player.y, 16, 0x8fd0ff, 0).setStrokeStyle(3, 0x8fd0ff, 0.9).setDepth(21);
-    this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => ring.destroy() });
+  // Alone permanente dello scudo: una bolla azzurra attorno al giocatore, VISIBILE solo
+  // quando lo scudo è CARICO (pronto a parare). Sparisce durante la ricarica → così si
+  // capisce sempre a colpo d'occhio se sei protetto o no. Chiamato ogni frame in update().
+  updateShieldAura(now) {
+    const pl = window.GameState.player;
+    if (!pl.shield) { if (this.shieldAura) this.shieldAura.setVisible(false); return; }
+    if (!this.shieldAura) {
+      this.shieldAura = this.add.circle(this.player.x, this.player.y, 24, 0x8fd0ff, 0.12)
+        .setStrokeStyle(2.5, 0xbfe8ff, 0.9).setDepth(9);   // dietro il PG (depth 10): alone, non lo copre
+    }
+    const charged = now >= (this.shieldReadyAt || 0);
+    this.shieldAura.setVisible(charged);
+    if (charged) {
+      this.shieldAura.x = this.player.x;
+      this.shieldAura.y = this.player.y;
+      this.shieldAura.setScale(1 + Math.sin(now / 180) * 0.06);   // pulsazione leggera = "vivo"
+    }
+  }
+
+  // Effetto di ROTTURA scudo (quando para un colpo): flash bianco + anello brillante +
+  // schegge che schizzano + lampo sul personaggio + scossa. Molto più evidente di prima.
+  shieldBreakFx(sourceX) {
+    const x = this.player.x, y = this.player.y;
+    const flash = this.add.circle(x, y, 30, 0xffffff, 0.85).setDepth(22);
+    this.tweens.add({ targets: flash, scale: 2.2, alpha: 0, duration: 260, ease: 'Quad.out', onComplete: () => flash.destroy() });
+    const ring = this.add.circle(x, y, 22, 0x8fd0ff, 0).setStrokeStyle(4, 0xbfe8ff, 1).setDepth(22);
+    this.tweens.add({ targets: ring, scale: 3, alpha: 0, duration: 380, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const sh = this.add.circle(x, y, 3, 0xbfe8ff, 1).setDepth(22);
+      this.tweens.add({ targets: sh, x: x + Math.cos(a) * 46, y: y + Math.sin(a) * 46, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => sh.destroy() });
+    }
+    this.player.setTintFill(0xffffff);                      // lampo bianco pieno sul PG
+    this.time.delayedCall(90, () => { if (this.player.active) this.player.clearTint(); });
+    this.cameras.main.shake(120, 0.008);
   }
 
   // Esplosione di particelle (briciole): vedi GameGfx in src/gfx.js.
@@ -1816,6 +1849,7 @@ class GameScene extends Phaser.Scene {
     });
 
     if (this.companion) this.updateCompanion(now);
+    this.updateShieldAura(now);
 
     this.updateHud();
   }
