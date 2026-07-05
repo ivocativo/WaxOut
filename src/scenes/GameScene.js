@@ -187,7 +187,11 @@ class GameScene extends Phaser.Scene {
       if (sh.corrosive) this.applyCorrosion(en);   // abilità SAPONE CORROSIVO: danno nel tempo
       consumeShot(sh);
     };
-    const hitSolid = (a, b) => this.popShot(this.shots.contains(a) ? a : b);   // i muri fermano sempre
+    const hitSolid = (a, b) => {
+      const sh = this.shots.contains(a) ? a : b, solid = (sh === a) ? b : a;
+      if (sh.bounceLeft > 0) this.bounceShot(sh, solid);   // abilità RIMBALZO
+      else this.popShot(sh);                               // altrimenti i muri fermano
+    };
     this.physics.add.overlap(this.shots, this.blocks, hitWax);
     this.physics.add.overlap(this.shots, this.enemies, hitFoe);
     this.physics.add.overlap(this.shots, this.platforms, hitSolid);
@@ -989,14 +993,17 @@ class GameScene extends Phaser.Scene {
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = p.jetDamage;
-    s.pierceLeft = p.jetPierce ? 3 : 1;    // abilità PERFORANTE
+    // EVOLUZIONE "Lama d'Acqua": perfora TUTTO; altrimenti abilità PERFORANTE normale.
+    s.pierceLeft = p.evoPierceAll ? 999 : (p.jetPierce ? 3 : 1);
     s.splash = p.jetSplash;                // abilità SCOPPIO DI SAPONE (area all'impatto)
     s.homing = p.homing;                   // abilità MIRA GUIDATA (curva verso il nemico)
     s.corrosive = p.corrosive;             // abilità SAPONE CORROSIVO (avvelena all'impatto)
+    s.bounceLeft = p.bounce | 0;           // abilità RIMBALZO (rimbalza N volte sui muri/suolo)
+    s.bounceGrace = 0;
     if (p.corrosive) s.setTint(0x9be86b);  // pallina verde = corrosiva
     const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
-    this.time.delayedCall(850, () => { if (s.active) s.destroy(); });
+    this.time.delayedCall(850 + (p.bounce | 0) * 300, () => { if (s.active) s.destroy(); });   // vive di più se rimbalza
   }
 
   popShot(s) {
@@ -1004,6 +1011,31 @@ class GameScene extends Phaser.Scene {
     this.splat(s.x, s.y, 'soft');
     if (s.splash) this.soapSplash(s.x, s.y);   // abilità: scoppio ad area all'impatto
     s.destroy();
+  }
+
+  // Abilità RIMBALZO: la pallina rimbalza sulla superficie invece di spappolarsi. Deduce l'asse
+  // dell'urto (orizzontale/verticale) confrontando la distanza dal centro della superficie
+  // normalizzata sui semilati, poi inverte la velocità su quell'asse. Consuma un rimbalzo.
+  bounceShot(sh, solid) {
+    if (!sh || !sh.active) return;
+    const now = this.time.now;
+    if (now < (sh.bounceGrace || 0)) return;   // evita doppi rimbalzi nello stesso istante
+    sh.bounceGrace = now + 60;
+    const sb = solid.getBounds();
+    const dx = sh.x - (sb.x + sb.width / 2);
+    const dy = sh.y - (sb.y + sb.height / 2);
+    const halfW = sb.width / 2 + 6, halfH = sb.height / 2 + 6;
+    if (Math.abs(dx) / halfW > Math.abs(dy) / halfH) {
+      sh.setVelocity(-sh.body.velocity.x, sh.body.velocity.y);   // urto laterale: inverti X
+      sh.x += Math.sign(dx) * 5;
+    } else {
+      sh.setVelocity(sh.body.velocity.x, -sh.body.velocity.y);   // urto sopra/sotto: inverti Y
+      sh.y += Math.sign(dy) * 5;
+    }
+    sh.bounceLeft -= 1;
+    window.Sfx.crack();
+    const f = this.add.circle(sh.x, sh.y, 5, 0xdff3ff, 0.85).setDepth(11);
+    this.tweens.add({ targets: f, scale: 0.2, alpha: 0, duration: 140, ease: 'Quad.out', onComplete: () => f.destroy() });
   }
 
   // Scoppio di sapone (abilità SPLASH): quando una pallina finisce, fa un piccolo scoppio
@@ -1014,8 +1046,9 @@ class GameScene extends Phaser.Scene {
     const ring = this.add.circle(x, y, R, 0xdff3ff, 0.35).setDepth(11).setScale(0.25);
     this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 220, ease: 'Quad.out', onComplete: () => ring.destroy() });
     window.Sfx.spray();
+    const toxic = window.GameState.player.evoToxic;   // EVOLUZIONE Nube Tossica: lo scoppio avvelena
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && !e.spawning && Math.hypot(e.x - x, e.y - y) < R) this.damageEnemy(e, dmg);
+      if (e.active && !e.spawning && Math.hypot(e.x - x, e.y - y) < R) { this.damageEnemy(e, dmg); if (toxic && e.active) this.applyCorrosion(e); }
     });
     this.blocks.getChildren().forEach((b) => {
       if (b.active && Math.hypot(b.x - x, b.y - y) < R) this.damageBlock(b, dmg);
@@ -1131,6 +1164,8 @@ class GameScene extends Phaser.Scene {
     s.dmg = Math.max(5, Math.round(p.jetDamage * 0.5));
     s.pierceLeft = 1;
     s.splash = false;
+    s.homing = p.evoSwarm || false;   // EVOLUZIONE Sciame: anche le bolle sparano a ricerca
+    s.bounceLeft = 0;
     window.Sfx.spray();
     this.time.delayedCall(900, () => { if (s.active) s.destroy(); });
     // piccolo "scatto" del compagno quando spara
@@ -1779,8 +1814,9 @@ class GameScene extends Phaser.Scene {
       (z) => this.player.x > z.x1 && this.player.x < z.x2);
 
     // Abilità CALAMITA: i bonus di cerume vicini volano verso il giocatore (raccolta a distanza).
+    // EVOLUZIONE Buco Nero (evoMagnet): raggio molto più ampio.
     if (p.magnet && this.pickups) {
-      const R = 170;
+      const R = p.evoMagnet ? 320 : 170;
       this.pickups.getChildren().forEach((pk) => {
         if (!pk.active) return;
         const dx = this.player.x - pk.x, dy = this.player.y - pk.y;

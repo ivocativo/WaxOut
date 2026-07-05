@@ -49,6 +49,8 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'greed', rep: false, stack: true, ability: 'greed', apply: (s) => { s.waxMult += 0.5; } },
       { id: 'dashstrike', rep: false, ability: 'dashstrike', apply: (s) => { s.dashStrike = true; if (!s.dash) s.dash = true; } },
       { id: 'corrosive', rep: false, ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
+      // Rimbalzo: IMPILABILE — ogni pesca aggiunge un rimbalzo alle palline.
+      { id: 'bounce', rep: false, stack: true, ability: 'bounce', apply: (s) => { s.bounce += 1; } },
       // Abilità NUOVE sbloccabili dai PROGETTI del negozio (locked: compaiono qui solo
       // dopo essere state sbloccate — vedi window.BLUEPRINTS / ShopScene).
       { id: 'magnet', rep: false, ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
@@ -69,7 +71,16 @@ class UpgradeScene extends Phaser.Scene {
       return owned.indexOf(u.ability) === -1;
     });
     Phaser.Utils.Array.Shuffle(avail);
-    const choices = avail.slice(0, 3);
+
+    // EVOLUZIONI disponibili: possiedi entrambe le abilità richieste e non l'hai ancora fusa.
+    // Hanno PRIORITA' (compaiono davanti) e il tag speciale "EVOLUZIONE".
+    const evoAvail = (window.EVOLUTIONS || []).filter((r) =>
+      r.needs.every((n) => owned.indexOf(n) !== -1) && owned.indexOf(r.id) === -1
+    ).map((r) => ({ id: r.id, evo: true, ability: r.id, apply: r.apply }));
+    Phaser.Utils.Array.Shuffle(evoAvail);
+
+    // Le carte: al massimo 1 evoluzione in evidenza + riempi fino a 3 con le normali.
+    const choices = [...evoAvail.slice(0, 1), ...avail].slice(0, 3);
 
     // Carte
     const cardW = 240, cardH = 170, gap = 30;
@@ -79,25 +90,30 @@ class UpgradeScene extends Phaser.Scene {
 
     choices.forEach((u, i) => {
       const cx = startX + i * (cardW + gap);
-      const card = this.add.rectangle(cx, cy, cardW, cardH, 0x2b1d12, 1)
-        .setStrokeStyle(4, 0xffd166).setInteractive({ useHandCursor: true });
+      const card = this.add.rectangle(cx, cy, cardW, cardH, u.evo ? 0x3a2140 : 0x2b1d12, 1)
+        .setStrokeStyle(4, u.evo ? 0xff9ff3 : 0xffd166).setInteractive({ useHandCursor: true });
 
       this.add.text(cx, cy - 55, (i + 1) + '. ' + T.t('up_' + u.id + '_name'), {
-        fontFamily: 'monospace', fontSize: '20px', color: '#ffe2b0',
+        fontFamily: 'monospace', fontSize: '20px', color: u.evo ? '#ffd6ff' : '#ffe2b0',
         align: 'center', wordWrap: { width: cardW - 20 },
       }).setOrigin(0.5);
       this.add.text(cx, cy + 10, T.t('up_' + u.id + '_desc'), {
         fontFamily: 'monospace', fontSize: '16px', color: '#fff7e8',
         align: 'center', lineSpacing: 4, wordWrap: { width: cardW - 24 },
       }).setOrigin(0.5);
-      if (!u.rep) {
+      if (u.evo) {
+        this.add.text(cx, cy + 65, T.t('up_evo_tag'), {
+          fontFamily: 'monospace', fontSize: '13px', color: '#ff9ff3',
+        }).setOrigin(0.5);
+      } else if (!u.rep) {
         this.add.text(cx, cy + 65, T.t('up_ability_tag'), {
           fontFamily: 'monospace', fontSize: '13px', color: '#9fe6a0',
         }).setOrigin(0.5);
       }
 
-      card.on('pointerover', () => card.setFillStyle(0x4a3320, 1));
-      card.on('pointerout', () => card.setFillStyle(0x2b1d12, 1));
+      const baseFill = u.evo ? 0x3a2140 : 0x2b1d12, hoverFill = u.evo ? 0x5a3562 : 0x4a3320;
+      card.on('pointerover', () => card.setFillStyle(hoverFill, 1));
+      card.on('pointerout', () => card.setFillStyle(baseFill, 1));
       card.on('pointerdown', () => this.choose(u));
     });
 

@@ -57,6 +57,17 @@ window.BLUEPRINTS = {
   companion: { cost: 130, ability: 'companion' },
 };
 
+// EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le
+// carte di fine livello può comparire l'EVOLUZIONE (`id`), che fonde le due in una versione
+// potenziata. `id` funge anche da chiave i18n (up_<id>_name/_desc, ability_<id>) e da voce
+// in ownedAbilities (una volta presa non ricompare). Meccaniche agganciate in GameScene.
+window.EVOLUTIONS = [
+  { id: 'evo_blade',  needs: ['pierce', 'spread'],       apply: (s) => { s.evoPierceAll = true; s.jetDamage += 6; } },
+  { id: 'evo_toxic',  needs: ['splash', 'corrosive'],    apply: (s) => { s.evoToxic = true; } },
+  { id: 'evo_magnet', needs: ['magnet', 'greed'],        apply: (s) => { s.evoMagnet = true; s.waxMult += 0.5; } },
+  { id: 'evo_swarm',  needs: ['companion', 'homing'],    apply: (s) => { s.evoSwarm = true; } },
+];
+
 // Stato di progressione DELLA RUN corrente (azzerato a ogni nuova run).
 window.GameState = {
   level: 1,
@@ -94,6 +105,12 @@ window.GameState = {
       waxMult: 1,            // Cerume Extra: moltiplicatore del cerume raccolto (+0.5 a ogni pesca)
       dashStrike: false,     // Scatto Offensivo: lo scatto danneggia i nemici e pulisce il cerume
       corrosive: false,      // Sapone Corrosivo: le palline avvelenano il nemico (danno nel tempo)
+      bounce: 0,             // Rimbalzo: le palline rimbalzano N volte (+1 a ogni pesca)
+      // EVOLUZIONI (due abilità collegate si fondono in una versione potenziata):
+      evoPierceAll: false,   // Perforante + Ventaglio  -> Lama d'Acqua (perfora tutto + danno)
+      evoToxic: false,       // Scoppio + Corrosivo     -> Nube Tossica (lo scoppio avvelena)
+      evoMagnet: false,      // Calamita + Cerume Extra  -> Buco Nero (raggio enorme + più cerume)
+      evoSwarm: false,       // Bolla + Mira Guidata     -> Sciame (le bolle sparano a ricerca)
       // Abilità sbloccabili dai PROGETTI del negozio (window.BLUEPRINTS):
       magnet: false,         // attira il cerume/pickup vicino
       meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
