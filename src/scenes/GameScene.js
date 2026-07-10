@@ -111,6 +111,7 @@ class GameScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     this.projectiles = this.physics.add.group();  // palline sputate dai nemici
 
+    this.chooseMutator();   // regola casuale di questo livello (prima di costruirlo: incide su cerume/nemici)
     this.buildLevel();
 
     // Giocatore (sprite PNG: scala per portarlo alla dimensione di gioco; hitbox invariato)
@@ -245,10 +246,16 @@ class GameScene extends Phaser.Scene {
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
     }
+    this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
     this.spawnTimer = this.time.addEvent({
       delay: spawnDelay, loop: true,
       callback: () => { if (!this.locked && this.enemies.countActive(true) < this.maxEnemies) this.spawnEnemy(); },
     });
+
+    // Annuncio del MODIFICATORE di livello (dopo il banner del tipo di livello).
+    if (this.mutator) {
+      this.time.delayedCall(1300, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color); });
+    }
 
     this.buildHud();
 
@@ -387,6 +394,7 @@ class GameScene extends Phaser.Scene {
     if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
     else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
     else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
+    hp = Math.max(1, Math.round(hp * (this.mutWaxHp || 1)));   // MODIFICATORE "cerume ostinato"
     const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
     b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
     b.col = col; b.row = row; b.waxType = type;
@@ -479,6 +487,24 @@ class GameScene extends Phaser.Scene {
     }
     // Rampa d'avvio prima della prima membrana.
     this.addPlatform(Math.max(200, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 150), 120);
+  }
+
+  // Azzera i modificatori ai valori "neutri" (nessun effetto) + rimette la gravita' di default.
+  resetMutators() {
+    this.mutEnemySpeed = 1; this.mutEnemyHp = 1; this.mutEnemyWax = 1;
+    this.mutMaxEnemies = 0; this.mutWaxMult = 1; this.mutWaxHp = 1;
+    this.physics.world.gravity.y = window.CONFIG.GRAVITY;
+    this.mutator = null;
+  }
+
+  // Sceglie (a volte) un MODIFICATORE per questo livello e lo applica. Niente mutatori nei
+  // primissimi livelli e nei livelli boss (per non sovraccaricare). Il banner lo mostra create().
+  chooseMutator() {
+    this.resetMutators();
+    if (window.GameState.level < 2 || this.levelKind === 'boss') return;
+    if (Math.random() > 0.55) return;   // ~55% dei livelli ha un mutatore
+    this.mutator = Phaser.Utils.Array.GetRandom(window.MUTATORS);
+    this.mutator.apply(this);
   }
 
   // Garantisce un minimo di pickup-CURA per livello (la vita non si ricarica piu' a fine
@@ -617,7 +643,7 @@ class GameScene extends Phaser.Scene {
 
   grabPickup(pk) {
     if (!pk || !pk.active) return;
-    window.GameState.wax += Math.round(pk.waxValue * (window.GameState.player.waxMult || 1));   // Cerume Extra
+    window.GameState.wax += Math.round(pk.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
     if (pk.isHeal) {
       const pl = window.GameState.player;
       pl.hp = Math.min(pl.maxHp, pl.hp + pk.healValue);
@@ -853,6 +879,11 @@ class GameScene extends Phaser.Scene {
     } else {
       cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22], scale: 1.6 };
     }
+
+    // MODIFICATORE di livello: adatta le statistiche del nemico appena create.
+    cfg.speed = Math.round(cfg.speed * (this.mutEnemySpeed || 1));
+    cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1)));
+    cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
 
     // Posizione di comparsa: i volanti calano dal soffitto, gli altri emergono dal
     // terreno in punti lontani dal giocatore (il boss esce verso destra).
@@ -1352,7 +1383,7 @@ class GameScene extends Phaser.Scene {
       window.Sfx.smash();
       this.burst(b.bitKey, b.x, b.y, 14);
       this.splat(b.x, b.y, b.waxType);
-      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1));   // Cerume Extra
+      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
       this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito" (valore GREZZO, il moltiplicatore non conta)
       const dcol = b.col;
       if (b.waxImg) b.waxImg.destroy();
@@ -1414,7 +1445,7 @@ class GameScene extends Phaser.Scene {
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
       const pl = window.GameState.player;
-      window.GameState.wax += Math.round(e.waxValue * (pl.waxMult || 1));   // Cerume Extra
+      window.GameState.wax += Math.round(e.waxValue * (pl.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
       // Abilità VITA RUBATA: uccidere cura un po' (piu' col boss).
       if (pl.lifesteal) {
         const heal = e.kind === 'boss' ? 25 : 3;

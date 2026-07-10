@@ -57,6 +57,20 @@ window.BLUEPRINTS = {
   companion: { cost: 500, ability: 'companion' },
 };
 
+// MODIFICATORI di livello (mutatori, stile Hades/Nuclear Throne): una regola casuale
+// annunciata a inizio livello che cambia le regole di QUELLA partita. Danno varieta'
+// combinatoria a costo minimo: ognuno regola solo parametri gia' esistenti (velocita'/HP/
+// cerume dei nemici, gravita', HP del cerume). `apply(scene)` imposta i campi mut* letti
+// dal gioco. `color` per il banner, `id` per la chiave i18n (mut_<id>).
+window.MUTATORS = [
+  { id: 'haste',    color: '#ff8f5a', apply(s) { s.mutEnemySpeed = 1.4; s.mutEnemyWax = 1.5; } },
+  { id: 'horde',    color: '#9be870', apply(s) { s.mutMaxEnemies = 3; s.mutEnemyHp = 0.6; } },
+  { id: 'armored',  color: '#8fd0ff', apply(s) { s.mutEnemyHp = 1.7; s.mutEnemyWax = 1.3; } },
+  { id: 'lowgrav',  color: '#c9a0ff', apply(s) { s.physics.world.gravity.y = Math.round(window.CONFIG.GRAVITY * 0.55); } },
+  { id: 'bonanza',  color: '#ffd166', apply(s) { s.mutWaxMult = 2; } },
+  { id: 'thickwax', color: '#e0a83a', apply(s) { s.mutWaxHp = 1.7; } },
+];
+
 // EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le
 // carte di fine livello può comparire l'EVOLUZIONE (`id`), che fonde le due in una versione
 // potenziata. `id` funge anche da chiave i18n (up_<id>_name/_desc, ability_<id>) e da voce
