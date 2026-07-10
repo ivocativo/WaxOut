@@ -1099,16 +1099,30 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // Abilità MIRA GUIDATA: ogni frame le palline "homing" curvano verso il nemico più vicino.
+  // Abilità MIRA GUIDATA: le palline curvano dolcemente verso un nemico DAVANTI a loro. È un
+  // aiuto di mira, non un cerca-bersagli: aggancia solo nemici entro un cono in avanti (~55°),
+  // così sparando dalla parte opposta i colpi NON fanno inversioni a U per andare a segno.
   updateHomingShots(now) {
+    const CONE = 0.95;   // ~55°: oltre questo scarto angolare il bersaglio è "fuori tiro"
+    const TURN = 0.08;   // virata per frame (dolce: niente giri a U)
+    const RANGE = 230;
     this.shots.getChildren().forEach((s) => {
       if (!s.active || !s.homing) return;
-      const t = this.nearestEnemyInRange(s.x, s.y, 260);
-      if (!t) return;
-      const sp = Math.hypot(s.body.velocity.x, s.body.velocity.y) || 580;
       const cur = Math.atan2(s.body.velocity.y, s.body.velocity.x);
-      const want = Math.atan2(t.y - s.y, t.x - s.x);
-      const na = cur + Phaser.Math.Angle.Wrap(want - cur) * 0.14;   // vira dolcemente
+      // nemico più vicino ENTRO il cono davanti alla pallina
+      let best = null, bd = RANGE;
+      this.enemies.getChildren().forEach((e) => {
+        if (!e.active || e.spawning) return;
+        const d = Math.hypot(e.x - s.x, e.y - s.y);
+        if (d >= bd) return;
+        const ang = Math.atan2(e.y - s.y, e.x - s.x);
+        if (Math.abs(Phaser.Math.Angle.Wrap(ang - cur)) > CONE) return;   // dietro/di lato: ignora
+        bd = d; best = e;
+      });
+      if (!best) return;
+      const sp = Math.hypot(s.body.velocity.x, s.body.velocity.y) || 580;
+      const want = Math.atan2(best.y - s.y, best.x - s.x);
+      const na = cur + Phaser.Math.Angle.Wrap(want - cur) * TURN;
       s.setVelocity(Math.cos(na) * sp, Math.sin(na) * sp);
     });
   }
@@ -1796,7 +1810,10 @@ class GameScene extends Phaser.Scene {
     }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
-    if (onGround) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
+    // Rifornisci i salti SOLO quando sei davvero appoggiato e non stai già salendo: subito
+    // dopo un salto il corpo "tocca" ancora il suolo per un frame e, senza questo controllo,
+    // bastava ripremere in fretta per ottenere un salto in più (falso doppio salto).
+    if (onGround && this.player.body.velocity.y >= 0) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
     // Ostacoli mobili: vanno avanti e indietro tra i due estremi memorizzati, ruotando su
     // se stessi (leggibilita'). Il danno al contatto e' gestito dall'overlap in create().
