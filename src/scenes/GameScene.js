@@ -73,11 +73,24 @@ class GameScene extends Phaser.Scene {
     // inizio RUN è piena, la imposta newPlayer). Ci si cura raccogliendo i pickup-cura.
     window.GameState.player.hp = Phaser.Math.Clamp(window.GameState.player.hp, 1, window.GameState.player.maxHp);
 
-    // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato), altrimenti normale
+    // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato). Gli altri di solito sono
+    // "normali", ma dal lvl 2 spesso diventano un TIPO SPECIALE con obiettivo/regole diverse
+    // (pulizia profonda / corsa / assedio) per rompere la monotonia.
     const levelNum = window.GameState.level;
-    this.levelKind =
-      (levelNum % 5 === 0) ? 'boss' :
-      (levelNum % 5 === 3) ? 'swarm' : 'normal';
+    let kind = (levelNum % 5 === 0) ? 'boss' : (levelNum % 5 === 3) ? 'swarm' : 'normal';
+    if (kind === 'normal' && levelNum >= 2) {
+      const r = Math.random();
+      if (r < 0.22) kind = 'deepclean';
+      else if (r < 0.44) kind = 'rush';
+      else if (r < 0.62) kind = 'siege';
+    }
+    this.levelKind = kind;
+    // Soglia di pulizia per completare: default 0.8; la pulizia PROFONDA ne chiede quasi tutta,
+    // la CORSA nessuna (basta arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
+    if (this.levelKind === 'deepclean') this.cleanGoal = 0.95;
+    else if (this.levelKind === 'rush') this.cleanGoal = 0;
+    this.siegeEndAt = 0;   // istante (ms) in cui l'assedio e' superato (0 = non assedio)
+    this.siegeText = null;
 
     // Mondo LARGO da attraversare (cresce un po' col livello): la telecamera segue
     // il giocatore mentre cammina verso il timpano (a destra). W/H restano la
@@ -240,11 +253,23 @@ class GameScene extends Phaser.Scene {
       spawnDelay = Math.max(800, 1700 - lvl * 110);
       for (let i = 0; i < Math.min(4, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
+    } else if (this.levelKind === 'siege') {
+      // ASSEDIO: non serve raggiungere il timpano, bisogna SOPRAVVIVERE a tempo mentre i
+      // nemici arrivano fitti. Vince allo scadere del cronometro (vedi update).
+      this.maxEnemies = Math.min(4 + lvl, 9);
+      spawnDelay = Math.max(700, 1500 - lvl * 100);
+      this.siegeEndAt = this.time.now + 30000 + lvl * 2000;
+      for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
+      this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
     } else {
+      // normal / deepclean / rush: attraversa fino al timpano (cambia solo la soglia pulizia).
       this.maxEnemies = Math.min(2 + lvl, 6);
       spawnDelay = Math.max(1500, 2800 - lvl * 150);
+      if (this.levelKind === 'rush') { this.maxEnemies = Math.min(this.maxEnemies + 2, 8); spawnDelay = Math.round(spawnDelay * 0.7); }
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
-      this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
+      const bkey = this.levelKind === 'deepclean' ? 'game_deepclean_in' : this.levelKind === 'rush' ? 'game_rush_in' : 'game_goal';
+      const bcol = this.levelKind === 'deepclean' ? '#9be870' : this.levelKind === 'rush' ? '#ffd166' : '#ffd9a0';
+      this.showBanner(window.I18n.t(bkey), bcol);
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
     this.spawnTimer = this.time.addEvent({
@@ -258,6 +283,13 @@ class GameScene extends Phaser.Scene {
     }
 
     this.buildHud();
+
+    // ASSEDIO: cronometro di sopravvivenza in alto (aggiornato in update).
+    if (this.levelKind === 'siege') {
+      this.siegeText = this.add.text(window.CONFIG.WIDTH / 2, 96, '', {
+        fontFamily: 'monospace', fontSize: '20px', color: '#ffd9a0', stroke: '#14161f', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    }
 
     // Pausa: tasti ESC/P + pulsante a schermo (in alto a destra)
     this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
@@ -1892,9 +1924,16 @@ class GameScene extends Phaser.Scene {
     const k = this.keys;
     const now = time;
 
+    // ASSEDIO: si vince SOPRAVVIVENDO fino allo scadere del cronometro (niente timpano).
+    if (this.levelKind === 'siege') {
+      const left = Math.max(0, Math.ceil((this.siegeEndAt - now) / 1000));
+      if (this.siegeText) this.siegeText.setText(window.I18n.t('hud_siege', { s: left }));
+      if (now >= this.siegeEndAt) { this.levelComplete(); return; }
+    }
+
     // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
     // Nei livelli boss il timpano resta "sbarrato" finche' il Tappo di Cerume e' vivo.
-    if (this.player.x >= this.goalX) {
+    if (this.levelKind !== 'siege' && this.player.x >= this.goalX) {
       const cleanPct = this.totalWax ? (this.cleanedWax / this.totalWax) : 1;
       const bossBlocking = this.levelKind === 'boss' &&
         this.enemies.getChildren().some((e) => e.active && e.kind === 'boss');
