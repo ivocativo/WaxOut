@@ -138,8 +138,10 @@ class GameScene extends Phaser.Scene {
     // Bonus di cerume raccoglibili sulle pedane.
     this.physics.add.overlap(this.player, this.pickups, (pl, pk) => this.grabPickup(pk));
 
-    // Ostacoli mobili: fanno danno da contatto (stessa hurtPlayer di un nemico), non si uccidono.
+    // Gocce dal soffitto: fanno danno da contatto col giocatore (come un nemico).
     this.physics.add.overlap(this.player, this.movers, (pl, mv) => this.hurtPlayer(12 + Math.floor(window.GameState.level / 2), mv.x));
+    // e SCHIZZANO quando incontrano il cerume nella caduta (niente attraversamenti).
+    this.physics.add.overlap(this.movers, this.blocks, (mv) => { if (mv && mv.active) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); } });
 
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
@@ -486,9 +488,12 @@ class GameScene extends Phaser.Scene {
     const slimeCount = lvl >= 2 ? Phaser.Math.Clamp(1 + Math.floor(lvl / 3), 1, 4) : 0;
     for (let i = 0; i < slimeCount; i++) this.addSlimeZone();
 
+    // Gocce dal soffitto (dal lvl 2): "movers" contiene le GOCCE che cadono (riusa l'overlap
+    // col giocatore per il danno), "drips" sono gli emettitori fissi a soffitto.
     this.movers = this.physics.add.group({ allowGravity: false });
-    const moverCount = lvl >= 3 ? Phaser.Math.Clamp(Math.floor(lvl / 3), 1, 3) : 0;
-    for (let i = 0; i < moverCount; i++) this.addMovingHazard();
+    this.drips = [];
+    const dripCount = lvl >= 2 ? Phaser.Math.Clamp(Math.floor(lvl / 2), 1, 4) : 0;
+    for (let i = 0; i < dripCount; i++) this.addDripHazard();
   }
 
   // Trova una fascia orizzontale libera (lontana da membrane e da altre pozze/ostacoli
@@ -519,22 +524,51 @@ class GameScene extends Phaser.Scene {
     this.slimeZones.push({ x1: x, x2: x + w });
   }
 
-  // Ostacolo mobile: una pallina di cerume indurito che va avanti e indietro tra due punti
-  // (a terra o sospesa in aria) e ferisce al contatto come un nemico (va schivato/scavalcato,
-  // non si puo' uccidere). Ruota su se stessa per leggibilita'.
-  addMovingHazard() {
-    const lvl = window.GameState.level;
-    const w = Phaser.Math.Between(220, 340);
-    const x = this.pickHazardX(w, 40);
+  // Emettitore di GOCCE a soffitto (sostituisce i vecchi pallini fluttuanti): un punto fisso
+  // dove una goccia di cerume si GONFIA (telegrafo) e poi CADE. La caduta ferisce il giocatore
+  // (overlap in this.movers). Verticale e leggibile: si schiva leggendo il ritmo.
+  addDripHazard() {
+    const x = this.pickHazardX(40, 20);
     if (x == null) return;
-    const floating = Math.random() < 0.5;
-    const y = floating ? this.groundTop - Phaser.Math.Between(110, 190) : this.groundTop - 22;
-    const m = this.movers.create(x + w / 2, y, 'wax_glob').setDepth(8).setScale(1.8).setTint(0xd6432f);
-    m.body.setAllowGravity(false);
-    m.body.setSize(14, 14, true);
-    m.range = { x1: x, x2: x + w };
-    m.dir = Math.random() < 0.5 ? 1 : -1;
-    m.speed = 65 + lvl * 4;
+    const cx = x + 20, ceilY = 58;   // sotto la fascia dell'HUD, ma in alto (soffitto)
+    const nub = this.add.circle(cx, ceilY, 7, 0xe8a32a, 0.95).setDepth(8);
+    nub.setStrokeStyle(1.5, 0xffd98a, 0.8);
+    this.drips.push({ x: cx, ceilY, nub, state: 'idle', nextAt: this.time.now + Phaser.Math.Between(500, 2200), swellUntil: 0 });
+  }
+
+  // Rilascia una goccia che cade (gravita' del mondo). Entra in this.movers -> ferisce al contatto.
+  releaseDrip(d) {
+    const drop = this.movers.create(d.x, d.ceilY + 12, 'wax_glob').setDepth(8).setScale(1.15).setTint(0xe8a32a);
+    drop.body.setAllowGravity(true);
+    drop.body.setSize(12, 14, true);
+    drop.setVelocityY(30);
+    this.time.delayedCall(4000, () => { if (drop.active) drop.destroy(); });
+  }
+
+  // Ciclo degli emettitori (attesa -> gonfiore/telegrafo -> rilascio) + splash delle gocce a terra.
+  updateDrips(now) {
+    if (this.drips) {
+      this.drips.forEach((d) => {
+        if (d.state === 'idle') {
+          if (now >= d.nextAt) { d.state = 'swell'; d.swellUntil = now + 640; }
+        } else {
+          const t = Phaser.Math.Clamp(1 - (d.swellUntil - now) / 640, 0, 1);   // 0..1 gonfiore
+          d.nub.setScale(1 + t * 1.7);         // si gonfia = sta per cadere (telegrafo)
+          d.nub.y = d.ceilY + t * 7;
+          if (now >= d.swellUntil) {
+            this.releaseDrip(d);
+            d.nub.setScale(1); d.nub.y = d.ceilY;
+            d.state = 'idle';
+            d.nextAt = now + Phaser.Math.Between(1500, 2800);
+          }
+        }
+      });
+    }
+    if (this.movers) {
+      this.movers.getChildren().forEach((m) => {
+        if (m.active && m.y >= this.groundTop - 4) { this.splat(m.x, this.groundTop - 6, 'soft'); m.destroy(); }
+      });
+    }
   }
 
   // Pallina di cerume da raccogliere (premia chi sale sulle pedane). Ondeggia leggera.
@@ -1815,17 +1849,9 @@ class GameScene extends Phaser.Scene {
     // bastava ripremere in fretta per ottenere un salto in più (falso doppio salto).
     if (onGround && this.player.body.velocity.y >= 0) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
-    // Ostacoli mobili: vanno avanti e indietro tra i due estremi memorizzati, ruotando su
-    // se stessi (leggibilita'). Il danno al contatto e' gestito dall'overlap in create().
-    if (this.movers) {
-      this.movers.getChildren().forEach((m) => {
-        if (!m.active) return;
-        if (m.x <= m.range.x1) m.dir = 1;
-        else if (m.x >= m.range.x2) m.dir = -1;
-        m.setVelocityX(m.dir * m.speed);
-        m.angle += 3.5 * m.dir;
-      });
-    }
+    // Gocce dal soffitto: emettitori che si gonfiano e rilasciano gocce che cadono. Il danno
+    // al contatto e' gestito dall'overlap player/movers in create(); lo splash a terra qui.
+    this.updateDrips(now);
     // Pozze di cerume scivoloso: rallentano il movimento mentre ci si cammina sopra a terra.
     const onSlime = onGround && this.slimeZones && this.slimeZones.some(
       (z) => this.player.x > z.x1 && this.player.x < z.x2);
