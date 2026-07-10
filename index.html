@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Earwax War</title>
   <style>
     html, body {
@@ -14,14 +14,17 @@
       font-family: monospace;
       overflow: hidden;
     }
+    /* Contenitore a tutto schermo. Il centraggio del canvas lo fa Phaser
+       (autoCenter: CENTER_BOTH): niente flex qui, o i due centraggi confliggono. */
     #game {
+      position: fixed;
+      inset: 0;
       width: 100vw;
       height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      height: 100dvh;   /* altezza reale visibile su mobile (barre browser incluse) */
+      overflow: hidden;
     }
-    canvas { image-rendering: pixelated; }
+    canvas { image-rendering: pixelated; display: block; }
   </style>
 </head>
 <body>
