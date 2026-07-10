@@ -69,8 +69,9 @@ class GameScene extends Phaser.Scene {
     this.secondLifeReady = true;   // Seconda Vita carica a inizio livello
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
-    // Ogni livello si parte a vita piena
-    window.GameState.player.hp = window.GameState.player.maxHp;
+    // La vita NON si ricarica a ogni livello: si porta dietro tra un livello e l'altro (a
+    // inizio RUN è piena, la imposta newPlayer). Ci si cura raccogliendo i pickup-cura.
+    window.GameState.player.hp = Phaser.Math.Clamp(window.GameState.player.hp, 1, window.GameState.player.maxHp);
 
     // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato), altrimenti normale
     const levelNum = window.GameState.level;
@@ -312,7 +313,8 @@ class GameScene extends Phaser.Scene {
     }
     this.buildMounds();          // cumuli di cerume su pavimento e soffitto
     this.buildPlatforms();
-    this.buildHazards();         // pozze scivolose + ostacoli mobili (dal lvl 2/3)
+    this.ensureHealPickups();    // garantisce un minimo di cure (la vita non si ricarica piu' a fine livello)
+    this.buildHazards();         // pozze scivolose + gocce dal soffitto
     this.buildGoal();
     window.GameGfx.drawProtuberances(this);   // scenografia organica (pavimento + soffitto)
 
@@ -456,14 +458,14 @@ class GameScene extends Phaser.Scene {
         const lowX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.25, 0.4));
         const py = this.groundTop - Phaser.Math.Between(90, 130);
         this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
-        if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26);
+        if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26, Math.random() < 0.35);   // a volte CURA
       }
       // Pedana alta: premia chi sale a cercarla.
       if (Math.random() < 0.55) {
         const midX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.5, 0.75));
         const py = this.groundTop - Phaser.Math.Between(150, 220);
         this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
-        if (Math.random() < 0.7) this.addWaxPickup(midX, py - 26);
+        if (Math.random() < 0.75) this.addWaxPickup(midX, py - 26, Math.random() < 0.45);   // pedana alta: piu' spesso CURA
         // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
         // in alto — un salto in piu' rispetto al percorso ovvio. Una sola volta a livello.
         if (!secretPlaced && Math.random() < 0.35) {
@@ -477,6 +479,20 @@ class GameScene extends Phaser.Scene {
     }
     // Rampa d'avvio prima della prima membrana.
     this.addPlatform(Math.max(200, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 150), 120);
+  }
+
+  // Garantisce un minimo di pickup-CURA per livello (la vita non si ricarica piu' a fine
+  // livello): se le pedane non ne hanno prodotti abbastanza a caso, ne aggiunge su pedane
+  // libere. Cosi' ci si cura esplorando, ma senza restare mai a secco di cure.
+  ensureHealPickups() {
+    const want = 2 + Math.floor(window.GameState.level / 4);
+    let have = this.pickups.getChildren().filter((p) => p.active && p.isHeal).length;
+    const plats = this.platforms ? this.platforms.getChildren().filter((p) => p.active).slice() : [];
+    Phaser.Utils.Array.Shuffle(plats);
+    for (let i = 0; i < plats.length && have < want; i++) {
+      this.addWaxPickup(plats[i].x, plats[i].y - 26, true);
+      have++;
+    }
   }
 
   // Terreno accidentato: pozze di cerume scivoloso (rallentano se ci cammini sopra, dal
@@ -524,23 +540,40 @@ class GameScene extends Phaser.Scene {
     this.slimeZones.push({ x1: x, x2: x + w });
   }
 
-  // Emettitore di GOCCE a soffitto (sostituisce i vecchi pallini fluttuanti): un punto fisso
-  // dove una goccia di cerume si GONFIA (telegrafo) e poi CADE. La caduta ferisce il giocatore
-  // (overlap in this.movers). Verticale e leggibile: si schiva leggendo il ritmo.
-  addDripHazard() {
-    const x = this.pickHazardX(40, 20);
-    if (x == null) return;
-    const cx = x + 20, ceilY = 58;   // sotto la fascia dell'HUD, ma in alto (soffitto)
-    const nub = this.add.circle(cx, ceilY, 7, 0xe8a32a, 0.95).setDepth(8);
-    nub.setStrokeStyle(1.5, 0xffd98a, 0.8);
-    this.drips.push({ x: cx, ceilY, nub, state: 'idle', nextAt: this.time.now + Phaser.Math.Between(500, 2200), swellUntil: 0 });
+  // Texture "goccia" a lacrima (punta in alto, pancia rotonda in basso). Segnaposto finche'
+  // non avremo uno sprite dedicato per la goccia/l'emettitore.
+  makeDripTexture() {
+    if (this.textures.exists('drip')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0xe8a32a, 1);
+    g.fillCircle(7, 15, 6);                       // pancia rotonda (basso)
+    g.fillTriangle(7, 1, 2.5, 14, 11.5, 14);      // punta (alto)
+    g.fillStyle(0xffd98a, 0.85); g.fillCircle(5, 12, 1.8);   // riflesso
+    g.generateTexture('drip', 14, 22);
+    g.destroy();
   }
 
-  // Rilascia una goccia che cade (gravita' del mondo). Entra in this.movers -> ferisce al contatto.
+  // Emettitore di GOCCE ATTACCATO AL SOFFITTO: una "radice" di cerume incollata al bordo alto,
+  // sotto cui una goccia (a lacrima) si GONFIA (telegrafo) e poi CADE. La caduta ferisce il
+  // giocatore (overlap in this.movers). Verticale e leggibile: si schiva leggendo il ritmo.
+  addDripHazard() {
+    this.makeDripTexture();
+    const x = this.pickHazardX(40, 20);
+    if (x == null) return;
+    const cx = x + 20, topY = 0;   // attaccato al bordo alto = soffitto
+    // radice: macchia di cerume larga e piatta incollata al soffitto
+    const root = this.add.ellipse(cx, topY + 5, 30, 16, 0xcf9524, 0.96).setDepth(8);
+    root.setStrokeStyle(1.5, 0xffd98a, 0.6);
+    // goccia che pende sotto la radice (cresce durante il gonfiore)
+    const bead = this.add.image(cx, topY + 15, 'drip').setDepth(8).setScale(0.5);
+    this.drips.push({ x: cx, topY, root, bead, state: 'idle', nextAt: this.time.now + Phaser.Math.Between(500, 2200), swellUntil: 0 });
+  }
+
+  // Rilascia una goccia (a lacrima) che cade con la gravita' del mondo. Entra in this.movers.
   releaseDrip(d) {
-    const drop = this.movers.create(d.x, d.ceilY + 12, 'wax_glob').setDepth(8).setScale(1.15).setTint(0xe8a32a);
+    const drop = this.movers.create(d.x, d.topY + 22, 'drip').setDepth(8).setScale(1.1);
     drop.body.setAllowGravity(true);
-    drop.body.setSize(12, 14, true);
+    drop.body.setSize(10, 16, true);
     drop.setVelocityY(30);
     this.time.delayedCall(4000, () => { if (drop.active) drop.destroy(); });
   }
@@ -553,11 +586,11 @@ class GameScene extends Phaser.Scene {
           if (now >= d.nextAt) { d.state = 'swell'; d.swellUntil = now + 640; }
         } else {
           const t = Phaser.Math.Clamp(1 - (d.swellUntil - now) / 640, 0, 1);   // 0..1 gonfiore
-          d.nub.setScale(1 + t * 1.7);         // si gonfia = sta per cadere (telegrafo)
-          d.nub.y = d.ceilY + t * 7;
+          d.bead.setScale(0.5 + t * 0.7);           // la goccia pende e si gonfia (telegrafo)
+          d.bead.y = d.topY + 15 + t * 8;           // si allunga verso il basso
           if (now >= d.swellUntil) {
             this.releaseDrip(d);
-            d.nub.setScale(1); d.nub.y = d.ceilY;
+            d.bead.setScale(0.5); d.bead.y = d.topY + 15;
             d.state = 'idle';
             d.nextAt = now + Phaser.Math.Between(1500, 2800);
           }

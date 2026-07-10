@@ -40,10 +40,10 @@ window.CONFIG = {
 // 'per' = bonus per ogni livello acquistato; base/step = costo (in cerume) del
 // prossimo acquisto = base + step * livelloAttuale; max = quante volte si compra.
 window.UNLOCKS = {
-  hp:    { per: 20, base: 15, step: 12, max: 10, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
-  dmg:   { per: 4,  base: 20, step: 16, max: 10, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
-  speed: { per: 15, base: 14, step: 11, max: 8,  name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
-  djump: { per: 1,  base: 70, step: 0,  max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
+  hp:    { per: 20, base: 45, step: 35, max: 10, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
+  dmg:   { per: 4,  base: 55, step: 45, max: 10, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
+  speed: { per: 15, base: 40, step: 30, max: 8,  name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  djump: { per: 1,  base: 200, step: 0, max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
 };
 
 // PROGETTI (blueprint): sblocchi PERMANENTI una-tantum che aggiungono ABILITA' NUOVE al
@@ -51,10 +51,10 @@ window.UNLOCKS = {
 // qui, col cerume in banca). A differenza di UNLOCKS non danno bonus di statistica: danno
 // CONTENUTO nuovo. 'ability' = id dell'abilità (deve combaciare con UpgradeScene.ALL).
 window.BLUEPRINTS = {
-  magnet:    { cost: 40,  ability: 'magnet'    },
-  blast:     { cost: 70,  ability: 'blast'     },
-  splash:    { cost: 95,  ability: 'splash'    },
-  companion: { cost: 130, ability: 'companion' },
+  magnet:    { cost: 120, ability: 'magnet'    },
+  blast:     { cost: 220, ability: 'blast'     },
+  splash:    { cost: 320, ability: 'splash'    },
+  companion: { cost: 500, ability: 'companion' },
 };
 
 // EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le
