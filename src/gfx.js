@@ -256,15 +256,24 @@ window.GameGfx = {
   },
 
   // Cartello a schermo per annunciare i livelli speciali (boss / sciame).
-  showBanner(scene, text, color) {
+  showBanner(scene, text, color, yPos) {
     const W = window.CONFIG.WIDTH;
-    const t = scene.add.text(W / 2, 120, text, {
-      fontFamily: 'monospace', fontSize: '24px', color: color || '#ffd166',
-      stroke: '#14161f', strokeThickness: 5, align: 'center',
-    }).setOrigin(0.5).setDepth(120).setScrollFactor(0).setAlpha(0);
-    scene.tweens.add({
-      targets: t, alpha: 1, y: 100, duration: 300, ease: 'Back.out',
-      onComplete: () => scene.tweens.add({ targets: t, alpha: 0, delay: 1700, duration: 600, onComplete: () => t.destroy() }),
+    const y = yPos || 118;
+    const col = color || '#ffd166';
+    const t = scene.add.text(W / 2, y, text, {
+      fontFamily: 'monospace', fontSize: '34px', color: col,
+      stroke: '#14161f', strokeThickness: 8, align: 'center',
+    }).setOrigin(0.5).setDepth(121).setScrollFactor(0);
+    // Pannello scuro dietro al testo: stacca il banner dallo sfondo carnoso (leggibilita').
+    const strokeCol = Phaser.Display.Color.HexStringToColor(col).color;
+    const bg = scene.add.rectangle(W / 2, y, t.width + 52, t.height + 26, 0x14161f, 0.74)
+      .setOrigin(0.5).setDepth(120).setScrollFactor(0).setStrokeStyle(3, strokeCol, 0.95);
+    const group = [bg, t];
+    group.forEach((o) => { o.setAlpha(0); o.setScale(0.85); });
+    // "Pop" d'entrata + permanenza lunga + dissolvenza.
+    scene.tweens.add({ targets: group, alpha: 1, scaleX: 1, scaleY: 1, duration: 320, ease: 'Back.out' });
+    scene.time.delayedCall(2600, () => {
+      scene.tweens.add({ targets: group, alpha: 0, duration: 550, ease: 'Quad.in', onComplete: () => { bg.destroy(); t.destroy(); } });
     });
   },
 };

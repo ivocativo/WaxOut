@@ -80,15 +80,13 @@ class GameScene extends Phaser.Scene {
     let kind = (levelNum % 5 === 0) ? 'boss' : (levelNum % 5 === 3) ? 'swarm' : 'normal';
     if (kind === 'normal' && levelNum >= 2) {
       const r = Math.random();
-      if (r < 0.22) kind = 'deepclean';
-      else if (r < 0.44) kind = 'rush';
-      else if (r < 0.62) kind = 'siege';
+      if (r < 0.28) kind = 'rush';
+      else if (r < 0.56) kind = 'siege';
     }
     this.levelKind = kind;
-    // Soglia di pulizia per completare: default 0.8; la pulizia PROFONDA ne chiede quasi tutta,
-    // la CORSA nessuna (basta arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
-    if (this.levelKind === 'deepclean') this.cleanGoal = 0.95;
-    else if (this.levelKind === 'rush') this.cleanGoal = 0;
+    // Soglia di pulizia per completare: default 0.8; la CORSA non chiede pulizia (basta
+    // arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
+    if (this.levelKind === 'rush') this.cleanGoal = 0;
     this.siegeEndAt = 0;   // istante (ms) in cui l'assedio e' superato (0 = non assedio)
     this.siegeText = null;
 
@@ -262,13 +260,13 @@ class GameScene extends Phaser.Scene {
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
     } else {
-      // normal / deepclean / rush: attraversa fino al timpano (cambia solo la soglia pulizia).
+      // normal / rush: attraversa fino al timpano (la corsa non chiede pulizia).
       this.maxEnemies = Math.min(2 + lvl, 6);
       spawnDelay = Math.max(1500, 2800 - lvl * 150);
       if (this.levelKind === 'rush') { this.maxEnemies = Math.min(this.maxEnemies + 2, 8); spawnDelay = Math.round(spawnDelay * 0.7); }
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
-      const bkey = this.levelKind === 'deepclean' ? 'game_deepclean_in' : this.levelKind === 'rush' ? 'game_rush_in' : 'game_goal';
-      const bcol = this.levelKind === 'deepclean' ? '#9be870' : this.levelKind === 'rush' ? '#ffd166' : '#ffd9a0';
+      const bkey = this.levelKind === 'rush' ? 'game_rush_in' : 'game_goal';
+      const bcol = this.levelKind === 'rush' ? '#ffd166' : '#ffd9a0';
       this.showBanner(window.I18n.t(bkey), bcol);
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
@@ -277,9 +275,10 @@ class GameScene extends Phaser.Scene {
       callback: () => { if (!this.locked && this.enemies.countActive(true) < this.maxEnemies) this.spawnEnemy(); },
     });
 
-    // Annuncio del MODIFICATORE di livello (dopo il banner del tipo di livello).
+    // Annuncio del MODIFICATORE di livello (piu' in basso del banner del tipo, cosi' si vedono
+    // entrambi senza sovrapporsi).
     if (this.mutator) {
-      this.time.delayedCall(1300, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color); });
+      this.time.delayedCall(700, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color, 172); });
     }
 
     this.buildHud();
@@ -1080,7 +1079,7 @@ class GameScene extends Phaser.Scene {
   }
 
   // Cartello a schermo per annunciare i livelli speciali: vedi GameGfx in src/gfx.js.
-  showBanner(text, color) { window.GameGfx.showBanner(this, text, color); }
+  showBanner(text, color, y) { window.GameGfx.showBanner(this, text, color, y); }
 
   // ---------- Combattimento ----------
 
@@ -1934,10 +1933,13 @@ class GameScene extends Phaser.Scene {
     // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
     // Nei livelli boss il timpano resta "sbarrato" finche' il Tappo di Cerume e' vivo.
     if (this.levelKind !== 'siege' && this.player.x >= this.goalX) {
-      const cleanPct = this.totalWax ? (this.cleanedWax / this.totalWax) : 1;
+      // Confronto sulle PERCENTUALI ARROTONDATE (le stesse mostrate nell'HUD): così se l'HUD
+      // segna "80%" e la soglia e' 80%, basta — niente 79,8% che sembra 80 ma non completa.
+      const cleanPct = this.totalWax ? Math.round((this.cleanedWax / this.totalWax) * 100) : 100;
+      const goalPct = Math.round(this.cleanGoal * 100);
       const bossBlocking = this.levelKind === 'boss' &&
         this.enemies.getChildren().some((e) => e.active && e.kind === 'boss');
-      if (cleanPct < this.cleanGoal) {
+      if (cleanPct < goalPct) {
         this.cleanHint(now);                       // sei al timpano ma manca cerume da pulire
       } else if (bossBlocking) {
         if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard'), '#ffb04a'); }
