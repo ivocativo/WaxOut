@@ -146,15 +146,18 @@ class GameScene extends Phaser.Scene {
     const notFlyer = (a, b) => (this.enemies.contains(a) ? a : b).kind !== 'fly';
     this.physics.add.collider(this.enemies, this.ground, null, notFlyer);
     this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
-    this.physics.add.collider(this.enemies, this.platforms, null, notFlyer);
+    // Le PEDANE sono solide anche per i moscerini (cosi' la loro picchiata non le attraversa).
+    this.physics.add.collider(this.enemies, this.platforms);
 
     // Bonus di cerume raccoglibili sulle pedane.
     this.physics.add.overlap(this.player, this.pickups, (pl, pk) => this.grabPickup(pk));
 
     // Gocce dal soffitto: fanno danno da contatto col giocatore (come un nemico).
     this.physics.add.overlap(this.player, this.movers, (pl, mv) => this.hurtPlayer(12 + Math.floor(window.GameState.level / 2), mv.x));
-    // e SCHIZZANO quando incontrano il cerume nella caduta (niente attraversamenti).
-    this.physics.add.overlap(this.movers, this.blocks, (mv) => { if (mv && mv.active) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); } });
+    // e SCHIZZANO quando incontrano il cerume O una pedana nella caduta (niente attraversamenti).
+    const dripSplash = (mv) => { if (mv && mv.active) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); } };
+    this.physics.add.overlap(this.movers, this.blocks, dripSplash);
+    this.physics.add.overlap(this.movers, this.platforms, dripSplash);
 
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
@@ -278,7 +281,7 @@ class GameScene extends Phaser.Scene {
     // Annuncio del MODIFICATORE di livello (piu' in basso del banner del tipo, cosi' si vedono
     // entrambi senza sovrapporsi).
     if (this.mutator) {
-      this.time.delayedCall(700, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color, 172); });
+      this.time.delayedCall(700, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color, 210); });
     }
 
     this.buildHud();
@@ -510,7 +513,7 @@ class GameScene extends Phaser.Scene {
         if (!secretPlaced && Math.random() < 0.35) {
           secretPlaced = true;
           const sx = midX + Phaser.Math.Between(-20, 20);
-          const sy = py - Phaser.Math.Between(110, 130);
+          const sy = py - Phaser.Math.Between(74, 96);   // raggiungibile con un salto dalla pedana alta
           this.addPlatform(sx, sy, 70);
           for (let k = -1; k <= 1; k++) this.addWaxPickup(sx + k * 20, sy - 28, k === 0);
         }
@@ -1315,6 +1318,9 @@ class GameScene extends Phaser.Scene {
   updateDashStrike(now) {
     if (now >= (this.dashUntil || 0)) return;
     const p = window.GameState.player;
+    // Mentre carichi attraverso i nemici resti invulnerabile con un MARGINE oltre la fine
+    // dello scatto: cosi' non subisci il loro danno da contatto mentre ti stacchi da loro.
+    this.invulnUntil = Math.max(this.invulnUntil, now + 240);
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active || e.spawning) return;
