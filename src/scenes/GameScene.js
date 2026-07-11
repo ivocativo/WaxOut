@@ -665,6 +665,35 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // EVENTO "Sciame Improvviso": invece del solito flusso regolare, un'ondata unica di nemici
+  // deboli arriva tutta insieme da un lato — un picco di caos concentrato. Rispetto a
+  // spawnSplitChildren i "figli" qui sono nemici normali (niente comparsa istantanea, emergono
+  // dal suolo come sempre) solo con statistiche ridotte, e usano l'IA normale del blob.
+  startSwarmRushEvent() {
+    const delay = Phaser.Math.Between(3000, 6000);
+    this.time.delayedCall(delay, () => { if (!this.locked) this.spawnSwarmRush(); });
+  }
+
+  spawnSwarmRush() {
+    const lvl = window.GameState.level;
+    const side = Math.random() < 0.5 ? 1 : -1;
+    // Centro del gruppo scelto con pickGroundX(side): resta DENTRO la sezione raggiungibile
+    // (tra le membrane), cosi' il gruppo non rischia di comparire oltre un muro intero e
+    // restare bloccato (lo stesso problema gia' corretto per il Fuggitivo Dorato).
+    const baseX = this.pickGroundX(side);
+    const count = Phaser.Math.Between(5, Math.min(8, 5 + Math.floor(lvl / 3)));
+    this.showBanner(window.I18n.t('event_swarmrush_in'), '#9be870');
+    for (let i = 0; i < count; i++) {
+      const x = Phaser.Math.Clamp(baseX + Phaser.Math.Between(-70, 70), 60, this.worldW - 60);
+      const e = this.spawnEnemy('blob', { x, swarmling: true });
+      e.swarmling = true;
+      // Individualmente deboli (il picco di minaccia e' il NUMERO, non la singola unita').
+      e.hp = e.maxHp = Math.max(1, Math.round(e.maxHp * 0.55));
+      e.speed = Math.round(e.speed * 1.15);
+      e.waxValue = Math.round(e.waxValue * 0.7);
+    }
+  }
+
   // Garantisce un minimo di pickup-CURA per livello (la vita non si ricarica piu' a fine
   // livello): se le pedane non ne hanno prodotti abbastanza a caso, ne aggiunge su pedane
   // libere. Cosi' ci si cura esplorando, ma senza restare mai a secco di cure.
@@ -1059,7 +1088,7 @@ class GameScene extends Phaser.Scene {
     // I volanti restano fuori dallo SPLIT (la comparsa "sul posto" dei figli non si presta al
     // calo dal soffitto).
     let elite = null;
-    if (!cfg.boss && !opts.splitChild && !opts.fugitive && lvl >= 3 &&
+    if (!cfg.boss && !opts.splitChild && !opts.fugitive && !opts.swarmling && lvl >= 3 &&
         Math.random() < Phaser.Math.Clamp(0.08 + lvl * 0.02, 0, 0.34)) {
       const pool = (kind === 'fly') ? ['tank', 'boom'] : ['tank', 'boom', 'split'];
       elite = Phaser.Utils.Array.GetRandom(pool);
@@ -1197,7 +1226,10 @@ class GameScene extends Phaser.Scene {
   // tra la membrana subito dietro e quella subito davanti. Cosi' i nemici possono
   // davvero raggiungerlo (non restano bloccati e ammucchiati contro una membrana) e
   // non compaiono mai addosso al giocatore.
-  pickGroundX() {
+  // preferSide: 1 = preferisci DAVANTI, -1 = preferisci DIETRO, omesso = peso normale 70/30
+  // (usato dall'evento Sciame per far arrivare il gruppo "da un lato" restando comunque
+  // dentro la sezione raggiungibile — vedi spawnSwarmRush).
+  pickGroundX(preferSide) {
     const px = this.player.x;
     let left = 40, right = this.worldW - 40;
     (this.membraneXs || []).forEach((mx) => {
@@ -1210,8 +1242,9 @@ class GameScene extends Phaser.Scene {
     const aLo = Math.min(px + gap, right), aHi = right;         // davanti
     const bLo = left, bHi = Math.max(px - gap, left);           // dietro
     const aOk = aHi - aLo > 20, bOk = bHi - bLo > 20;
+    const wantAhead = preferSide === 1 ? true : preferSide === -1 ? false : (Math.random() < 0.7);
     let x;
-    if (aOk && (Math.random() < 0.7 || !bOk)) x = Phaser.Math.Between(aLo, aHi);
+    if (aOk && (wantAhead || !bOk)) x = Phaser.Math.Between(aLo, aHi);
     else if (bOk) x = Phaser.Math.Between(bLo, bHi);
     else x = Phaser.Math.Clamp(px + gap, left, right);          // sezione stretta: il meglio possibile
     return Math.round(x);

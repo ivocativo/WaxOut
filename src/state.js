@@ -78,6 +78,7 @@ window.MUTATORS = [
 window.EVENTS = [
   { id: 'goldfugitive', color: '#ffd700', apply(s) { s.startGoldFugitiveEvent(); } },
   { id: 'waxcollapse', color: '#e0a83a', apply(s) { s.startWaxCollapseEvent(); } },
+  { id: 'swarmrush', color: '#9be870', apply(s) { s.startSwarmRushEvent(); } },
 ];
 
 // EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le

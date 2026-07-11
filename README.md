@@ -7,6 +7,10 @@ oggetti fatti di cerume e sporco. A fine di ogni livello **sblocchi nuove abilit
 Costruito con [Phaser 3](https://phaser.io/) in puro HTML5 + JavaScript. Nessuna build,
 nessuna dipendenza da installare: gira **offline aprendo `index.html`**.
 
+> 📄 Questo file è la **presentazione** del gioco (cos'è, come si gioca, com'è fatto). Per lo
+> sviluppo: lo **stato attuale e come si collauda** stanno in `HANDOFF.md`, il **piano del
+> lavoro in corso** in `ROADMAP.md`.
+
 ## ▶️ Come giocare
 
 Fai **doppio clic su `index.html`** (oppure trascinalo in un browser moderno: Chrome,
@@ -56,57 +60,58 @@ blocchi più duri, più nemici).
 earwaxwar/
 ├─ index.html              # punto d'ingresso
 ├─ vendor/phaser.min.js    # libreria Phaser (locale)
+├─ assets/                 # sprite/immagini (incorporati come data-URI per girare da file://)
 └─ src/
    ├─ main.js              # config Phaser + avvio
-   ├─ state.js             # stato globale + costanti
+   ├─ state.js             # stato globale, costanti e tabelle (abilità, mutatori, eventi…)
+   ├─ meta.js              # progressi permanenti (banca, sblocchi) su localStorage
+   ├─ i18n.js              # dizionario testi EN/IT
    ├─ sfx.js               # effetti sonori procedurali (WebAudio)
+   ├─ gfx.js               # rendering (sfondo, cerume, effetti) — separato dal gameplay
    ├─ pixelart.js          # generatore di texture pixel-art
+   ├─ touch.js             # comandi touch (stick + tasti a schermo)
    └─ scenes/
-      ├─ BootScene.js      # genera tutte le texture
-      ├─ MenuScene.js      # titolo + istruzioni
-      ├─ GameScene.js      # gameplay del livello
-      └─ UpgradeScene.js   # scelta potenziamenti
+      ├─ BootScene.js      # carica gli sprite e genera le texture mancanti
+      ├─ MenuScene.js      # titolo + istruzioni       ├─ PauseScene.js  # pausa
+      ├─ GameScene.js      # gameplay del livello       ├─ ShopScene.js   # negozio
+      └─ UpgradeScene.js   # scelta potenziamenti (carte a fine livello)
 ```
 
-Tutta la grafica è **generata via codice** (pixel art disegnata in `pixelart.js` /
-`BootScene.js`): niente file immagine da caricare, così il gioco gira da `file://`.
-Per integrare in seguito asset pack open-source (CC0), basta sostituire le texture
-generate con `this.load.image(...)` in `BootScene` servendo la cartella via HTTP.
+La grafica è **mista**: parte disegnata via codice (pixel art in `pixelart.js` / `BootScene.js`),
+parte **sprite** veri (cerume, fondali) incorporati come data-URI in `src/*_data.js` così il gioco
+gira anche aprendo `index.html` da `file://`.
 
 ## 🗺️ Stato del progetto
 
-Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-06-27._
+Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-07-11._
 
-**Fatto finora:**
-- Comandi **touch** a schermo (pad direzionale, salto, attacco, scatto) per giocare da cellulare
-- **Menu di pausa** (`ESC`/`P` o pulsante a schermo)
-- Struttura **roguelike**: ogni run riparte dal livello 1; alla sconfitta la run finisce
-- **Banca permanente** del cerume (salvataggio nel browser) e **negozio** di potenziamenti permanenti
-- **Varietà di nemici e livelli**: Gorgogliante (sputatore), Moscerino (volante), boss
-  "Tappo di Cerume" ogni 5 livelli, livelli "Sciame", cartelli per i livelli speciali
-- **Livelli esplorabili** (scrolling): il condotto è un mondo largo che attraversi da
-  sinistra verso il **timpano**, con **telecamera che segue**, **membrane di cerume** da
-  sfondare lungo il percorso e **pedane** per saltare. Si vince **raggiungendo il timpano**.
+**Fatto finora (in sintesi):**
+- Comandi **touch** a schermo per giocare da cellulare, **menu di pausa**, canvas che si ri-adatta
+  alla rotazione.
+- Struttura **roguelike** con **banca permanente** del cerume e **negozio** di potenziamenti e
+  progetti permanenti.
+- **Combattimento** con hit-stop, colpi telegrafati, tanti **nemici** (Cerumino, Crosta, Gorgogliante,
+  Moscerino, boss) con **varianti élite** (Corazzato, Esplosivo, che-si-sdoppia).
+- **Rigiocabilità:** carte potenziamento con **rarità**, **evoluzioni** (fusioni di abilità),
+  **tipi di livello** (corsa/assedio/boss/sciame), **modificatori** e **eventi casuali** di livello.
+- **Livelli esplorabili** (scrolling): un mondo largo da attraversare verso il **timpano**, con
+  telecamera che segue, membrane di cerume da sfondare, pedane e ostacoli.
 
-**Prossimi passi (in ordine):**
-1. Grafica definitiva: sprite mancanti (Moscerino, Gorgogliante, boss) e poi
-   **animazioni** dei personaggi (camminata/salto/attacco) — da fare *dopo* aver
-   bloccato l'aspetto, per non rifarle due volte
-2. Restyle dei menu (Menu/Negozio/Pausa/Potenziamenti/game-over) col look "viscido"
-3. Musica di sottofondo e miglioramento degli effetti audio
-4. Impacchettamento con **Capacitor** → app Android per Google Play
+> Lo stato di dettaglio, cosa è già collaudato e cosa no, e il piano dei prossimi passi sono nei
+> file di sviluppo **`HANDOFF.md`** e **`ROADMAP.md`** (per non ripetere le stesse cose in due posti).
 
-**Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e tablet Android).
+**Prossimi grandi traguardi:** rifinire il *game feel* e le **animazioni**, poi impacchettare con
+**Capacitor** per Android. **Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e
+tablet Android).
 
-> Nota tecnica: il salvataggio (`localStorage`) funziona quando il gioco è servito
-> via HTTP o nell'app Android; aprendo `index.html` da `file://` alcuni browser
-> non lo permettono.
+> Nota tecnica: il salvataggio (`localStorage`) funziona quando il gioco è servito via HTTP o
+> nell'app Android; aprendo `index.html` da `file://` alcuni browser non lo permettono.
 
 ## 🔁 Riprendere lo sviluppo in una nuova sessione
 
-Apri Claude Code **nella cartella `C:\Users\ivanf\Claude\code`** (la stessa di
-prima) e scrivi qualcosa come _"riprendiamo earwax war, da dove eravamo?"_.
-Lo stato e i prossimi passi sono qui sopra e nel repository
+Apri Claude Code **nella cartella `C:\Users\ivanf\Claude\code`** e scrivi qualcosa come
+_"riprendiamo earwax war, da dove eravamo?"_. Il punto della situazione è in **`HANDOFF.md`**
+(inizia da lì), il piano del blocco in corso in **`ROADMAP.md`**. Repository:
 [ivocativo/earwax-war](https://github.com/ivocativo/earwax-war).
 
 ## 📜 Licenza

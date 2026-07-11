@@ -1,8 +1,13 @@
 # Earwax War — Piano esecutivo (blocco "Gameplay backlog")
 
+> 📄 **A cosa serve questo file:** è la "lista di lavoro" del blocco in corso (con le caselle da
+> spuntare), usa e getta: quando il blocco è chiuso e playtestato, i risultati si travasano in
+> `HANDOFF.md` e questa lista si azzera per il blocco dopo. Per lo **stato generale** del progetto,
+> come collaudare e le regole vedi **`HANDOFF.md`**; per la descrizione del gioco vedi **`README.md`**.
+
 _Pianificato con Opus il 2026-07-11. Pensato per essere ESEGUITO da Sonnet, un passo alla volta._
-_Riferimento generale: vedi `HANDOFF.md`. Regole: god-mode nei test SEMPRE, i18n EN+IT per ogni stringa,_
-_commit solo su richiesta dell'utente, mai lasciare il god-mode nel codice committato._
+_Regole: god-mode nei test SEMPRE, i18n EN+IT per ogni stringa, commit solo su richiesta dell'utente,_
+_mai lasciare il god-mode nel codice committato._
 
 ## Come usare questo file (per Sonnet)
 - Esegui le FASI in ordine. Non iniziare la Fase 1 finché la Fase 0 non è chiusa.
@@ -142,7 +147,19 @@ stessa larghezza) — piace all'utente, da approfondire più avanti, non è tra 
       sul cerume vicino (apre un varco), atterraggio a terra pulito, nessun doppio impatto,
       partenza ritardata + arresto automatico dopo 18s. **Manca il collaudo visivo/di
       sensazione sul telefono** (rendering preview bloccato, vedi Fase 0).
-- [ ] 2B.3 Sciame improvviso implementato e verificato.
+- [x] 2B.3 Sciame improvviso implementato e verificato con test diretti (god-mode + chiamate
+      mirate). Controllo qualità (1 agente) ha trovato lo stesso problema già corretto per il
+      Fuggitivo Dorato: il gruppo poteva comparire oltre una membrana intera e restare
+      bloccato. Corretto estendendo `pickGroundX(preferSide)` con una preferenza di lato
+      (invece di un offset grezzo), cosi' il centro del gruppo resta sempre nella sezione
+      raggiungibile. Verificato: conteggio 5-8, statistiche ridotte (hp*0.55/velocita'*1.15/
+      cerume*0.7), mai elite anche forzando la casualita', posizioni sempre dentro i muri di
+      cerume più vicini (testato anche con membrane su entrambi i lati), nessuna regressione
+      su `pickGroundX()` senza argomenti (70/30 davanti/dietro invariato). **Manca il collaudo
+      visivo/di sensazione sul telefono** (rendering preview bloccato, vedi Fase 0).
+
+**FASE 2 COMPLETA** (rarità carte + 3 eventi casuali). Prossimo blocco: Fase 3 (game feel:
+accelerazione/decelerazione del movimento) — vedi sotto.
 
 ---
 

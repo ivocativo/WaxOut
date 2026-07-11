@@ -58,6 +58,7 @@ window.I18n = (function () {
       event_goldfugitive_caught: 'FUGITIVE CAUGHT!  +{wax}',
       event_goldfugitive_escaped: 'The fugitive got away...',
       event_waxcollapse_in: 'WAX COLLAPSE!  Watch the ceiling!',
+      event_swarmrush_in: 'SWARM INCOMING!  Brace yourself!',
       // --- Livello completato ---
       done_title: 'LEVEL {n} COMPLETE!',
       done_sub: 'Ear canal cleaned!',
@@ -211,6 +212,7 @@ window.I18n = (function () {
       event_goldfugitive_caught: 'FUGGITIVO CATTURATO!  +{wax}',
       event_goldfugitive_escaped: 'Il fuggitivo e\' scappato...',
       event_waxcollapse_in: 'FRANA DI CERUME!  Occhio al soffitto!',
+      event_swarmrush_in: 'SCIAME IN ARRIVO!  Tieniti pronto!',
       // --- Livello completato ---
       done_title: 'LIVELLO {n} COMPLETATO!',
       done_sub: 'Condotto ripulito!',
