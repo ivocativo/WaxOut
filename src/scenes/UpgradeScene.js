@@ -28,37 +28,68 @@ class UpgradeScene extends Phaser.Scene {
 
     // Pool di potenziamenti. Nome/descrizione vengono dal dizionario (up_<id>_name
     // / up_<id>_desc). Per le abilita 'ability' e' un id stabile, tradotto a parte.
+    // rarity: comune (stat base) / rara (abilita' che cambia stile) / leggendaria
+    // (abilita' da Progetto sbloccato). Decide peso di pesca e colore della carta.
     const ALL = [
-      { id: 'damage', rep: true, apply: (s) => { s.damage += 8; } },
-      { id: 'hp', rep: true, apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
-      { id: 'attspd', rep: true, apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
-      { id: 'speed', rep: true, apply: (s) => { s.moveSpeed += 30; } },
-      { id: 'range', rep: true, apply: (s) => { s.attackRange += 0.25; } },
-      { id: 'doublejump', rep: false, ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
-      { id: 'dash', rep: false, ability: 'dash', apply: (s) => { s.dash = true; } },
-      { id: 'hammer', rep: false, ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
+      { id: 'damage', rep: true, rarity: 'common', apply: (s) => { s.damage += 8; } },
+      { id: 'hp', rep: true, rarity: 'common', apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
+      { id: 'attspd', rep: true, rarity: 'common', apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
+      { id: 'speed', rep: true, rarity: 'common', apply: (s) => { s.moveSpeed += 30; } },
+      { id: 'range', rep: true, rarity: 'common', apply: (s) => { s.attackRange += 0.25; } },
+      { id: 'doublejump', rep: false, rarity: 'rare', ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
+      { id: 'dash', rep: false, rarity: 'rare', ability: 'dash', apply: (s) => { s.dash = true; } },
+      { id: 'hammer', rep: false, rarity: 'rare', ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
       // Abilità che cambiano lo stile di gioco (una volta sola ciascuna):
       // Ventaglio: ora IMPILABILE — ogni pesca aggiunge una pallina al getto.
-      { id: 'spread', rep: false, stack: true, ability: 'spread', apply: (s) => { s.jetPellets += 1; } },
-      { id: 'pierce', rep: false, ability: 'pierce', apply: (s) => { s.jetPierce = true; } },
-      { id: 'lifesteal', rep: false, ability: 'lifesteal', apply: (s) => { s.lifesteal = true; } },
-      { id: 'shield', rep: false, ability: 'shield', apply: (s) => { s.shield = true; } },
+      { id: 'spread', rep: false, stack: true, rarity: 'rare', ability: 'spread', apply: (s) => { s.jetPellets += 1; } },
+      { id: 'pierce', rep: false, rarity: 'rare', ability: 'pierce', apply: (s) => { s.jetPierce = true; } },
+      { id: 'lifesteal', rep: false, rarity: 'rare', ability: 'lifesteal', apply: (s) => { s.lifesteal = true; } },
+      { id: 'shield', rep: false, rarity: 'rare', ability: 'shield', apply: (s) => { s.shield = true; } },
       // Nuove abilità del pool di run (non richiedono sblocco al negozio):
-      { id: 'homing', rep: false, ability: 'homing', apply: (s) => { s.homing = true; } },
-      { id: 'secondlife', rep: false, ability: 'secondlife', apply: (s) => { s.secondLife = true; } },
-      { id: 'greed', rep: false, stack: true, ability: 'greed', apply: (s) => { s.waxMult += 0.5; } },
-      { id: 'dashstrike', rep: false, ability: 'dashstrike', apply: (s) => { s.dashStrike = true; if (!s.dash) s.dash = true; } },
-      { id: 'corrosive', rep: false, ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
+      { id: 'homing', rep: false, rarity: 'rare', ability: 'homing', apply: (s) => { s.homing = true; } },
+      { id: 'secondlife', rep: false, rarity: 'rare', ability: 'secondlife', apply: (s) => { s.secondLife = true; } },
+      { id: 'greed', rep: false, stack: true, rarity: 'rare', ability: 'greed', apply: (s) => { s.waxMult += 0.5; } },
+      { id: 'dashstrike', rep: false, rarity: 'rare', ability: 'dashstrike', apply: (s) => { s.dashStrike = true; if (!s.dash) s.dash = true; } },
+      { id: 'corrosive', rep: false, rarity: 'rare', ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
       // Rimbalzo: IMPILABILE — ogni pesca aggiunge un rimbalzo alle palline.
-      { id: 'bounce', rep: false, stack: true, ability: 'bounce', apply: (s) => { s.bounce += 1; } },
+      { id: 'bounce', rep: false, stack: true, rarity: 'rare', ability: 'bounce', apply: (s) => { s.bounce += 1; } },
       // Abilità NUOVE sbloccabili dai PROGETTI del negozio (locked: compaiono qui solo
       // dopo essere state sbloccate — vedi window.BLUEPRINTS / ShopScene).
-      { id: 'magnet', rep: false, ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
-      { id: 'blast',  rep: false, ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
-      { id: 'splash', rep: false, ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
+      { id: 'magnet', rep: false, rarity: 'legendary', ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
+      { id: 'blast',  rep: false, rarity: 'legendary', ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
+      { id: 'splash', rep: false, rarity: 'legendary', ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
       // Bolla-aiutante: IMPILABILE — ogni pesca aggiunge una bolla (richiede il Progetto sbloccato).
-      { id: 'companion', rep: false, stack: true, ability: 'companion', locked: true, apply: (s) => { s.companions += 1; } },
+      { id: 'companion', rep: false, stack: true, rarity: 'legendary', ability: 'companion', locked: true, apply: (s) => { s.companions += 1; } },
     ];
+
+    // Peso di pesca per rarita' (piu' alto = piu' probabile) e stile della carta.
+    const RARITY_WEIGHT = { common: 60, rare: 30, legendary: 10 };
+    const RARITY_STYLE = {
+      common:    { fill: 0x2b1d12, hover: 0x453322, border: 0xcfcfcf, title: '#e8e8e8' },
+      rare:      { fill: 0x16283a, hover: 0x1f3c52, border: 0x4fd1ff, title: '#bfeeff' },
+      legendary: { fill: 0x3a2a12, hover: 0x5a4020, border: 0xffd166, title: '#ffe9a8' },
+    };
+
+    // Pesca SENZA reinserimento, pesata per FASCIA di rarita' (non per singola voce): si
+    // sceglie prima la fascia con le probabilita' 60/30/10, poi una voce a caso al suo
+    // interno. Cosi' le probabilita' 60/30/10 restano quelle della fascia — altrimenti una
+    // fascia con piu' voci nel pool (es. "rara" con 13 abilita' contro le 5 "comuni")
+    // finirebbe per uscire piu' spesso, nonostante il peso minore.
+    function weightedSample(pool, n) {
+      const remaining = pool.slice();
+      const picked = [];
+      while (remaining.length && picked.length < n) {
+        const tiers = Object.keys(RARITY_WEIGHT).filter((t) => remaining.some((u) => u.rarity === t));
+        const total = tiers.reduce((sum, t) => sum + RARITY_WEIGHT[t], 0);
+        let r = Math.random() * total;
+        let tier = tiers[tiers.length - 1];
+        for (const t of tiers) { r -= RARITY_WEIGHT[t]; if (r <= 0) { tier = t; break; } }
+        const inTier = remaining.filter((u) => u.rarity === tier);
+        const chosen = inTier[Math.floor(Math.random() * inTier.length)];
+        picked.push(remaining.splice(remaining.indexOf(chosen), 1)[0]);
+      }
+      return picked;
+    }
 
     // Disponibili: gli stat ripetibili sempre; le "stack" (impilabili) ri-pescabili all'infinito;
     // le abilità una-tantum solo se non gia' possedute (ownedAbilities le traccia tutte). Le
@@ -70,17 +101,18 @@ class UpgradeScene extends Phaser.Scene {
       if (u.stack) return true;
       return owned.indexOf(u.ability) === -1;
     });
-    Phaser.Utils.Array.Shuffle(avail);
 
     // EVOLUZIONI disponibili: possiedi entrambe le abilità richieste e non l'hai ancora fusa.
-    // Hanno PRIORITA' (compaiono davanti) e il tag speciale "EVOLUZIONE".
+    // Hanno PRIORITA' (compaiono davanti) e il tag speciale "EVOLUZIONE" (stile fucsia, sopra
+    // al sistema di rarita': un'evoluzione e' sempre "speciale" a prescindere).
     const evoAvail = (window.EVOLUTIONS || []).filter((r) =>
       r.needs.every((n) => owned.indexOf(n) !== -1) && owned.indexOf(r.id) === -1
     ).map((r) => ({ id: r.id, evo: true, ability: r.id, apply: r.apply }));
     Phaser.Utils.Array.Shuffle(evoAvail);
 
-    // Le carte: al massimo 1 evoluzione in evidenza + riempi fino a 3 con le normali.
-    const choices = [...evoAvail.slice(0, 1), ...avail].slice(0, 3);
+    // Le carte: al massimo 1 evoluzione in evidenza + riempi fino a 3 pescando per rarita'.
+    const evoSlice = evoAvail.slice(0, 1);
+    const choices = [...evoSlice, ...weightedSample(avail, 3 - evoSlice.length)];
 
     // Carte
     const cardW = 240, cardH = 170, gap = 30;
@@ -90,11 +122,18 @@ class UpgradeScene extends Phaser.Scene {
 
     choices.forEach((u, i) => {
       const cx = startX + i * (cardW + gap);
-      const card = this.add.rectangle(cx, cy, cardW, cardH, u.evo ? 0x3a2140 : 0x2b1d12, 1)
-        .setStrokeStyle(4, u.evo ? 0xff9ff3 : 0xffd166).setInteractive({ useHandCursor: true });
+      // Stile per rarita' (comune/rara/leggendaria); le evoluzioni restano fucsia, sopra al sistema.
+      const style = u.evo ? null : (RARITY_STYLE[u.rarity] || RARITY_STYLE.common);
+      const baseFill = u.evo ? 0x3a2140 : style.fill;
+      const hoverFill = u.evo ? 0x5a3562 : style.hover;
+      const borderColor = u.evo ? 0xff9ff3 : style.border;
+      const titleColor = u.evo ? '#ffd6ff' : style.title;
+
+      const card = this.add.rectangle(cx, cy, cardW, cardH, baseFill, 1)
+        .setStrokeStyle(4, borderColor).setInteractive({ useHandCursor: true });
 
       this.add.text(cx, cy - 55, (i + 1) + '. ' + T.t('up_' + u.id + '_name'), {
-        fontFamily: 'monospace', fontSize: '20px', color: u.evo ? '#ffd6ff' : '#ffe2b0',
+        fontFamily: 'monospace', fontSize: '20px', color: titleColor,
         align: 'center', wordWrap: { width: cardW - 20 },
       }).setOrigin(0.5);
       this.add.text(cx, cy + 10, T.t('up_' + u.id + '_desc'), {
@@ -105,13 +144,12 @@ class UpgradeScene extends Phaser.Scene {
         this.add.text(cx, cy + 65, T.t('up_evo_tag'), {
           fontFamily: 'monospace', fontSize: '13px', color: '#ff9ff3',
         }).setOrigin(0.5);
-      } else if (!u.rep) {
-        this.add.text(cx, cy + 65, T.t('up_ability_tag'), {
-          fontFamily: 'monospace', fontSize: '13px', color: '#9fe6a0',
+      } else {
+        this.add.text(cx, cy + 65, T.t('up_rarity_' + u.rarity), {
+          fontFamily: 'monospace', fontSize: '13px', color: titleColor,
         }).setOrigin(0.5);
       }
 
-      const baseFill = u.evo ? 0x3a2140 : 0x2b1d12, hoverFill = u.evo ? 0x5a3562 : 0x4a3320;
       card.on('pointerover', () => card.setFillStyle(hoverFill, 1));
       card.on('pointerout', () => card.setFillStyle(baseFill, 1));
       card.on('pointerdown', () => this.choose(u));

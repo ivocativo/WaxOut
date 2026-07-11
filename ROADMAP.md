@@ -100,22 +100,49 @@ disegno carta righe 91-118; `src/i18n.js` per i tag; colori in `CONFIG.COLORS` s
 **Collaudo:** aprire più volte la UpgradeScene (finire livelli col god-mode) e verificare distribuzione
 sensata dei colori e che le leggendarie siano rare ma pescabili.
 
-- [ ] 2A rarità carte implementata e verificata.
+- [x] 2A rarità carte implementata e verificata con test statistici in-preview. Controllo
+      qualità (2 agenti) + test dal vivo hanno trovato e corretto: pesatura per singola voce
+      invece che per fascia (13 abilità "rare" uscivano più spesso delle 5 "comuni" nonostante
+      il peso minore — ora si sceglie prima la fascia 60/30/10, poi la voce al suo interno,
+      distribuzione osservata ~61/32/7); stringhe i18n orfane rimosse; piccola protezione
+      difensiva sul lookup colore. **Manca ancora il collaudo visivo/di "sensazione" sul
+      telefono** (rendering preview bloccato, vedi Fase 0).
 
 ### 2B — Eventi casuali di livello
 _"Il gusto dell'imprevisto". Sistema fratello dei MUTATORI già esistenti (in `src/state.js` tabella
 `MUTATORS`, applicati in GameScene con banner d'annuncio)._
 
-**Approccio (da confermare con l'utente sul tipo di eventi prima di codare):**
+**Eventi confermati con l'utente (2026-07-11), da implementare UNO alla volta, in quest'ordine:**
+1. **Fuggitivo dorato**: un nemico speciale scappa subito verso il timpano invece di attaccare; se lo
+   raggiungi e lo elimini in tempo ottieni un bottino grosso, altrimenti sparisce per sempre.
+2. **Frana di cerume**: per un periodo, blocchi di cerume crollano dal soffitto in punti casuali con un
+   breve telegrafo (lampeggio) prima di cadere — da schivare (o da sfruttare per aprire scorciatoie).
+3. **Sciame improvviso**: un'ondata unica di tanti nemici deboli arriva tutta insieme da un lato,
+   annunciata da banner — un picco di caos concentrato, diverso dal normale flusso regolare di spawn.
+
+**Backlog/futuro (non ora):** idea "condotto a dimensione variabile" (il corridoio non è sempre della
+stessa larghezza) — piace all'utente, da approfondire più avanti, non è tra i 3 eventi sopra.
+
+**Approccio (per ciascun evento):**
 1. Studiare come i MUTATORI vengono scelti/annunciati (banner) e applicati in `GameScene.js`, e replicare
-   lo stesso schema per un pool di EVENTI (probabilità bassa a inizio livello).
-2. Proporre all'utente 3-4 idee di evento semplici (es.: "pioggia di cerume" bonus, "nemico d'oro" che vale
-   doppio, "buio" con visione ridotta, "mercante di passaggio"). Implementarne UNO alla volta su ok utente.
-3. Ogni evento: banner d'annuncio (riusare `showBanner`), effetto, e i18n EN+IT.
+   lo stesso schema per il pool di EVENTI (probabilità bassa a inizio livello, un evento alla volta).
+2. Ogni evento: banner d'annuncio (riusare `showBanner`), effetto, i18n EN+IT.
+3. Collaudo: forzare l'evento, verificare banner + effetto reale + che il livello resti completabile.
 
-**Collaudo:** forzare l'evento, verificare banner + effetto reale + che il livello resti completabile.
-
-- [ ] 2B eventi casuali: idee proposte all'utente, primo evento implementato e verificato.
+- [x] 2B.1 Fuggitivo dorato implementato e verificato con test diretti (god-mode + chiamate
+      mirate). Controllo qualità (2 agenti) ha trovato e corretto: tinta dorata cancellata dal
+      lampo del colpo e mai ripristinata; posizione di comparsa non "sicura" (poteva finire
+      oltre una membrana intera e restare bloccato); pulizia "lasciato indietro" lo eliminava
+      senza banner "scappato" se il giocatore lo superava. **Manca il collaudo visivo/di
+      sensazione sul telefono** (rendering preview bloccato, vedi Fase 0).
+- [x] 2B.2 Frana di cerume implementato e verificato con test diretti (god-mode + chiamate
+      mirate + pompaggio del loop). Controllo qualità (1 agente) ha trovato un piccolo problema
+      di pulizia (il timer dell'evento non veniva fermato a fine livello, come invece si fa
+      già per lo spawner nemici) — corretto. Verificato: telegrafo → caduta → impatto ad area
+      sul cerume vicino (apre un varco), atterraggio a terra pulito, nessun doppio impatto,
+      partenza ritardata + arresto automatico dopo 18s. **Manca il collaudo visivo/di
+      sensazione sul telefono** (rendering preview bloccato, vedi Fase 0).
+- [ ] 2B.3 Sciame improvviso implementato e verificato.
 
 ---
 

@@ -71,6 +71,15 @@ window.MUTATORS = [
   { id: 'thickwax', color: '#e0a83a', apply(s) { s.mutWaxHp = 1.7; } },
 ];
 
+// EVENTI CASUALI di livello (indipendenti dai mutatori, possono capitare insieme): a
+// differenza dei mutatori (regolano solo numeri) qui parte una MECCANICA a tempo, gestita da
+// metodi dedicati in GameScene. `apply(scene)` avvia l'evento; `color` per il banner, `id`
+// per la chiave i18n (usata dai singoli eventi per i propri messaggi).
+window.EVENTS = [
+  { id: 'goldfugitive', color: '#ffd700', apply(s) { s.startGoldFugitiveEvent(); } },
+  { id: 'waxcollapse', color: '#e0a83a', apply(s) { s.startWaxCollapseEvent(); } },
+];
+
 // EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le
 // carte di fine livello può comparire l'EVOLUZIONE (`id`), che fonde le due in una versione
 // potenziata. `id` funge anche da chiave i18n (up_<id>_name/_desc, ability_<id>) e da voce

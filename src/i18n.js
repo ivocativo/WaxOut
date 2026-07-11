@@ -54,6 +54,10 @@ window.I18n = (function () {
       mut_lowgrav: 'LOW GRAVITY!  Floaty jumps',
       mut_bonanza: 'BONANZA!  Double wax',
       mut_thickwax: 'STUBBORN WAX!  Harder to clean',
+      event_goldfugitive_in: 'GOLDEN FUGITIVE ON THE RUN!  Catch it before it flees!',
+      event_goldfugitive_caught: 'FUGITIVE CAUGHT!  +{wax}',
+      event_goldfugitive_escaped: 'The fugitive got away...',
+      event_waxcollapse_in: 'WAX COLLAPSE!  Watch the ceiling!',
       // --- Livello completato ---
       done_title: 'LEVEL {n} COMPLETE!',
       done_sub: 'Ear canal cleaned!',
@@ -103,7 +107,9 @@ window.I18n = (function () {
       // --- Potenziamento (a fine livello) ---
       up_title: 'UPGRADE',
       up_hint: 'Choose a new ability or weapon (1 / 2 / 3 or click)',
-      up_ability_tag: '★ ABILITY',
+      up_rarity_common: 'COMMON',
+      up_rarity_rare: 'RARE',
+      up_rarity_legendary: 'LEGENDARY',
       up_stat_wax: 'Wax collected: {wax}',
       up_stat_line: 'Damage: {dmg}   Max HP: {hp}   Speed: {spd}',
       up_stat_weapon: 'Weapon: {weapon}',
@@ -201,6 +207,10 @@ window.I18n = (function () {
       mut_lowgrav: 'POCA GRAVITA\'!  Salti fluttuanti',
       mut_bonanza: 'CUCCAGNA!  Cerume doppio',
       mut_thickwax: 'CERUME OSTINATO!  Piu\' duro da pulire',
+      event_goldfugitive_in: 'FUGGITIVO DORATO IN FUGA!  Prendilo prima che scappi!',
+      event_goldfugitive_caught: 'FUGGITIVO CATTURATO!  +{wax}',
+      event_goldfugitive_escaped: 'Il fuggitivo e\' scappato...',
+      event_waxcollapse_in: 'FRANA DI CERUME!  Occhio al soffitto!',
       // --- Livello completato ---
       done_title: 'LIVELLO {n} COMPLETATO!',
       done_sub: 'Condotto ripulito!',
@@ -250,7 +260,9 @@ window.I18n = (function () {
       // --- Potenziamento (a fine livello) ---
       up_title: 'POTENZIAMENTO',
       up_hint: 'Scegli una nuova abilita o arma (1 / 2 / 3 o click)',
-      up_ability_tag: '★ ABILITA',
+      up_rarity_common: 'COMUNE',
+      up_rarity_rare: 'RARA',
+      up_rarity_legendary: 'LEGGENDARIA',
       up_stat_wax: 'Cerume raccolto: {wax}',
       up_stat_line: 'Danno: {dmg}   HP max: {hp}   Velocita: {spd}',
       up_stat_weapon: 'Arma: {weapon}',

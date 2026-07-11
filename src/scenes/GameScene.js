@@ -121,8 +121,10 @@ class GameScene extends Phaser.Scene {
     this.platforms = this.physics.add.staticGroup();  // pedane sospese (verticalita')
     this.enemies = this.physics.add.group();
     this.projectiles = this.physics.add.group();  // palline sputate dai nemici
+    this.collapseChunks = this.physics.add.group({ allowGravity: false });  // EVENTO frana
 
     this.chooseMutator();   // regola casuale di questo livello (prima di costruirlo: incide su cerume/nemici)
+    this.chooseEvent();     // evento a tempo indipendente (puo' capitare insieme a un mutatore)
     this.buildLevel();
 
     // Giocatore (sprite PNG: scala per portarlo alla dimensione di gioco; hitbox invariato)
@@ -158,6 +160,15 @@ class GameScene extends Phaser.Scene {
     const dripSplash = (mv) => { if (mv && mv.active) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); } };
     this.physics.add.overlap(this.movers, this.blocks, dripSplash);
     this.physics.add.overlap(this.movers, this.platforms, dripSplash);
+
+    // EVENTO Frana di cerume: i blocchi caduti fanno danno da contatto E aprono un piccolo
+    // varco nel cerume vicino a dove atterrano (a differenza delle gocce, che schizzano e basta).
+    this.physics.add.overlap(this.player, this.collapseChunks, (pl, c) => {
+      this.hurtPlayer(14 + Math.floor(window.GameState.level / 2), c.x);
+      this.collapseImpact(c);
+    });
+    this.physics.add.overlap(this.collapseChunks, this.blocks, (c) => this.collapseImpact(c));
+    this.physics.add.overlap(this.collapseChunks, this.platforms, (c) => this.collapseImpact(c));
 
     // Guardiani fermi a presidiare le membrane piene.
     this.spawnGuardians();
@@ -539,6 +550,119 @@ class GameScene extends Phaser.Scene {
     if (Math.random() > 0.55) return;   // ~55% dei livelli ha un mutatore
     this.mutator = Phaser.Utils.Array.GetRandom(window.MUTATORS);
     this.mutator.apply(this);
+  }
+
+  // Sceglie (a volte) un EVENTO CASUALE per questo livello: indipendente dai mutatori (puo'
+  // capitare insieme), niente numeri da regolare ma una MECCANICA a tempo (vedi i metodi
+  // dedicati per ciascun evento, es. startGoldFugitiveEvent). Niente eventi nei primissimi
+  // livelli, nei boss (gia' un evento a se') o nell'assedio (gia' abbastanza intenso).
+  chooseEvent() {
+    this.activeEvent = null;
+    if (window.GameState.level < 2 || this.levelKind === 'boss' || this.levelKind === 'siege') return;
+    if (Math.random() > 0.25) return;   // ~25% dei livelli ha un evento
+    this.activeEvent = Phaser.Utils.Array.GetRandom(window.EVENTS);
+    this.activeEvent.apply(this);
+  }
+
+  // EVENTO "Fuggitivo Dorato": dopo un breve ritardo (il giocatore si e' gia' orientato nel
+  // livello) compare un nemico dorato che NON attacca ma scappa dritto verso il timpano.
+  // Ucciderlo in tempo da' un bottino grosso; se scappa (raggiunge il fondo o scade il
+  // tempo) sparisce senza ricompensa — l'imprevisto e' doverlo rincorrere SUBITO.
+  startGoldFugitiveEvent() {
+    const delay = Phaser.Math.Between(4000, 7000);
+    this.time.delayedCall(delay, () => { if (!this.locked) this.spawnGoldFugitive(); });
+  }
+
+  spawnGoldFugitive() {
+    const lvl = window.GameState.level;
+    // pickGroundX() (non un offset fisso) tiene il punto DENTRO la sezione attuale (tra le
+    // membrane), altrimenti il fuggitivo rischierebbe di comparire oltre una membrana ancora
+    // intera e restare bloccato contro il muro per tutta la durata dell'evento.
+    const e = this.spawnEnemy('blob', { x: this.pickGroundX(), fugitive: true });
+    e.fugitive = true;
+    e.contactDamage = 0;                          // e' preda, non minaccia: non fa danno da contatto
+    e.speed = Math.round(e.speed * 1.7);
+    e.waxValue = Math.round(45 + lvl * 4);
+    e.setTint(0xffd700);                          // firma visiva: dorato
+    this.fugitiveEscapeAt = this.time.now + 14000; // tempo limite per catturarlo
+    this.showBanner(window.I18n.t('event_goldfugitive_in'), '#ffd700');
+  }
+
+  // IA del Fuggitivo Dorato: ignora del tutto il giocatore, corre sempre verso il timpano.
+  // Scaduto il tempo o raggiunto il fondo, sparisce (nessuna ricompensa per averlo lasciato fuggire).
+  fugitiveAI(e, now) {
+    if (now >= (this.fugitiveEscapeAt || 0) || e.x >= this.goalX - 40) {
+      this.showBanner(window.I18n.t('event_goldfugitive_escaped'), '#c9a0ff');
+      e.destroy();
+      return;
+    }
+    e.setVelocityX(e.speed);
+    e.setFlipX(false);
+  }
+
+  // EVENTO "Frana di cerume": per un periodo, blocchi crollano dal soffitto in punti casuali
+  // con un breve telegrafo lampeggiante. Fanno danno da contatto E aprono un piccolo varco nel
+  // cerume dove atterrano (sfruttabile come scorciatoia) — a differenza delle gocce (permanenti,
+  // solo schizzano), qui e' un evento a tempo con una meccanica diversa all'impatto.
+  startWaxCollapseEvent() {
+    const duration = 18000;
+    const delay = Phaser.Math.Between(2000, 4000);
+    this.time.delayedCall(delay, () => {
+      if (this.locked) return;
+      this.showBanner(window.I18n.t('event_waxcollapse_in'), '#e0a83a');
+      this.collapseTimer = this.time.addEvent({
+        delay: 1500, loop: true,
+        callback: () => { if (!this.locked) this.spawnCollapseChunk(); },
+      });
+      this.time.delayedCall(duration, () => {
+        if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
+      });
+    });
+  }
+
+  // Sceglie un punto libero (come le altre insidie: lontano da membrane/pozze gia' piazzate),
+  // mostra il telegrafo al soffitto, poi lascia cadere il blocco.
+  spawnCollapseChunk() {
+    const x = this.pickHazardX(36, 20);
+    if (x == null) return;
+    const cx = x + 18;
+    const warn = this.add.rectangle(cx, 14, 30, 16, 0xe0a83a, 0.5).setDepth(8).setStrokeStyle(2, 0xffd98a, 0.8);
+    this.tweens.add({ targets: warn, alpha: 0.15, yoyo: true, repeat: 3, duration: 130 });
+    this.time.delayedCall(560, () => {
+      warn.destroy();
+      if (this.locked) return;
+      const chunk = this.collapseChunks.create(cx, 6, 'block_hard').setDepth(8).setScale(0.9);
+      chunk.body.setAllowGravity(true);
+      chunk.body.setSize(24, 24, true);
+      chunk.setVelocityY(40);
+      this.time.delayedCall(5000, () => { if (chunk.active) chunk.destroy(); });   // rete di sicurezza
+    });
+  }
+
+  // Impatto della frana: danno ad area al cerume vicino (puo' aprire un varco), effetto
+  // visivo, poi si distrugge. Guardia anti-doppio-impatto (piu' overlap nello stesso frame,
+  // es. urta un blocco e una pedana insieme).
+  collapseImpact(c) {
+    if (!c.active) return;
+    const R = 46;
+    this.blocks.getChildren().forEach((b) => {
+      if (b.active && Math.hypot(b.x - c.x, b.y - c.y) < R) this.damageBlock(b, 26);
+    });
+    this.splat(c.x, c.y, 'hard');
+    this.burst('bit_hard', c.x, c.y, 10);
+    window.Sfx.smash();
+    c.destroy();
+  }
+
+  // I blocchi che non incontrano cerume/pedane nella caduta atterrano a terra (come le gocce).
+  updateCollapseChunks() {
+    this.collapseChunks.getChildren().forEach((c) => {
+      if (c.active && c.y >= this.groundTop - 6) {
+        this.splat(c.x, this.groundTop - 8, 'hard');
+        this.burst('bit_hard', c.x, this.groundTop - 8, 6);
+        c.destroy();
+      }
+    });
   }
 
   // Garantisce un minimo di pickup-CURA per livello (la vita non si ricarica piu' a fine
@@ -935,7 +1059,7 @@ class GameScene extends Phaser.Scene {
     // I volanti restano fuori dallo SPLIT (la comparsa "sul posto" dei figli non si presta al
     // calo dal soffitto).
     let elite = null;
-    if (!cfg.boss && !opts.splitChild && lvl >= 3 &&
+    if (!cfg.boss && !opts.splitChild && !opts.fugitive && lvl >= 3 &&
         Math.random() < Phaser.Math.Clamp(0.08 + lvl * 0.02, 0, 0.34)) {
       const pool = (kind === 'fly') ? ['tank', 'boom'] : ['tank', 'boom', 'split'];
       elite = Phaser.Utils.Array.GetRandom(pool);
@@ -1530,12 +1654,16 @@ class GameScene extends Phaser.Scene {
     if (armored) dmg = Math.max(2, Math.round(dmg * 0.3));   // il getto la scalfisce: poco ma visibile
     e.hp -= dmg;
 
+    // Il FUGGITIVO DORATO ha una tinta permanente (firma visiva): il lampo del colpo la
+    // sovrascrive, va ripristinata quando il lampo finisce, altrimenti tornerebbe del
+    // colore normale per il resto dell'inseguimento.
+    const restoreTint = () => { if (e.active) { e.clearTint(); if (e.fugitive) e.setTint(0xffd700); } };
     if (dot) {
       e.setTintFill(0x9be86b);   // lampo verde = corrosione
-      this.time.delayedCall(70, () => { if (e.active) e.clearTint(); });
+      this.time.delayedCall(70, restoreTint);
     } else {
       e.setTintFill(armored ? 0xbfe0ff : 0xffffff);
-      this.time.delayedCall(armored ? 55 : (heavy ? 95 : 75), () => { if (e.active) e.clearTint(); });
+      this.time.delayedCall(armored ? 55 : (heavy ? 95 : 75), restoreTint);
 
       if (armored) {
         // Guscio che respinge: scintilla + "clang", niente pop nè rinculo (sembra invulnerabile davanti).
@@ -1582,6 +1710,7 @@ class GameScene extends Phaser.Scene {
       }
       if (e.elite === 'boom') this.enemyExplode(e.x, e.y);   // ESPLOSIVO: scoppio ritardato ad area
       if (e.elite === 'split') this.spawnSplitChildren(e);   // SPLIT: si sdoppia sul posto
+      if (e.fugitive) this.showBanner(window.I18n.t('event_goldfugitive_caught', { wax: e.waxValue }), '#ffd700');
       e.destroy();
     }
   }
@@ -1882,6 +2011,7 @@ class GameScene extends Phaser.Scene {
     this.locked = true;
     window.Sfx.win();
     if (this.spawnTimer) this.spawnTimer.remove();
+    if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
     this.player.setVelocity(0, 0);
     this.enemies.getChildren().forEach((e) => { if (e.active) e.setVelocity(0, 0); });
 
@@ -1904,6 +2034,7 @@ class GameScene extends Phaser.Scene {
     this.locked = true;
     window.Sfx.lose();
     if (this.spawnTimer) this.spawnTimer.remove();
+    if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
 
     // Fine della run: incassa il cerume raccolto nella banca permanente.
     const lvl = window.GameState.level;
@@ -2061,6 +2192,7 @@ class GameScene extends Phaser.Scene {
     // Gocce dal soffitto: emettitori che si gonfiano e rilasciano gocce che cadono. Il danno
     // al contatto e' gestito dall'overlap player/movers in create(); lo splash a terra qui.
     this.updateDrips(now);
+    this.updateCollapseChunks();
     // Pozze di cerume scivoloso: rallentano il movimento mentre ci si cammina sopra a terra.
     const onSlime = onGround && this.slimeZones && this.slimeZones.some(
       (z) => this.player.x > z.x1 && this.player.x < z.x2);
@@ -2183,14 +2315,17 @@ class GameScene extends Phaser.Scene {
 
       // Nemico rimasto troppo indietro (oltre una membrana gia' superata): non potra'
       // piu' raggiungere il giocatore, lo rimuoviamo cosi' lo spawner ne crea di nuovi
-      // nella sezione attuale. Boss e guardiani sono esenti.
-      if (!e.guard && e.kind !== 'boss' && (this.player.x - e.x) > this.cameras.main.width * 1.3) {
+      // nella sezione attuale. Boss, guardiani e il fuggitivo (gestisce da solo il proprio
+      // esaurimento in fugitiveAI, con banner "scappato") sono esenti.
+      if (!e.guard && !e.fugitive && e.kind !== 'boss' && (this.player.x - e.x) > this.cameras.main.width * 1.3) {
         e.destroy();
         return;
       }
 
       if (now >= e.knockUntil) {
-        if (e.kind === 'boss') {
+        if (e.fugitive) {
+          this.fugitiveAI(e, now);   // ignora tutto il resto: corre sempre verso il timpano
+        } else if (e.kind === 'boss') {
           this.bossAI(e, now);
         } else if (e.kind === 'spit') {
           // Gorgogliante: spara SOLO se è nell'inquadratura (range d'attacco limitato).
@@ -2216,7 +2351,7 @@ class GameScene extends Phaser.Scene {
         }
       }
 
-      if (Phaser.Geom.Intersects.RectangleToRectangle(e.getBounds(), pb)) {
+      if (!e.fugitive && Phaser.Geom.Intersects.RectangleToRectangle(e.getBounds(), pb)) {
         this.hurtPlayer(e.contactDamage, e.x);
       }
     });
