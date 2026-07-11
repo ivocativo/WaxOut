@@ -916,6 +916,24 @@ class GameScene extends Phaser.Scene {
     cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1)));
     cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
 
+    // VARIANTE ELITE (dal lvl 3): a volte un nemico normale e' potenziato. Modifica cfg PRIMA
+    // del calcolo scala/posizione; l'aura e i comportamenti di morte si agganciano dopo (sotto).
+    let elite = null;
+    if (!cfg.boss && !opts.splitChild && lvl >= 3 &&
+        Math.random() < Phaser.Math.Clamp(0.08 + lvl * 0.02, 0, 0.34)) {
+      elite = Phaser.Utils.Array.GetRandom(['tank', 'boom']);
+      if (elite === 'tank') {          // CORAZZATO: grosso, tanta vita, lento, piu' cerume
+        cfg.hp = Math.round(cfg.hp * 2.2);
+        cfg.speed = Math.round(cfg.speed * 0.82);
+        cfg.dmg = Math.round(cfg.dmg * 1.2);
+        cfg.wax = Math.round(cfg.wax * 1.9);
+        cfg.scale = (cfg.scale || 1) * 1.25;
+      } else {                         // ESPLOSIVO: scoppia morendo (vedi enemyExplode)
+        cfg.hp = Math.round(cfg.hp * 1.25);
+        cfg.wax = Math.round(cfg.wax * 1.5);
+      }
+    }
+
     // Posizione di comparsa: i volanti calano dal soffitto, gli altri emergono dal
     // terreno in punti lontani dal giocatore (il boss esce verso destra).
     const groundTop = H - gh;
@@ -966,10 +984,38 @@ class GameScene extends Phaser.Scene {
       e.bobPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);    // sfasa l'ondeggio tra i moscerini
     }
 
+    // ELITE: aura colorata dietro il nemico (segnale visivo, niente tint per non confliggere
+    // coi lampi dei colpi). L'aura viene sincronizzata in update() e distrutta con il nemico.
+    if (elite) {
+      e.elite = elite;
+      const col = elite === 'tank' ? 0x8fd0ff : 0xff6b3d;
+      const auraR = Math.max(cfg.body[0], cfg.body[1]) * (cfg.scale || 1) * 0.7;
+      e.eliteAura = this.add.circle(e.x, e.y, auraR, col, 0.16).setDepth(7).setStrokeStyle(2.5, col, 0.85);
+      e.once('destroy', () => { if (e.eliteAura) { e.eliteAura.destroy(); e.eliteAura = null; } });
+    }
+
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
     if (cfg.fly) this.dropFromCeiling(e, targetScale);
     else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
     return e;
+  }
+
+  // ESPLOSIVO: alla morte, un breve telegrafo poi uno scoppio ad area nel punto del corpo
+  // (chi ha ucciso il nemico da vicino deve scansarsi). Fa danno solo al giocatore.
+  enemyExplode(x, y) {
+    const warn = this.add.circle(x, y, 12, 0xff6b3d, 0.5).setDepth(11);
+    this.tweens.add({ targets: warn, scale: 5.5, alpha: 0.12, duration: 280, ease: 'Quad.in' });
+    this.time.delayedCall(280, () => {
+      if (warn.active) warn.destroy();
+      const R = 74;
+      const ring = this.add.circle(x, y, R, 0xff8a4a, 0.35).setDepth(12).setScale(0.3);
+      this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => ring.destroy() });
+      window.Sfx.smash();
+      this.cameras.main.shake(180, 0.012);
+      if (Math.hypot(this.player.x - x, this.player.y - y) < R) {
+        this.hurtPlayer(14 + Math.floor(window.GameState.level / 2), x);
+      }
+    });
   }
 
   // Mette un nemico di guardia davanti ad alcune membrane piene: resta a presidiare
@@ -1492,6 +1538,7 @@ class GameScene extends Phaser.Scene {
         this.hitStop(85);
         this.burst(e.bitKey, e.x, e.y, 18);
       }
+      if (e.elite === 'boom') this.enemyExplode(e.x, e.y);   // ESPLOSIVO: scoppio ritardato ad area
       e.destroy();
     }
   }
@@ -2067,6 +2114,7 @@ class GameScene extends Phaser.Scene {
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
+      if (e.eliteAura) { e.eliteAura.x = e.x; e.eliteAura.y = e.y; }   // l'aura élite segue il nemico
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
 
       // Sapone corrosivo: danno-nel-tempo ad intervalli finché la corrosione è attiva.
