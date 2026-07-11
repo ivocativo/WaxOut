@@ -919,21 +919,38 @@ class GameScene extends Phaser.Scene {
     cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1)));
     cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
 
+    // FIGLIO DELLO SPLIT: piu' piccolo, debole E MENO DANNOSO del genitore (due figli ~= un
+    // genitore anche come minaccia: senza ridurre anche il danno, due figli farebbero insieme
+    // il doppio del danno del genitore invece che l'equivalente).
+    if (opts.splitChild) {
+      cfg.hp = Math.max(1, Math.round(cfg.hp * 0.4));
+      cfg.dmg = Math.max(1, Math.round(cfg.dmg * 0.4));
+      if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * 0.4));
+      cfg.wax = Math.max(1, Math.round(cfg.wax * 0.5));
+      cfg.scale = (cfg.scale || 1) * 0.7;
+    }
+
     // VARIANTE ELITE (dal lvl 3): a volte un nemico normale e' potenziato. Modifica cfg PRIMA
     // del calcolo scala/posizione; l'aura e i comportamenti di morte si agganciano dopo (sotto).
+    // I volanti restano fuori dallo SPLIT (la comparsa "sul posto" dei figli non si presta al
+    // calo dal soffitto).
     let elite = null;
     if (!cfg.boss && !opts.splitChild && lvl >= 3 &&
         Math.random() < Phaser.Math.Clamp(0.08 + lvl * 0.02, 0, 0.34)) {
-      elite = Phaser.Utils.Array.GetRandom(['tank', 'boom']);
+      const pool = (kind === 'fly') ? ['tank', 'boom'] : ['tank', 'boom', 'split'];
+      elite = Phaser.Utils.Array.GetRandom(pool);
       if (elite === 'tank') {          // CORAZZATO: grosso, tanta vita, lento, piu' cerume
         cfg.hp = Math.round(cfg.hp * 2.2);
         cfg.speed = Math.round(cfg.speed * 0.82);
         cfg.dmg = Math.round(cfg.dmg * 1.2);
         cfg.wax = Math.round(cfg.wax * 1.9);
         cfg.scale = (cfg.scale || 1) * 1.25;
-      } else {                         // ESPLOSIVO: scoppia morendo (vedi enemyExplode)
+      } else if (elite === 'boom') {   // ESPLOSIVO: scoppia morendo (vedi enemyExplode)
         cfg.hp = Math.round(cfg.hp * 1.25);
         cfg.wax = Math.round(cfg.wax * 1.5);
+      } else {                         // SPLIT: leggero bonus, il premio vero e' sdoppiarsi alla morte
+        cfg.hp = Math.round(cfg.hp * 1.15);
+        cfg.wax = Math.round(cfg.wax * 1.3);
       }
     }
 
@@ -991,16 +1008,31 @@ class GameScene extends Phaser.Scene {
     // coi lampi dei colpi). L'aura viene sincronizzata in update() e distrutta con il nemico.
     if (elite) {
       e.elite = elite;
-      const col = elite === 'tank' ? 0x8fd0ff : 0xff6b3d;
+      const col = { tank: 0x8fd0ff, boom: 0xff6b3d, split: 0x9b7bff }[elite];
       const auraR = Math.max(cfg.body[0], cfg.body[1]) * (cfg.scale || 1) * 0.7;
       e.eliteAura = this.add.circle(e.x, e.y, auraR, col, 0.16).setDepth(7).setStrokeStyle(2.5, col, 0.85);
       e.once('destroy', () => { if (e.eliteAura) { e.eliteAura.destroy(); e.eliteAura = null; } });
     }
 
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
-    if (cfg.fly) this.dropFromCeiling(e, targetScale);
+    // I figli dello SPLIT compaiono con un "pop" istantaneo sul posto (il genitore e' appena
+    // morto li': emergere da lontano non avrebbe senso).
+    if (opts.splitChild) this.splitPop(e, targetScale);
+    else if (cfg.fly) this.dropFromCeiling(e, targetScale);
     else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
     return e;
+  }
+
+  // Comparsa istantanea per i figli dello SPLIT: pop rapido sul posto, niente emersione dal
+  // terreno. Resta "spawning" (inerte) per una manciata di ms, come le altre comparse.
+  splitPop(e, targetScale) {
+    e.setScale(targetScale * 0.3);
+    e.setAlpha(0.85);
+    this.tweens.add({
+      targets: e, scaleX: targetScale, scaleY: targetScale, alpha: 1,
+      duration: 150, ease: 'Back.out',
+      onComplete: () => { e.spawning = false; },
+    });
   }
 
   // ESPLOSIVO: alla morte, un breve telegrafo poi uno scoppio ad area nel punto del corpo
@@ -1487,6 +1519,10 @@ class GameScene extends Phaser.Scene {
   // piu' marcato e rinculo maggiore. Senza heavy (es. pallina del getto) l'impatto c'e'
   // ma piu' contenuto, cosi' il corpo a corpo "pesa" piu' del getto.
   damageEnemy(e, dmg, heavy, dot) {
+    // Guardia: un nemico gia' morto in questo stesso istante (es. due palline del ventaglio
+    // che lo colpiscono nello stesso frame) non va rielaborato — altrimenti cerume/scossa/SPLIT
+    // scatterebbero due volte per una sola morte.
+    if (!e.active) return;
     // CROSTA = corazzata anti-getto: il GETTO (non heavy) la scalfisce appena e rimbalza
     // con un "clang"; solo il CORPO A CORPO (heavy) la abbatte come si deve. Il CORROSIVO (dot)
     // ignora l'armatura (il sapone la mangia) e non fa rinculo/pop (e' un danno "silenzioso").
@@ -1545,7 +1581,22 @@ class GameScene extends Phaser.Scene {
         this.burst(e.bitKey, e.x, e.y, 18);
       }
       if (e.elite === 'boom') this.enemyExplode(e.x, e.y);   // ESPLOSIVO: scoppio ritardato ad area
+      if (e.elite === 'split') this.spawnSplitChildren(e);   // SPLIT: si sdoppia sul posto
       e.destroy();
+    }
+  }
+
+  // SPLIT: alla morte, genera fino a 2 nemici piu' piccoli sul posto (mai a loro volta elite:
+  // vedi il filtro opts.splitChild in spawnEnemy, che li esclude anche dal ri-sdoppiarsi).
+  // Rispetta il tetto di nemici del livello: il genitore e' ancora "active" in questo istante,
+  // va tolto dal conteggio per capire quanto spazio si libera.
+  spawnSplitChildren(e) {
+    const activeAfterParent = this.enemies.countActive(true) - 1;
+    const room = Math.max(0, this.maxEnemies - activeAfterParent);
+    const count = Math.min(2, room);
+    for (let i = 0; i < count; i++) {
+      const ox = (i === 0 ? -1 : 1) * Phaser.Math.Between(16, 26);
+      this.spawnEnemy(e.kind, { splitChild: true, x: e.x + ox });
     }
   }
 
