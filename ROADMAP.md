@@ -182,7 +182,20 @@ _Ritocco veloce, alto ritorno. Toglie il "legnoso" del movimento istantaneo._
 **Collaudo:** provare corsa, inversione di direzione, salto+movimento in aria, dash: deve sembrare più fluido
 ma ancora preciso. Chiedere all'utente il "sentore" finale (è soggettivo).
 
-- [ ] 3 accel/decel implementata e verificata; valori tarati con l'utente.
+- [x] 3 accel/decel implementata e verificata con test diretti (god-mode + pompaggio del loop).
+      Controllo qualità (1 agente) ha trovato un bug **CRITICO**: una variabile rinominata
+      (`vx`→`targetVx`) aveva lasciato un riferimento orfano al vecchio nome nel controllo
+      dell'animazione di camminata, che avrebbe fatto CRASHARE `update()` (quindi tutto il
+      gioco) ad ogni frame col giocatore a terra. Corretto (ora legge la velocità reale).
+      Verificato: accelerazione/decelerazione a terra (0.3) e in aria (0.15, più lenta) seguono
+      esattamente la curva prevista, lo scatto resta istantaneo, l'accovacciamento riduce
+      correttamente il bersaglio. **Note di game-feel da valutare col playtest dell'utente**
+      (non bug, conseguenze plausibilmente positive del nuovo sistema, ma soggettive):
+      dopo uno scatto la velocità ora "scivola" verso il bersaglio invece di fermarsi di
+      scatto; il rinculo da colpo subito dura visibilmente un po' di più (prima veniva
+      azzerato quasi subito). Valori (`MOVE_ACCEL_GROUND`/`AIR` in `state.js`) da tarare a
+      sensazione. **Manca il collaudo visivo/di sensazione sul telefono** (rendering preview
+      bloccato, vedi Fase 0).
 
 ---
 

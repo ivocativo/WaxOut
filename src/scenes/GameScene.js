@@ -2256,16 +2256,23 @@ class GameScene extends Phaser.Scene {
     this.crouching = downHeld && (onGround ||
       ((now - this.lastGroundAt) < 140 && this.player.body.velocity.y > -50));
 
-    // Movimento (tastiera o pad a schermo); accovacciato ci si muove piano.
+    // Movimento (tastiera o pad a schermo); accovacciato ci si muove piano. La velocita' REALE
+    // insegue quella bersaglio con un'accelerazione/decelerazione morbida (a terra piu'
+    // reattiva, in aria piu' "molle"), invece di scattare istantanea: toglie il "legnoso" senza
+    // diventare scivoloso. Lo SCATTO resta istantaneo (salta l'inseguimento apposta).
     const left = k.A.isDown || k.LEFT.isDown || this.touch.left;
     const right = k.D.isDown || k.RIGHT.isDown || this.touch.right;
-    let vx = 0;
-    if (left) { vx = -p.moveSpeed; this.facing = -1; }
-    else if (right) { vx = p.moveSpeed; this.facing = 1; }
-    if (this.crouching) vx *= 0.45;
-    if (onSlime) vx *= 0.5;
-    if (now < this.dashUntil) vx = this.facing * p.moveSpeed * 2.4;
-    this.player.setVelocityX(vx);
+    let targetVx = 0;
+    if (left) { targetVx = -p.moveSpeed; this.facing = -1; }
+    else if (right) { targetVx = p.moveSpeed; this.facing = 1; }
+    if (this.crouching) targetVx *= 0.45;
+    if (onSlime) targetVx *= 0.5;
+    if (now < this.dashUntil) {
+      this.player.setVelocityX(this.facing * p.moveSpeed * 2.4);
+    } else {
+      const accel = onGround ? window.CONFIG.MOVE_ACCEL_GROUND : window.CONFIG.MOVE_ACCEL_AIR;
+      this.player.setVelocityX(Phaser.Math.Linear(this.player.body.velocity.x, targetVx, accel));
+    }
     // Posa accovacciata: sprite schiacciato (segnaposto in attesa di un frame dedicato).
     this.player.setScale(1.5, this.crouching ? 1.02 : 1.5);
 
@@ -2329,7 +2336,7 @@ class GameScene extends Phaser.Scene {
     // Animazione
     this.player.setFlipX(this.facing < 0);
     if (!onGround) { this.player.anims.stop(); this.player.setTexture('player_a'); }
-    else if (Math.abs(vx) > 10) { this.player.anims.play('walk', true); }
+    else if (Math.abs(this.player.body.velocity.x) > 10) { this.player.anims.play('walk', true); }
     else { this.player.anims.stop(); this.player.setTexture('player_a'); }
 
     // IA nemici + danno da contatto

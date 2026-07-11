@@ -5,6 +5,12 @@ window.CONFIG = {
   WIDTH: 960,
   HEIGHT: 540,
   GRAVITY: 1100,
+  // Accelerazione/decelerazione del movimento orizzontale (0..1, quota di avvicinamento alla
+  // velocita' bersaglio ad ogni frame — piu' alto = piu' reattivo/"scattante", piu' basso =
+  // piu' morbido/"pesante"). A terra piu' reattiva, in aria piu' "molle" (meno controllo
+  // diretto da saltati, tipico dei platform). Il dash resta ISTANTANEO (non passa da qui).
+  MOVE_ACCEL_GROUND: 0.3,
+  MOVE_ACCEL_AIR: 0.15,
   GROUND_H: 180,        // altezza del "pavimento" del condotto (alto: tiene l'azione
                         // sopra le dita sui comandi touch e riempie il canale)
   BLOCK: 32,            // lato di un blocco del muro (px display)
