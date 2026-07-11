@@ -89,6 +89,29 @@ class ShopScene extends Phaser.Scene {
     back.on('pointerout', () => back.setStyle({ backgroundColor: '#ffd166' }));
     back.on('pointerdown', () => this.toMenu());
 
+    // Pulsante AZZERA PROGRESSI (in basso a destra) con conferma a DUE tocchi, cosi' non si
+    // cancella per sbaglio: 1o tocco arma ("Sicuro?"), 2o tocco entro 3s azzera davvero.
+    this._resetArmed = false;
+    const reset = this.add.text(W - 120, H - 30, T.t('shop_reset'), {
+      fontFamily: 'monospace', fontSize: '15px', color: '#ffd9d9',
+      backgroundColor: '#6a3030', padding: { x: 12, y: 8 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    reset.on('pointerdown', () => {
+      if (!this._resetArmed) {
+        this._resetArmed = true;
+        reset.setText(T.t('shop_reset_confirm')).setStyle({ backgroundColor: '#b03030', color: '#ffffff' });
+        this._resetTimer = this.time.delayedCall(3000, () => {
+          this._resetArmed = false;
+          if (reset.active) reset.setText(T.t('shop_reset')).setStyle({ backgroundColor: '#6a3030', color: '#ffd9d9' });
+        });
+      } else {
+        if (this._resetTimer) this._resetTimer.remove();
+        window.Meta.resetAll();
+        window.Sfx.unlock();
+        this.scene.restart();   // ridisegna il negozio azzerato (banca 0, sblocchi vuoti)
+      }
+    });
+
     // Tastiera: 1-4 comprano i potenziamenti; ESC esce. (I progetti sono solo cliccabili.)
     this.input.keyboard.on('keydown-ONE', () => this.buyStat('hp'));
     this.input.keyboard.on('keydown-TWO', () => this.buyStat('dmg'));
