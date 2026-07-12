@@ -6,9 +6,11 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-11 · Ultimo commit: `5490cc5` (game feel: accel/decel). Tutto pushato su GitHub._
-_**Blocco "Gameplay backlog" (Fasi 1-3 di `ROADMAP.md`) COMPLETO in codice.** Manca SOLO il playtest
-dell'utente sul telefono. Prossimo blocco ancora da decidere (vedi §DA FARE)._
+_Ultimo aggiornamento: 2026-07-12 · Ultimo commit: `9c9cf84` (personaggio animato AutoSprite + look pixellato). Tutto pushato._
+_**Personaggio NUOVO di qualita' (immagine AI) con animazioni VERE di camminata/corsa integrate in gioco.**_
+_La vecchia "Fase C sprite" e il blocco "preview cieco" sono RISOLTI (vedi §COLLAUDO e §DA FARE). Restano:_
+_generare idle/salto/attacco su AutoSprite (crediti utente), decidere le armi in mano, e il playtest/taratura_
+_dell'arretrato di gameplay._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -27,18 +29,25 @@ telefono + tablet) via Capacitor. Giocabile su PC (tastiera) e telefono (comandi
 
 ---
 
-## ⚠️ COLLAUDO: cosa è verificato e cosa no
+## ✅ COLLAUDO: ora si VEDE (aggiornato 2026-07-12)
 
-**Il preview nel browser NON mostra l'immagine** (la scheda risulta "nascosta/senza focus", il
-browser sospende il ciclo di animazione → screenshot e click vanno in timeout). Il gioco però
-**non è rotto**: il codice gira. Vedi sotto la **tecnica che funziona** (pompare il loop a mano)
-per collaudare tutta la LOGICA senza vederla.
+**Il preview ADESSO mostra l'immagine.** Con lo strumento **Browser pane** (`preview_start {url|name}`
+poi `computer {action:"screenshot"}`) si ottengono screenshot LIVE puliti sia del menu sia della
+GameScene → l'assistente **vede** e itera su grafica/animazioni. Superato il vecchio blocco "preview
+cieco" (era: la scheda perdeva il focus / il canale corrompeva le immagini).
 
-Quindi la distinzione da tenere a mente:
-- **Logica verificata** (assegnazioni, conteggi, danni, tempi, niente crash): fatta con la
-  tecnica del loop-pumping in questa sessione per SPLIT, rarità carte, i 3 eventi.
-- **Aspetto e "sensazione" (feel) NON verificati**: colori a schermo, leggibilità, come si
-  "sente" giocare → **serve il playtest dell'utente sul telefono**.
+Distinzione:
+- **Logica** (assegnazioni/danni/tempi/niente crash): verificabile con loop-pumping + `javascript_tool`.
+- **Aspetto/feel**: ora l'assistente lo vede a schermo, ma il giudizio finale di GUSTO (e il feel su
+  touch) resta il **playtest dell'utente sul telefono**.
+
+**⚠️ Instabilita' del preview (da sapere):** il server `serve.ps1` (porta 8123) a volte MUORE → la
+scheda finisce su pagina vuota (`window.game` assente, titolo vuoto). Rimedio: `preview_start
+{name:"earwaxwar"}` per RIAVVIARE il server (non basta riaprire l'URL se il server e' morto). Anche:
+un `location.reload()` puo' chiudere la scheda del preview → riaprirla. Dopo `scene.start('GameScene')`
+il `create` gira al tick DOPO: non leggere subito `heroVisual`/`player` (aspetta o verifica `isActive`).
+Per i test in preview vale la regola god-mode robusta (metterlo nel hook `events.once('create')`, o il
+PG muore durante i riavvii e parte il game-over).
 
 ### Ancora da far playtestare sul telefono all'utente (dal più vecchio)
 Arretrato mai provato dal vivo (verificato solo staticamente in sessioni precedenti):
@@ -52,14 +61,19 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 - `5490cc5` — **game feel**: accel/decel del movimento. Due cose SOGGETTIVE da giudicare col
   playtest (non bug): dopo lo scatto il PG "scivola" un attimo verso la velocità normale; il
   rinculo da colpo subito dura un filo di più. Se stonano: `MOVE_ACCEL_GROUND`/`AIR` in `state.js`.
+- `257c2a5` — **juice procedurale** (il PG si schiaccia/allunga a salto/atterraggio/inversione/colpo)
+  + **carattere comico** (fumetto con battute a inizio livello/uccisione/colpo/boss). Da giudicare:
+  quanto marcato il juice (`JUICE_*` in `state.js`), se le battute fanno ridere/stonano (in `state.js`
+  `SPEECH` + `i18n.js`). Punto specifico: accovacciandosi può vedersi un micro-"assestamento" (effetto
+  collaterale già preesistente, ora visibile) — segnalare se stona.
 
 ---
 
 ## Come provare il gioco
 
-**Preview per l'assistente:** `preview_start` con config `earwaxwar-8124` (porta 8124) da
-`.claude/launch.json`. Il RENDER visivo è indisponibile (vedi sopra), ma si collauda la logica
-così — **pompando il loop a mano** e interrogando lo stato con `javascript_tool`:
+**Preview per l'assistente:** `preview_start {name:"earwaxwar"}` (porta 8123) da `.claude/launch.json`
+→ apre la scheda e RENDERIZZA (screenshot ok, vedi §COLLAUDO). Per collaudare la LOGICA a fondo, o se il
+tab perde il focus, si puo' anche **pompare il loop a mano** e interrogare lo stato con `javascript_tool`:
 ```js
 // base sull'orologio INTERNO del gioco (NON performance.now(): divergono e falsano i tempi)
 const loop = window.game.loop; let t = loop.time;
@@ -94,16 +108,23 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   (modificatori di livello), `EVENTS` (eventi casuali). `Meta` sta in `src/meta.js` (localStorage).
 - `src/scenes/GameScene.js` — cuore del gioco (~2400 righe): build livello, spawn nemici, IA,
   combattimento, abilità, mutatori, tipi di livello, gocce, élite, **eventi casuali**, update loop.
+  **Personaggio animato:** `this.player` (fisica) reso invisibile + `this.heroVisual` (sprite animato che
+  lo segue, scala `HERO_SCALE`, origin `HERO_ORIGIN_Y`, riceve il juice); anim per stato in `update()`.
 - `src/scenes/UpgradeScene.js` — carte di fine livello (pool `ALL` + evoluzioni + **rarità** + filtro).
 - `src/scenes/ShopScene.js` — negozio (2 colonne: Potenziamenti + Progetti) + pulsante reset.
 - `src/scenes/MenuScene.js` / `PauseScene.js` — menu e pausa. `src/scenes/BootScene.js` — carica gli
-  sprite PNG (assets) e genera via codice le texture non ancora ridisegnate.
+  sprite PNG (assets), gli **sprite sheet animati del personaggio** (`hero_walk`/`hero_run`, frame 84) e
+  genera via codice le texture non ancora ridisegnate.
 - `src/gfx.js` (`GameGfx`) — SOLO rendering (sfondo, cerume, splat, `showBanner`, ecc.). Tenere
   grafica separata dal gameplay: sessione "grafica" tocca gfx.js, "gameplay" GameScene.js.
 - `src/i18n.js` — dizionario EN (default) + IT. Ogni stringa passa da `I18n.t('chiave')`.
 - `src/touch.js` — comandi touch (stick analogico + tasti). `src/sfx.js` — audio procedurale.
 - `assets/` — sprite/immagini (incorporati come data-URI in `sprites_data.js`/`assets_data.js`
-  per girare da `file://`). `tools/` — script PowerShell (serve LAN, embed assets, ecc.).
+  per girare da `file://`). Personaggio in `assets/sprites/hero/`: `hero_ai.png` (ritaglio sorgente),
+  `hero_walk`/`hero_run` (sheet AutoSprite 256) + `_px` (pixellati, USATI dal gioco). **Gli sheet NON
+  sono ancora incorporati** → si vedono via server/LAN, non da `file://`. `tools/` — script PowerShell:
+  `cutout_bg.ps1` (sfondo trasparente), `scale_sprite.ps1` (ridimensiona), `bake_sheet_pixel.ps1`
+  (pixelate), + serve LAN / embed assets. (`gen_hero*.ps1` = esperimento procedurale SCARTATO, non usato.)
 
 ---
 
@@ -111,7 +132,14 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - **Combattimento:** attacco unico "intelligente" (mazza da vicino / getto da lontano),
   hit-stop + shake, salto ad altezza variabile + coyote/buffer, accovacciamento, scatto.
 - **Movimento:** accelerazione/decelerazione morbida (a terra `MOVE_ACCEL_GROUND` 0.3, in aria
-  `MOVE_ACCEL_AIR` 0.15); lo scatto resta istantaneo.
+  `MOVE_ACCEL_AIR` 0.15); lo scatto resta istantaneo. **Juice procedurale**: il PG si schiaccia/
+  allunga a salto/atterraggio/inversione/colpo (`JUICE_*` in `state.js`, `jx`/`jy` + `setJuice` in GameScene).
+- **Carattere comico:** fumetto con battute a inizio livello/uccisione/colpo/boss (`SPEECH` in
+  `state.js`, `speech_*` in i18n; `maybeSpeech`/`showSpeech` in GameScene, `GameGfx.showSpeech` per il rendering).
+- **Personaggio (grafica/animazione, dal 2026-07-12):** esploratore da **immagine AI** (Leonardo),
+  **animato** con **AutoSprite** (sprite sheet camminata/corsa, pixellati per lo stile del gioco).
+  Cammina/corre di profilo, fisica/hitbox invariati. **Idle e salto = placeholder** (frame fisso) finche'
+  non si generano quelle anim; **attacco** = effetti a codice (getto/colpo/lampi), niente arma in mano.
 - **Nemici:** blob (cerumino), crust (crosta, corazzata anti-getto), spit (gorgogliante),
   fly (moscerino, picchiata telegrafata), boss (Tappo di Cerume, si infuria a metà vita).
   **Varianti élite** (dal lvl 3): Corazzato (aura azzurra), Esplosivo (aura rossa),
@@ -132,31 +160,39 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 ---
 
 ## DA FARE
-Il blocco pianificato in **`ROADMAP.md`** è **COMPLETO** e pushato (tutte le fasi fatte):
-- **Fase 1 — élite SPLIT** ✅ (`c0d6bdc`)
-- **Fase 2 — rarità carte + 3 eventi casuali** ✅ (`f0f2273`, `06b4b6b`)
-- **Fase 3 — game feel accel/decel** ✅ (`5490cc5`)
 
-**Prossimo blocco DA DECIDERE con l'utente.** I candidati principali (in ordine di impatto
-secondo l'assistente, il 2026-07-11):
-1. **Animazioni + carattere del personaggio** (camminata/entrata, versetti/frasi comiche): è la
-   cosa che l'utente stesso indica come il vero rimedio al "legnoso", e fa fruttare l'accel/decel
-   appena fatto. Richiede molto l'occhio dell'utente (preview cieco lato assistente).
-2. **Strada verso Google Play**: ottimizzare `assets_data.js` (~4.6MB) → **Capacitor** → build
-   Android. Avvicina l'obiettivo finale ed è adatto al lavoro "alla cieca" (misurabile: dimensioni,
-   struttura), meno dipendente dal preview.
-3. **Rifacimento estetico** (look gommoso/organico, muro di muco unico, livelli più grandi): grande
-   resa visiva ma è il più penalizzato dal preview cieco (serve tantissimo l'occhio dell'utente).
-Prima di aprire un blocco: **il playtest dell'utente** valida/tara tutto l'arretrato non provato.
+### Personaggio & animazioni — BLOCCO IN CORSO (piano in `ROADMAP.md`)
+- **Idle, salto, attacco corpo a corpo:** da generare su **AutoSprite** (stessa immagine `hero_ai.png`,
+  stile coerente) quando all'utente tornano i crediti o con l'abbonamento base. Poi si agganciano come
+  walk/run: BootScene `load.spritesheet` (+ `bake_sheet_pixel.ps1` per pixellarle) + `anims.create` +
+  stato in `GameScene.update()`. Ora idle/salto sono un frame fisso (placeholder).
+- **Armi in mano:** DECISIONE APERTA. Consiglio dato all'utente: personaggio SENZA arma fissa (la
+  bombola sulla schiena racconta gia' la storia; gli attacchi si vedono con gli effetti a codice). Se si
+  vuole l'arma visibile: generare un'anim "attacco" con l'arma in pugno e mostrarla solo durante lo sparo.
+- **Embed + peso:** gli sprite sheet NON sono in `assets_data.js` → si vedono via server/LAN (preview +
+  telefono ok) ma NON da doppio-click `file://`. Da incorporare (`embed_assets.ps1`) e/o ottimizzare il
+  peso (i `_px` sono gia' molto piu' leggeri dei 256) prima del build Android.
 
-### Backlog estetico / futuro (dall'utente) — dettagli nella memoria `earwaxwar-backlog`
-- **Animazioni** (migliorano il "legnoso"): entrata personaggio, camminata, strisciamento nemici,
-  carattere comico del personaggio.
-- **Sprite dedicati** per goccia/emettitore del soffitto (ora procedurali).
-- **Alternative ostacoli** ancora da fare (una alla volta): peli oscillanti, geyser di cerume.
-- **Idea "condotto a dimensione variabile"** (larghezza del corridoio non sempre uguale) — piaciuta
-  all'utente, da approfondire.
-- Ottimizzare `assets_data.js` (~4.6MB) prima del build Android. Monetizzazione (non decisa).
+### Pipeline arte (NUOVA, collaudata 2026-07-12) — sostituisce il procedurale
+Look di qualita' = **immagini AI (Leonardo)**, NON procedurale a codice (bocciato dall'utente: "qualita'
+bassa"). Flusso: **l'utente genera** su Leonardo (prompt scritti dall'assistente) → **l'assistente**
+ritaglia/scala/pixela/integra. Tool: `cutout_bg.ps1`, `scale_sprite.ps1`, `bake_sheet_pixel.ps1`.
+Animazioni = **AutoSprite** (1 immagine → sprite sheet per stato, preserva il design). Stesso metodo
+riusabile per **nemici/ambiente** per uniformare l'estetica al nuovo personaggio.
+
+### Grandi assi (dopo)
+- **Playtest/taratura arretrato di gameplay** — la LOGICA e' ok, mancano gusto e feel dell'utente. Da
+  provare/tarare sul telefono (manopole in `state.js`):
+  - `5a52325`→`00ec955` — gocce dal soffitto, mutatori, tipi di livello (corsa/**assedio**), élite
+    Corazzato/Esplosivo, reset progressi.
+  - `c0d6bdc` élite SPLIT · `f0f2273`+`06b4b6b` rarita' carte + eventi (Fuggitivo/Frana/Sciame) ·
+    `5490cc5` game-feel accel/decel · `257c2a5` juice + fumetti comici.
+- **Strada verso Google Play:** ottimizzare `assets_data.js` (~4.6MB, cresce con gli sheet) → **Capacitor**
+  → build Android. (Node servira' lì; ora NON installato — verificato. Non piu' bloccante per l'arte.)
+
+### Backlog estetico/futuro (dettagli in memoria `earwaxwar-backlog`)
+- Sprite dedicati per goccia/emettitore soffitto (ora procedurali). Alternative ostacoli (peli oscillanti,
+  geyser). Idea "condotto a larghezza variabile". Monetizzazione (non decisa).
 
 ---
 

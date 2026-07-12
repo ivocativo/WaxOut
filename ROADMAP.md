@@ -1,146 +1,66 @@
-# Earwax War — Piano esecutivo (blocco "Animazioni + carattere")
+# Earwax War — Piano esecutivo (blocco "Personaggio AI animato")
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" del blocco in corso (con le caselle da
-> spuntare), usa e getta: quando il blocco è chiuso e playtestato, i risultati si travasano in
-> `HANDOFF.md` e questa lista si azzera per il blocco dopo. Per lo **stato generale** del progetto,
-> come collaudare e le regole vedi **`HANDOFF.md`**; per la descrizione del gioco vedi **`README.md`**.
+> spuntare), usa e getta. Per lo **stato generale** del progetto, come collaudare e le regole vedi
+> **`HANDOFF.md`**; per la descrizione del gioco vedi **`README.md`**.
 
-_Pianificato con Opus il 2026-07-11. Pensato per essere ESEGUITO da Sonnet, un passo alla volta._
-_Regole: god-mode nei test SEMPRE, i18n EN+IT per ogni stringa, commit solo su richiesta dell'utente,_
-_mai lasciare il god-mode nel codice committato._
+_Aggiornato 2026-07-12. Regole: god-mode nei test SEMPRE, i18n EN+IT per ogni stringa nuova,_
+_commit solo su richiesta dell'utente. Ultimo commit: `9c9cf84`._
 
-> ⚠️ **VINCOLO DI QUESTO BLOCCO — l'assistente è "cieco" sull'aspetto.** Il preview renderizza ma
-> l'immagine NON arriva integra all'assistente (canale di trasferimento che corrompe i frame). Perciò:
-> l'assistente costruisce e verifica la **LOGICA** dell'animazione (i valori di scala cambiano nel modo
-> giusto al momento giusto, i tempi tornano, niente crash, la scala torna a riposo), e **l'UTENTE giudica
-> come APPARE e si SENTE** con un playtest sul telefono, dicendo cosa ritoccare. Tenere quindi i "numeri"
-> (ampiezze/durate) in costanti facili da cambiare.
+## Decisione di fondo (bloccata con l'utente 2026-07-12)
+Il **procedurale a codice** per il personaggio è stato **bocciato** ("qualità bassa"). Si va con:
+- **LOOK = immagini AI (Leonardo).** L'utente genera (prompt scritti dall'assistente), l'assistente
+  ritaglia/scala/pixela/integra. Personaggio scelto: esploratore (casco+lampada, occhialoni, tuta blu,
+  **bombola di sapone gialla** col tubo, guanti, stivali). Sorgente ritagliata: `assets/sprites/hero/hero_ai.png`.
+- **ANIMAZIONE = AutoSprite** (autosprite.io): carichi UNA immagine → sprite sheet per stato
+  (camminata/corsa/idle/salto/attacco), preserva il design. Export griglia PNG.
+- Dettagli e razionale in memoria `earwaxwar-anim-architecture`. Il vecchio "pupazzo procedurale"
+  (`gen_hero*.ps1`, rig da pezzi) è **SUPERATO** — file lasciati su disco come riferimento, non usati.
 
-## Come usare questo file (per Sonnet)
-- Esegui le FASI in ordine. Ogni fase è un blocco piccolo e auto-contenuto, con questo ciclo FISSO:
-  1. implementa;
-  2. **controllo qualità automatico** sulla modifica (`/code-review` e/o skill *verify*); correggi prima di chiudere;
-  3. collauda dal vivo la LOGICA col god-mode (loop-pumping — vedi `HANDOFF.md` §Come provare);
-  4. riferisci all'utente in italiano semplice, elencando cosa deve GUARDARE lui al playtest;
-  5. chiedi se committare.
-- Se un dettaglio non torna col codice reale, fermati e chiedi all'utente invece di improvvisare.
-- Aggiorna la casella `[ ]`→`[x]` quando una fase è verificata (logica), annotando ostacoli/decisioni.
+## Pipeline (come si integra una nuova animazione AutoSprite)
+1. L'utente genera l'animazione su AutoSprite dalla stessa `hero_ai.png` (vista di profilo, verso destra)
+   e la scarica (PNG sprite sheet, griglia NxN — la walk/run erano **5×5 = 25 frame da 256×256**).
+2. Copiala in `assets/sprites/hero/hero_<stato>.png`.
+3. **Pixela**: `tools/bake_sheet_pixel.ps1 -In ... -Out ..._px.png -Frames 5 -TargetFrame 84 -Levels 6 -AlphaThreshold 110`
+   (allinea `-Frames` alla griglia reale; il frame finale = `TargetFrame`).
+4. **BootScene**: `this.load.spritesheet('hero_<stato>', ..._px.png, { frameWidth: 84, frameHeight: 84 })`.
+5. **GameScene create**: `this.anims.create({ key:'hero_<stato>_a', frames: generateFrameNumbers(...), frameRate, repeat })`.
+6. **GameScene update** (blocco "Animazione"): scegli l'anim in base allo stato (onGround/vx/salto/attacco).
+7. Collauda a schermo (god-mode + screenshot), riferisci, chiedi se committare.
 
----
-
-## FASE A — "Juice" procedurale (schiacciamento/allungamento). NIENTE nuovi sprite.
-_Il primo passo: dare "vita" col codice sugli sprite già esistenti. Alto ritorno, tutto verificabile
-dall'assistente; l'utente giudica solo la sensazione. Completa l'accel/decel del blocco precedente._
-
-**Idea:** il personaggio si **allunga** quando salta (alto/sottile), si **schiaccia** quando atterra
-(largo/basso) e rimbalza indietro a riposo; piccola schiacciata anche quando inverte la corsa e quando
-incassa un colpo. Effetto morbido e discreto (aliveness, non gomma da cartone).
-
-**Nodo tecnico da rispettare:** la scala del PG è impostata OGNI FRAME a
-`src/scenes/GameScene.js` riga ~2277 (`this.player.setScale(1.5, this.crouching ? 1.02 : 1.5)`), per
-l'accovacciamento. Quindi NON usare tween di scala (confliggerebbero): usare un sistema a **molla** con
-due moltiplicatori che decadono verso 1 ogni frame, e ripiegarli in QUELL'UNICA riga di setScale.
-
-**Passi:**
-1. **Costanti** in `src/state.js` `CONFIG` (accanto a `MOVE_ACCEL_*`), così l'utente le tara facile:
-   `JUICE_SPRING: 0.2` (quanto in fretta torna a riposo), `JUICE_LAND: 0.22`, `JUICE_JUMP: 0.14`,
-   `JUICE_TURN: 0.08`, `JUICE_HIT: 0.25` (ampiezze massime).
-2. **Stato** in `create()` (dopo aver creato `this.player`): `this.jx = 1; this.jy = 1;`
-   `this._wasOnGround = true; this._prevVelY = 0; this._lastFacing = 1;`
-3. **Molla + scala finale**: sostituire la riga 2277 con:
-   - prima far tendere i moltiplicatori a 1: `this.jx += (1 - this.jx) * CONFIG.JUICE_SPRING;`
-     idem `this.jy` (uguale con jy);
-   - poi la scala: `this.player.setScale(1.5 * this.jx, (this.crouching ? 1.02 : 1.5) * this.jy);`
-4. **Salto (allungo)** nel blocco `if (wantJump && this.jumpsLeft > 0)` (~riga 2287, dove c'è
-   `window.Sfx.jump()`): `this.jx = 1 - CONFIG.JUICE_JUMP; this.jy = 1 + CONFIG.JUICE_JUMP;`
-5. **Atterraggio (schiaccio)**: serve la velocità di caduta PRIMA che il pavimento la azzeri → in fondo
-   all'update salvare `this._prevVelY = this.player.body.velocity.y;` e rilevare l'atterraggio col
-   passaggio aria→terra:
-   `const landed = onGround && !this._wasOnGround; this._wasOnGround = onGround;`
-   Se `landed`: `const impact = Phaser.Math.Clamp(this._prevVelY / p.jumpVelocity, 0, 1.4);`
-   `const a = CONFIG.JUICE_LAND * (0.5 + 0.5 * impact); this.jx = 1 + a; this.jy = 1 - a;`
-   (usare `onGround` già calcolato a ~riga 2219; mettere il rilevamento dopo quel calcolo).
-6. **Inversione di corsa (piccola schiaccia)**: dopo aver deciso `this.facing`, se
-   `onGround && this.facing !== this._lastFacing && Math.abs(this.player.body.velocity.x) > 10` →
-   `this.jx = 1 + CONFIG.JUICE_TURN; this.jy = 1 - CONFIG.JUICE_TURN;`. Aggiornare sempre `this._lastFacing = this.facing;`
-7. **Colpo incassato (schiaccia netta)**: in `hurtPlayer`, SOLO quando il danno viene davvero applicato
-   (non quando lo scudo para, non se invulnerabile): `this.jx = 1 + CONFIG.JUICE_HIT; this.jy = 1 - CONFIG.JUICE_HIT;`
-8. (Opzionale, se resta semplice) micro-"bob" in corsa a terra: un `Math.sin` di piccola ampiezza (~0.02)
-   su `jy` mentre `onGround && |vx|>10`. Se complica, rimandare alla Fase C.
-
-**Attenzione (da segnalare all'utente per il playtest):** con l'origine dello sprite al centro, lo
-schiacciamento "solleva i piedi" di un pelo. Se al playtest stona, la cura è mettere l'origine in basso
-(`this.player.setOrigin(0.5, 1)` + ricalcolo dell'offset del corpo) — ma è più invasivo, farlo solo se serve.
-
-**Collaudo LOGICA (god-mode, loop-pumping):**
-- salto → `jy > 1` subito dopo, poi torna verso 1 nei frame successivi;
-- caduta + atterraggio → `jy < 1` sul frame di atterraggio, poi rimbalza a ~1;
-- inversione a terra in corsa → piccola schiaccia;
-- colpo (per questo test togliere il god-mode) → schiaccia; scudo attivo → NIENTE schiaccia;
-- a riposo la scala torna esattamente a `(1.5, 1.5)`; accovacciato resta `scaleY ≈ 1.02`; nessun crash.
-
-**Da GUARDARE (utente, playtest):** il personaggio sembra più "vivo" senza sembrare di gomma? Salto e
-atterraggio "pesano" bene? I piedi restano piantati a terra? Numeri troppo/poco marcati? (si tarano in `CONFIG`.)
-In più, un punto specifico da osservare: **quando ti accovacci**, potrebbe vedersi un piccolissimo
-"assestamento" un attimo dopo (la posa accovacciata rimpicciolisce anche il corpo fisico, non solo lo
-sprite — cosa già presente prima, ora resa visibile dallo schiacciamento). Se sembra strano, va rivisto;
-se è impercettibile o sembra naturale, nessun intervento necessario.
-
-- [x] A juice procedurale implementato e verificato con test diretti (god-mode + pompaggio del loop,
-      numeri confrontati frame per frame con la formula attesa). Controllo qualità (1 agente) + test
-      dal vivo hanno trovato e corretto 3 problemi:
-      1. **(il più serio) `onGround` sfarfalla vero/falso ad OGNI frame anche da fermi** (così risolve
-         Arcade Physics gravità+collisione) — senza filtro, il rilevamento dell'atterraggio avrebbe
-         fatto scattare uno schiacciamento quasi ogni frame pure stando immobili. Corretto riusando
-         lo stesso rimedio già presente nel codice per l'accovacciamento (`lastGroundAt` con soglia,
-         invece di leggere `onGround` nudo).
-      2. Il colpo incassato da contatto nemico aveva comunque un frame di ritardo prima di vedersi
-         (la molla+scala giravano troppo presto nel ciclo `update()`) — spostata a fine ciclo.
-      3. Un salto "bufferizzato" che scatta esattamente sul frame dell'atterraggio cancellava del
-         tutto lo schiacciamento dell'atterraggio (bunny-hop) — corretto con un confronto di ampiezza
-         (`setJuice`) invece di sovrascrivere sempre l'ultimo trigger arrivato.
-      Verificato numero per numero: salto/atterraggio/inversione/colpo producono esattamente i valori
-      previsti dalla formula; a riposo la scala torna sempre esatta a (1.5, 1.5); nessun crash; nessuna
-      regressione sull'accovacciamento. **Manca il collaudo visivo/di sensazione sul telefono** — numeri
-      da tarare in `CONFIG` (`JUICE_*`) secondo il gusto dell'utente.
+Nota: `this.player` (fisica) è **invisibile**; il visual è `this.heroVisual` (segue il player, scala
+`HERO_SCALE`, origin `HERO_ORIGIN_Y` per i piedi, riceve il juice jx/jy, flip per direzione).
 
 ---
 
-## FASE B — Carattere comico: "versetti"/frasi (fumetto)
-_Quasi tutta logica: un fumetto con una battuta casuale a certi eventi. Tono scherzoso (come vuole l'utente)._
+## FASI (casella `[ ]`→`[x]` a verifica fatta)
 
-**Bozza (dettagliare quando si arriva qui):** pool di frasi brevi in `i18n.js` (EN+IT), mostrate in un
-piccolo fumetto sopra il PG a eventi scelti (inizio livello / uccisione / colpo incassato / boss), con
-cooldown per non spammare. Riusare lo stile grafico esistente (`showBanner`/testo). Verificabile: la frase
-giusta compare all'evento giusto col cooldown; l'utente giudica tono e piazzamento.
+- [x] **Look personaggio** scelto (AI n.3) e approvato dall'utente; ritagliato pulito (`cutout_bg.ps1`).
+- [x] **Camminata + corsa** (AutoSprite) integrate, **pixellate** (`bake_sheet_pixel.ps1`, frame 84) e
+      rimpicciolite; fisica/hitbox invariati; verificato a schermo. **Committato `9c9cf84`.**
+- [ ] **Idle**: generare su AutoSprite → agganciare (sostituisce il placeholder "frame 0 della camminata").
+- [ ] **Salto / caduta**: generare → agganciare (sostituisce il frame fisso in aria). Valutare 2 stati
+      (stacco vs caduta) o 1 solo.
+- [ ] **Attacco**: DECIDERE prima le **armi in mano** (vedi sotto). Poi o anim "attacco" dedicata (arma in
+      pugno, mostrata durante lo sparo) oppure si resta con gli effetti a codice.
+- [ ] **Embed + peso**: incorporare gli sheet in `assets_data.js` (per `file://`) e/o ottimizzare il peso,
+      prima del build Android. (Ora si vedono solo via server/LAN.)
+- [ ] **(poi) Nemici/ambiente**: stesso metodo AI+AutoSprite+pixelate per uniformare l'estetica.
 
-- [x] B carattere comico (fumetto + frasi) implementato e verificato con test diretti (god-mode +
-      chiamate mirate). 16 battute (4 per categoria: inizio livello/uccisione/colpo/boss) in EN+IT,
-      fumetto con pop-in/salita/dissolvenza riusando lo stile di `showBanner`, cooldown globale 4.5s
-      per non spammare (uccisione e colpo hanno anche una probabilita' — 18%/35% — per non commentare
-      OGNI singolo evento). Controllo qualità (1 agente) ha trovato e corretto: un'uccisione o un
-      colpo capitati nei primissimi istanti del livello potevano consumare il cooldown PRIMA che
-      scattasse la battuta di inizio livello, facendola sparire silenziosamente — corretto con un
-      parametro `force` che la fa comparire comunque (e poi il cooldown riparte da li', throttling
-      regolare per quello che segue). Verificato: testo giusto per ogni categoria (incluso IT),
-      trigger boss separato da quello normale, cooldown blocca correttamente chiamate ravvicinate,
-      nessun crash. **Manca il collaudo visivo/di tono sul telefono** (l'utente giudica se le battute
-      fanno ridere/stonano — facile aggiungerne o toglierne in `state.js`/`i18n.js`).
+### Decisione aperta — armi in mano
+Il gioco ha **più armi** (getto di sapone a distanza, coton fioc/martello corpo a corpo, potenziamenti).
+Incollare un'arma ai fotogrammi la **fissa** (non riflette i cambi) e obbliga a rigenerare tutto se cambia.
+**Consiglio dato:** personaggio senza arma fissa (bombola sulla schiena + effetti d'attacco a codice);
+se si vuole l'arma visibile, un'anim "attacco" dedicata solo durante lo sparo. **Da confermare con l'utente.**
 
----
-
-## FASE C — Sprite d'animazione veri (camminata, strisciamento nemici)
-_Ultima perché è la più dipendente dall'occhio dell'utente (fotogrammi pixel disegnati)._
-
-**Bozza:** oggi `anims.play('walk')` usa `player_a`/`player_b` identici (segnaposto, non si vede nulla).
-Servono fotogrammi veri (camminata del PG, strisciamento di cerumino/gorgogliante). Flusso asset come per
-il cerume (generazione immagini → ritaglio → embed). Da pianificare in dettaglio con l'utente, che deve
-fornire/validare i fotogrammi. Il micro-"bob" della Fase A può fare da ponte nel frattempo.
-
-- [ ] C sprite d'animazione veri implementati e verificati.
+### Manopole rapide (per la taratura col playtest utente)
+- Dimensione a schermo: `HERO_SCALE` in `GameScene.create` (ora 1.0, frame 84).
+- Allineamento piedi: `HERO_ORIGIN_Y` (ora 0.86).
+- Livello "pixel": `bake_sheet_pixel.ps1` `-TargetFrame` (più piccolo = pixel più grossi) e `-Levels`.
+- Velocità/fluidità: `frameRate` delle anim; soglia corsa in update (ora `vx > moveSpeed*0.85`).
 
 ---
 
-## Dopo questo blocco (non ora)
-Con più "anima" a posto, i prossimi grandi assi restano (vedi `HANDOFF.md` §DA FARE): **rifacimento
-estetico** (look gommoso/organico) e/o **strada verso Google Play** (ottimizzare assets + Capacitor).
+## Dopo questo blocco
+Playtest/taratura dell'arretrato di gameplay (vedi `HANDOFF.md` §DA FARE) e **strada verso Google Play**
+(ottimizzare assets + Capacitor). Uniformare l'estetica (nemici/ambiente) al nuovo personaggio.
