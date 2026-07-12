@@ -6,8 +6,9 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-11 · Ultimo commit: `f0f2273` (rarità carte + primi 2 eventi)._
-_In attesa di commit: evento **Sciame improvviso** (2B.3, fatto e verificato) + questo riordino dei `.md`._
+_Ultimo aggiornamento: 2026-07-11 · Ultimo commit: `5490cc5` (game feel: accel/decel). Tutto pushato su GitHub._
+_**Blocco "Gameplay backlog" (Fasi 1-3 di `ROADMAP.md`) COMPLETO in codice.** Manca SOLO il playtest
+dell'utente sul telefono. Prossimo blocco ancora da decidere (vedi §DA FARE)._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -47,7 +48,10 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 - `c0d6bdc` — élite **SPLIT** (si sdoppia in 2 figli alla morte).
 - `f0f2273` — **rarità carte** (comune/rara/leggendaria colorate) + eventi **Fuggitivo Dorato**
   e **Frana di cerume**.
-- (non ancora committato) — evento **Sciame improvviso**.
+- `06b4b6b` — evento **Sciame improvviso** (+ riordino dei `.md`).
+- `5490cc5` — **game feel**: accel/decel del movimento. Due cose SOGGETTIVE da giudicare col
+  playtest (non bug): dopo lo scatto il PG "scivola" un attimo verso la velocità normale; il
+  rinculo da colpo subito dura un filo di più. Se stonano: `MOVE_ACCEL_GROUND`/`AIR` in `state.js`.
 
 ---
 
@@ -106,6 +110,8 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 ## Cosa c'è già (sistemi principali)
 - **Combattimento:** attacco unico "intelligente" (mazza da vicino / getto da lontano),
   hit-stop + shake, salto ad altezza variabile + coyote/buffer, accovacciamento, scatto.
+- **Movimento:** accelerazione/decelerazione morbida (a terra `MOVE_ACCEL_GROUND` 0.3, in aria
+  `MOVE_ACCEL_AIR` 0.15); lo scatto resta istantaneo.
 - **Nemici:** blob (cerumino), crust (crosta, corazzata anti-getto), spit (gorgogliante),
   fly (moscerino, picchiata telegrafata), boss (Tappo di Cerume, si infuria a metà vita).
   **Varianti élite** (dal lvl 3): Corazzato (aura azzurra), Esplosivo (aura rossa),
@@ -126,11 +132,22 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 ---
 
 ## DA FARE
-Il piano dettagliato del blocco in corso è in **`ROADMAP.md`** (con le caselle spuntate). In sintesi:
-- **Fase 1 — élite SPLIT** ✅ fatto (`c0d6bdc`).
-- **Fase 2 — rarità carte + 3 eventi casuali** ✅ fatto (rarità+2 eventi in `f0f2273`; Sciame da committare).
-- **Fase 3 — game feel (accel/decel del movimento)** ⏳ prossima. Il movimento usa `setVelocityX`
-  istantaneo (= "legnoso") → aggiungere accelerazione/decelerazione. Ritocco veloce, alto ritorno.
+Il blocco pianificato in **`ROADMAP.md`** è **COMPLETO** e pushato (tutte le fasi fatte):
+- **Fase 1 — élite SPLIT** ✅ (`c0d6bdc`)
+- **Fase 2 — rarità carte + 3 eventi casuali** ✅ (`f0f2273`, `06b4b6b`)
+- **Fase 3 — game feel accel/decel** ✅ (`5490cc5`)
+
+**Prossimo blocco DA DECIDERE con l'utente.** I candidati principali (in ordine di impatto
+secondo l'assistente, il 2026-07-11):
+1. **Animazioni + carattere del personaggio** (camminata/entrata, versetti/frasi comiche): è la
+   cosa che l'utente stesso indica come il vero rimedio al "legnoso", e fa fruttare l'accel/decel
+   appena fatto. Richiede molto l'occhio dell'utente (preview cieco lato assistente).
+2. **Strada verso Google Play**: ottimizzare `assets_data.js` (~4.6MB) → **Capacitor** → build
+   Android. Avvicina l'obiettivo finale ed è adatto al lavoro "alla cieca" (misurabile: dimensioni,
+   struttura), meno dipendente dal preview.
+3. **Rifacimento estetico** (look gommoso/organico, muro di muco unico, livelli più grandi): grande
+   resa visiva ma è il più penalizzato dal preview cieco (serve tantissimo l'occhio dell'utente).
+Prima di aprire un blocco: **il playtest dell'utente** valida/tara tutto l'arretrato non provato.
 
 ### Backlog estetico / futuro (dall'utente) — dettagli nella memoria `earwaxwar-backlog`
 - **Animazioni** (migliorano il "legnoso"): entrata personaggio, camminata, strisciamento nemici,
