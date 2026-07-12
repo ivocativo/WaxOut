@@ -11,6 +11,15 @@ window.CONFIG = {
   // diretto da saltati, tipico dei platform). Il dash resta ISTANTANEO (non passa da qui).
   MOVE_ACCEL_GROUND: 0.3,
   MOVE_ACCEL_AIR: 0.15,
+  // "Juice" procedurale: schiacciamento/allungamento del personaggio (jx/jy sono moltiplicatori
+  // di scala che partono da un valore spostato da 1 e decadono verso 1 ogni frame). SPRING =
+  // quanto in fretta torna a riposo (piu' alto = piu' veloce/scattante il rimbalzo); gli altri
+  // sono l'ampiezza massima dello spostamento per ciascun evento.
+  JUICE_SPRING: 0.2,
+  JUICE_LAND: 0.22,
+  JUICE_JUMP: 0.14,
+  JUICE_TURN: 0.08,
+  JUICE_HIT: 0.25,
   GROUND_H: 180,        // altezza del "pavimento" del condotto (alto: tiene l'azione
                         // sopra le dita sui comandi touch e riempie il canale)
   BLOCK: 32,            // lato di un blocco del muro (px display)
@@ -86,6 +95,16 @@ window.EVENTS = [
   { id: 'waxcollapse', color: '#e0a83a', apply(s) { s.startWaxCollapseEvent(); } },
   { id: 'swarmrush', color: '#9be870', apply(s) { s.startSwarmRushEvent(); } },
 ];
+
+// CARATTERE COMICO: battute brevi in un fumetto sopra il personaggio (vedi GameScene.maybeSpeech
+// / showSpeech). Ogni voce e' una chiave i18n (speech_<categoria>_<n>, testo in EN+IT in i18n.js).
+// Categorie: inizio livello, uccisione nemico, colpo subito, comparsa del boss.
+window.SPEECH = {
+  start: ['speech_start_1', 'speech_start_2', 'speech_start_3', 'speech_start_4'],
+  kill: ['speech_kill_1', 'speech_kill_2', 'speech_kill_3', 'speech_kill_4'],
+  hit: ['speech_hit_1', 'speech_hit_2', 'speech_hit_3', 'speech_hit_4'],
+  boss: ['speech_boss_1', 'speech_boss_2', 'speech_boss_3', 'speech_boss_4'],
+};
 
 // EVOLUZIONI (stile Vampire Survivors): se possiedi ENTRAMBE le abilità di `needs`, tra le
 // carte di fine livello può comparire l'EVOLUZIONE (`id`), che fonde le due in una versione

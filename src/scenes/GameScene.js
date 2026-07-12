@@ -67,6 +67,7 @@ class GameScene extends Phaser.Scene {
     this.companions = [];   // bolle-aiutante (create sotto, una per punto di companions)
     this.shieldAura = null; // alone dello scudo (creato al volo se l'abilità è posseduta)
     this.secondLifeReady = true;   // Seconda Vita carica a inizio livello
+    this.speechCooldownUntil = 0;  // CARATTERE COMICO: azzerato ad ogni livello (vedi maybeSpeech)
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
     // La vita NON si ricarica a ogni livello: si porta dietro tra un livello e l'altro (a
@@ -131,6 +132,11 @@ class GameScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(80, H - gh - 60, 'player_a').setDepth(10).setScale(1.5);
     this.player.body.setSize(18, 40, true);
     this.player.setCollideWorldBounds(true);
+    // "Juice" procedurale (schiacciamento/allungamento): jx/jy = moltiplicatori di scala che
+    // decadono verso 1 ogni frame (vedi update()). _wasOnGround/_prevVelY per rilevare
+    // l'atterraggio; _lastFacing per rilevare l'inversione di corsa.
+    this.jx = 1; this.jy = 1;
+    this._wasOnGround = true; this._prevVelY = 0; this._lastFacing = 1;
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.blocks);
     this.physics.add.collider(this.player, this.platforms);
@@ -294,6 +300,14 @@ class GameScene extends Phaser.Scene {
     if (this.mutator) {
       this.time.delayedCall(700, () => { if (!this.locked) this.showBanner(window.I18n.t('mut_' + this.mutator.id), this.mutator.color, 210); });
     }
+
+    // CARATTERE COMICO: battuta di inizio livello (boss a parte: taunt dedicato). Ritardata
+    // per non accavallarsi coi banner di tipo/mutatore appena mostrati. `force`: deve comparire
+    // SEMPRE, anche se nel frattempo un'uccisione/colpo precoce ha gia' consumato il cooldown.
+    this.time.delayedCall(1400, () => {
+      if (this.locked) return;
+      this.maybeSpeech(this.levelKind === 'boss' ? 'boss' : 'start', undefined, true);
+    });
 
     this.buildHud();
 
@@ -1319,6 +1333,24 @@ class GameScene extends Phaser.Scene {
   // Cartello a schermo per annunciare i livelli speciali: vedi GameGfx in src/gfx.js.
   showBanner(text, color, y) { window.GameGfx.showBanner(this, text, color, y); }
 
+  showSpeech(text) { window.GameGfx.showSpeech(this, this.player.x, this.player.y - 46, text); }
+
+  // CARATTERE COMICO: sceglie una battuta a caso dalla categoria e la mostra, rispettando un
+  // cooldown GLOBALE (altrimenti spammerebbe, es. ad ogni uccisione) + una probabilita'
+  // opzionale (`chance`) per le categorie che capitano spesso (uccisione, colpo subito) cosi'
+  // non commenta OGNI singolo evento. `force` salta il cooldown (solo per inizio livello/boss:
+  // altrimenti un'uccisione o un colpo nei primi istanti del livello gli "ruberebbe il turno"
+  // prima che scatti, facendola sparire silenziosamente).
+  maybeSpeech(category, chance, force) {
+    const now = this.time.now;
+    if (!force && now < (this.speechCooldownUntil || 0)) return;
+    if (chance !== undefined && Math.random() > chance) return;
+    const pool = window.SPEECH[category];
+    if (!pool || !pool.length) return;
+    this.speechCooldownUntil = now + 4500;
+    this.showSpeech(window.I18n.t(Phaser.Utils.Array.GetRandom(pool)));
+  }
+
   // ---------- Combattimento ----------
 
   // Texture procedurale per la pallina del getto (acqua e sapone): nessun file.
@@ -1740,6 +1772,7 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.shake(110, 0.009);
         this.hitStop(85);
         this.burst(e.bitKey, e.x, e.y, 18);
+        this.maybeSpeech('kill', 0.18);   // CARATTERE COMICO: commento occasionale (non su OGNI uccisione)
       }
       if (e.elite === 'boom') this.enemyExplode(e.x, e.y);   // ESPLOSIVO: scoppio ritardato ad area
       if (e.elite === 'split') this.spawnSplitChildren(e);   // SPLIT: si sdoppia sul posto
@@ -1952,6 +1985,10 @@ class GameScene extends Phaser.Scene {
     window.GameState.player.hp -= dmg;
     window.Sfx.hurt();
     this.cameras.main.shake(120, 0.01);
+    // JUICE — colpo incassato: schiacciata netta (solo quando il danno e' REALMENTE applicato,
+    // non se lo scudo para o si e' invulnerabili — quei casi escono prima, sopra).
+    this.setJuice(1 + window.CONFIG.JUICE_HIT, 1 - window.CONFIG.JUICE_HIT);
+    this.maybeSpeech('hit', 0.35);   // CARATTERE COMICO: reazione occasionale al colpo
     const dir = Math.sign(this.player.x - sourceX) || 1;
     this.player.setVelocity(dir * 240, -260);
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 90, yoyo: true, repeat: 4 });
@@ -2183,6 +2220,16 @@ class GameScene extends Phaser.Scene {
 
   // ---------- Loop ----------
 
+  // JUICE — imposta jx/jy SOLO se lo spostamento richiesto e' piu' marcato di quello gia' in
+  // corso (per ampiezza, |1-jx|+|1-jy|), invece di sovrascrivere sempre l'ultimo arrivato.
+  // Altrimenti un salto "bufferizzato" che scatta esattamente sul frame dell'atterraggio
+  // cancellerebbe del tutto lo schiacciamento dell'atterraggio (capita nei bunny-hop veloci).
+  setJuice(ax, ay) {
+    const newAmp = Math.abs(1 - ax) + Math.abs(1 - ay);
+    const curAmp = Math.abs(1 - this.jx) + Math.abs(1 - this.jy);
+    if (newAmp >= curAmp) { this.jx = ax; this.jy = ay; }
+  }
+
   update(time) {
     window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
     this.animateWax(time);                    // cerume "fluido": ondeggia e cola
@@ -2217,6 +2264,22 @@ class GameScene extends Phaser.Scene {
     }
 
     const onGround = this.player.body.blocked.down || this.player.body.touching.down;
+
+    // JUICE — atterraggio: si rileva il passaggio aria->terra, ma solo se si era DAVVERO in aria
+    // da un po' (confronto con `this.lastGroundAt`, letto PRIMA che il rifornimento salti qui
+    // sotto lo aggiorni). Necessario perche' Arcade Physics risolve gravita'+collisione ogni
+    // frame: da fermo `onGround` sfarfalla vero/falso in continuazione (un frame gravita' stacca
+    // di un pelo, il frame dopo il collider rincolla) — lo stesso motivo per cui piu' sotto
+    // l'accovacciamento usa gia' `lastGroundAt` invece di `onGround` nudo. Senza il filtro,
+    // ogni sfarfallio farebbe scattare uno schiacciamento anche da fermi.
+    const landed = onGround && !this._wasOnGround && (now - this.lastGroundAt) > 60;
+    this._wasOnGround = onGround;
+    if (landed) {
+      const impact = Phaser.Math.Clamp(this._prevVelY / p.jumpVelocity, 0, 1.4);
+      const a = window.CONFIG.JUICE_LAND * (0.5 + 0.5 * impact);
+      this.setJuice(1 + a, 1 - a);
+    }
+
     // Rifornisci i salti SOLO quando sei davvero appoggiato e non stai già salendo: subito
     // dopo un salto il corpo "tocca" ancora il suolo per un frame e, senza questo controllo,
     // bastava ripremere in fretta per ottenere un salto in più (falso doppio salto).
@@ -2273,8 +2336,12 @@ class GameScene extends Phaser.Scene {
       const accel = onGround ? window.CONFIG.MOVE_ACCEL_GROUND : window.CONFIG.MOVE_ACCEL_AIR;
       this.player.setVelocityX(Phaser.Math.Linear(this.player.body.velocity.x, targetVx, accel));
     }
-    // Posa accovacciata: sprite schiacciato (segnaposto in attesa di un frame dedicato).
-    this.player.setScale(1.5, this.crouching ? 1.02 : 1.5);
+
+    // JUICE — inversione di corsa: piccola schiacciata quando cambi direzione a terra in movimento.
+    if (onGround && this.facing !== this._lastFacing && Math.abs(this.player.body.velocity.x) > 10) {
+      this.setJuice(1 + window.CONFIG.JUICE_TURN, 1 - window.CONFIG.JUICE_TURN);
+    }
+    this._lastFacing = this.facing;
 
     // --- Salto con "game feel": buffer + altezza variabile ---
     // Tasto DEDICATO: Spazio o pulsante a schermo. (Su/W NON saltano: mirano il getto.)
@@ -2290,6 +2357,8 @@ class GameScene extends Phaser.Scene {
       this.jumpBufferedAt = -9999;   // consuma il buffer (niente doppio salto involontario)
       this.canCutJump = true;        // da qui in poi il rilascio puo' accorciare il salto
       window.Sfx.jump();
+      // JUICE — salto: allungamento (alto/sottile) al decollo.
+      this.setJuice(1 - window.CONFIG.JUICE_JUMP, 1 + window.CONFIG.JUICE_JUMP);
     }
     // Altezza variabile: se rilasci mentre stai ancora salendo, tronca la salita (saltino).
     if (this.canCutJump && !jumpHeld && this.player.body.velocity.y < 0) {
@@ -2402,6 +2471,19 @@ class GameScene extends Phaser.Scene {
     this.updateShieldAura(now);
     // Seconda Vita: si ricarica quando torni a vita piena.
     if (p.secondLife && !this.secondLifeReady && p.hp >= p.maxHp) this.secondLifeReady = true;
+
+    // JUICE — molla: i moltiplicatori di scala tornano verso 1 ogni frame (rimbalzo morbido).
+    // Applicata qui, a fine update(): DOPO ogni possibile trigger di questo stesso frame
+    // (atterraggio/inversione/salto sopra, ma anche il contatto coi nemici appena elaborato
+    // sopra), cosi' nessun evento resta con un frame di ritardo prima di vedersi.
+    this.jx += (1 - this.jx) * window.CONFIG.JUICE_SPRING;
+    this.jy += (1 - this.jy) * window.CONFIG.JUICE_SPRING;
+    // Posa accovacciata (segnaposto in attesa di un frame dedicato) + juice procedurale.
+    this.player.setScale(1.5 * this.jx, (this.crouching ? 1.02 : 1.5) * this.jy);
+
+    // JUICE — salva la velocita' verticale di QUESTO frame: al prossimo frame, se si atterra,
+    // e' la velocita' di caduta appena prima che il pavimento la azzeri (misura l'impatto).
+    this._prevVelY = this.player.body.velocity.y;
 
     this.updateHud();
   }

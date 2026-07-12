@@ -81,8 +81,28 @@ schiacciamento "solleva i piedi" di un pelo. Se al playtest stona, la cura è me
 
 **Da GUARDARE (utente, playtest):** il personaggio sembra più "vivo" senza sembrare di gomma? Salto e
 atterraggio "pesano" bene? I piedi restano piantati a terra? Numeri troppo/poco marcati? (si tarano in `CONFIG`.)
+In più, un punto specifico da osservare: **quando ti accovacci**, potrebbe vedersi un piccolissimo
+"assestamento" un attimo dopo (la posa accovacciata rimpicciolisce anche il corpo fisico, non solo lo
+sprite — cosa già presente prima, ora resa visibile dallo schiacciamento). Se sembra strano, va rivisto;
+se è impercettibile o sembra naturale, nessun intervento necessario.
 
-- [ ] A juice procedurale implementato, logica verificata; numeri tarati col playtest dell'utente.
+- [x] A juice procedurale implementato e verificato con test diretti (god-mode + pompaggio del loop,
+      numeri confrontati frame per frame con la formula attesa). Controllo qualità (1 agente) + test
+      dal vivo hanno trovato e corretto 3 problemi:
+      1. **(il più serio) `onGround` sfarfalla vero/falso ad OGNI frame anche da fermi** (così risolve
+         Arcade Physics gravità+collisione) — senza filtro, il rilevamento dell'atterraggio avrebbe
+         fatto scattare uno schiacciamento quasi ogni frame pure stando immobili. Corretto riusando
+         lo stesso rimedio già presente nel codice per l'accovacciamento (`lastGroundAt` con soglia,
+         invece di leggere `onGround` nudo).
+      2. Il colpo incassato da contatto nemico aveva comunque un frame di ritardo prima di vedersi
+         (la molla+scala giravano troppo presto nel ciclo `update()`) — spostata a fine ciclo.
+      3. Un salto "bufferizzato" che scatta esattamente sul frame dell'atterraggio cancellava del
+         tutto lo schiacciamento dell'atterraggio (bunny-hop) — corretto con un confronto di ampiezza
+         (`setJuice`) invece di sovrascrivere sempre l'ultimo trigger arrivato.
+      Verificato numero per numero: salto/atterraggio/inversione/colpo producono esattamente i valori
+      previsti dalla formula; a riposo la scala torna sempre esatta a (1.5, 1.5); nessun crash; nessuna
+      regressione sull'accovacciamento. **Manca il collaudo visivo/di sensazione sul telefono** — numeri
+      da tarare in `CONFIG` (`JUICE_*`) secondo il gusto dell'utente.
 
 ---
 
@@ -94,7 +114,18 @@ piccolo fumetto sopra il PG a eventi scelti (inizio livello / uccisione / colpo 
 cooldown per non spammare. Riusare lo stile grafico esistente (`showBanner`/testo). Verificabile: la frase
 giusta compare all'evento giusto col cooldown; l'utente giudica tono e piazzamento.
 
-- [ ] B carattere comico (fumetto + frasi) implementato e verificato.
+- [x] B carattere comico (fumetto + frasi) implementato e verificato con test diretti (god-mode +
+      chiamate mirate). 16 battute (4 per categoria: inizio livello/uccisione/colpo/boss) in EN+IT,
+      fumetto con pop-in/salita/dissolvenza riusando lo stile di `showBanner`, cooldown globale 4.5s
+      per non spammare (uccisione e colpo hanno anche una probabilita' — 18%/35% — per non commentare
+      OGNI singolo evento). Controllo qualità (1 agente) ha trovato e corretto: un'uccisione o un
+      colpo capitati nei primissimi istanti del livello potevano consumare il cooldown PRIMA che
+      scattasse la battuta di inizio livello, facendola sparire silenziosamente — corretto con un
+      parametro `force` che la fa comparire comunque (e poi il cooldown riparte da li', throttling
+      regolare per quello che segue). Verificato: testo giusto per ogni categoria (incluso IT),
+      trigger boss separato da quello normale, cooldown blocca correttamente chiamate ravvicinate,
+      nessun crash. **Manca il collaudo visivo/di tono sul telefono** (l'utente giudica se le battute
+      fanno ridere/stonano — facile aggiungerne o toglierne in `state.js`/`i18n.js`).
 
 ---
 

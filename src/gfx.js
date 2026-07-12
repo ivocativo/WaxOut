@@ -276,4 +276,24 @@ window.GameGfx = {
       scene.tweens.add({ targets: group, alpha: 0, duration: 550, ease: 'Quad.in', onComplete: () => { bg.destroy(); t.destroy(); } });
     });
   },
+
+  // Fumetto/battuta comica: piccola scritta che spunta sopra la testa del personaggio, sale un
+  // po' e sfuma. Posizione fissata al momento della comparsa (effetto breve, non insegue il
+  // movimento). Usata per dare carattere al personaggio (vedi window.SPEECH in state.js e
+  // GameScene.maybeSpeech/showSpeech).
+  showSpeech(scene, x, y, text) {
+    const t = scene.add.text(x, y, text, {
+      fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8',
+      stroke: '#14161f', strokeThickness: 4, align: 'center',
+      wordWrap: { width: 150 },
+    }).setOrigin(0.5, 1).setDepth(50);
+    const bg = scene.add.rectangle(x, y - t.height / 2, t.width + 18, t.height + 12, 0x14161f, 0.68)
+      .setOrigin(0.5, 0.5).setDepth(49).setStrokeStyle(2, 0xffd166, 0.85);
+    const group = [bg, t];
+    group.forEach((o) => { o.setAlpha(0); o.setScale(0.7); });
+    scene.tweens.add({ targets: group, alpha: 1, scaleX: 1, scaleY: 1, y: '-=6', duration: 200, ease: 'Back.out' });
+    scene.time.delayedCall(1400, () => {
+      scene.tweens.add({ targets: group, alpha: 0, y: '-=14', duration: 400, ease: 'Quad.in', onComplete: () => { bg.destroy(); t.destroy(); } });
+    });
+  },
 };
