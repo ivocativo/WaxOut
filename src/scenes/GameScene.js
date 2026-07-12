@@ -137,6 +137,19 @@ class GameScene extends Phaser.Scene {
     // l'atterraggio; _lastFacing per rilevare l'inversione di corsa.
     this.jx = 1; this.jy = 1;
     this._wasOnGround = true; this._prevVelY = 0; this._lastFacing = 1;
+
+    // ---- Personaggio ANIMATO (sprite sheet AutoSprite) ----
+    // La FISICA resta su this.player, reso INVISIBILE: hitbox/collisioni/scala-juice invariati.
+    // Il "vestito" animato e' un secondo sprite (this.heroVisual) che ogni frame SEGUE il player
+    // e ha scala PROPRIA (indipendente dal corpo fisico), cosi' non altera le collisioni.
+    this.player.setVisible(false);
+    this.HERO_SCALE = 1.0;        // dimensione a schermo del vestito (frame 84; si tara guardando)
+    this.HERO_ORIGIN_Y = 0.86;    // altezza dei piedi nel fotogramma (si tara)
+    this.heroVisual = this.add.sprite(this.player.x, this.player.body.bottom, 'hero_walk', 0)
+      .setDepth(10).setOrigin(0.5, this.HERO_ORIGIN_Y);
+    if (!this.anims.exists('hero_walk_a')) this.anims.create({ key: 'hero_walk_a', frames: this.anims.generateFrameNumbers('hero_walk', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
+    if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
+
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.blocks);
     this.physics.add.collider(this.player, this.platforms);
@@ -2014,8 +2027,8 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, scale: 3.4, alpha: 0, duration: 480, ease: 'Quad.out', onComplete: () => ring.destroy() });
     const flash = this.add.circle(x, y, 34, 0xffffff, 0.8).setDepth(23);
     this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => flash.destroy() });
-    this.player.setTintFill(0xffe08a);
-    this.time.delayedCall(140, () => { if (this.player.active) this.player.clearTint(); });
+    this.heroVisual.setTintFill(0xffe08a);
+    this.time.delayedCall(140, () => { if (this.heroVisual && this.heroVisual.active) this.heroVisual.clearTint(); });
     this.cameras.main.shake(220, 0.012);
     this.showBanner(window.I18n.t('game_second_life'), '#ffd166');
   }
@@ -2058,8 +2071,8 @@ class GameScene extends Phaser.Scene {
       const sh = this.add.circle(x, y, 3, 0xbfe8ff, 1).setDepth(22);
       this.tweens.add({ targets: sh, x: x + Math.cos(a) * 46, y: y + Math.sin(a) * 46, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => sh.destroy() });
     }
-    this.player.setTintFill(0xffffff);                      // lampo bianco pieno sul PG
-    this.time.delayedCall(90, () => { if (this.player.active) this.player.clearTint(); });
+    this.heroVisual.setTintFill(0xffffff);                  // lampo bianco pieno sul PG
+    this.time.delayedCall(90, () => { if (this.heroVisual && this.heroVisual.active) this.heroVisual.clearTint(); });
     this.cameras.main.shake(120, 0.008);
   }
 
@@ -2402,11 +2415,19 @@ class GameScene extends Phaser.Scene {
       else this.fireJet(adx, ady);
     }
 
-    // Animazione
-    this.player.setFlipX(this.facing < 0);
-    if (!onGround) { this.player.anims.stop(); this.player.setTexture('player_a'); }
-    else if (Math.abs(this.player.body.velocity.x) > 10) { this.player.anims.play('walk', true); }
-    else { this.player.anims.stop(); this.player.setTexture('player_a'); }
+    // Animazione (sul "vestito" this.heroVisual; la fisica resta sul player invisibile)
+    this.heroVisual.setFlipX(this.facing < 0);
+    const _vx = Math.abs(this.player.body.velocity.x);
+    if (!onGround) {
+      // niente animazione di salto ancora: fotogramma fisso (placeholder) finche' non la generiamo
+      this.heroVisual.anims.stop(); this.heroVisual.setTexture('hero_walk', 0);
+    } else if (_vx > 10) {
+      const key = (_vx > p.moveSpeed * 0.85) ? 'hero_run_a' : 'hero_walk_a';
+      this.heroVisual.anims.play(key, true);
+    } else {
+      // fermo: niente animazione idle ancora -> primo fotogramma della camminata (placeholder)
+      this.heroVisual.anims.stop(); this.heroVisual.setTexture('hero_walk', 0);
+    }
 
     // IA nemici + danno da contatto
     const pb = this.player.getBounds();
@@ -2480,6 +2501,9 @@ class GameScene extends Phaser.Scene {
     this.jy += (1 - this.jy) * window.CONFIG.JUICE_SPRING;
     // Posa accovacciata (segnaposto in attesa di un frame dedicato) + juice procedurale.
     this.player.setScale(1.5 * this.jx, (this.crouching ? 1.02 : 1.5) * this.jy);
+    // Il "vestito" animato segue il player (piedi = fondo del corpo fisico) e riceve il juice.
+    this.heroVisual.setPosition(this.player.x, this.player.body.bottom);
+    this.heroVisual.setScale(this.HERO_SCALE * this.jx, this.HERO_SCALE * this.jy);
 
     // JUICE — salva la velocita' verticale di QUESTO frame: al prossimo frame, se si atterra,
     // e' la velocita' di caduta appena prima che il pavimento la azzeri (misura l'impatto).

@@ -33,6 +33,14 @@ class BootScene extends Phaser.Scene {
     // CERUME (sprite AI): pezzi/chunk per il muro + gocce/colate. Ricolorati per tipo in gioco.
     ['wax_a', 'wax_b', 'wax_c', 'wax_d', 'wax_drip_a', 'wax_drip_b']
       .forEach((k) => aimg(k, 'assets/wax/' + k + '.png'));
+
+    // Sprite sheet ANIMATI del personaggio (generati con AutoSprite da UNA sola immagine AI).
+    // Griglia 5x5 = 25 frame da 256x256. Caricati da file (in preview via server); per far
+    // girare da file:// andranno incorporati come gli altri (embed) piu' avanti.
+    // Versione PIXELLATA (bake: risoluzione ridotta + colori ridotti + bordi netti) per
+    // combaciare con lo stile pixel-art dello sfondo. Frame 84x84 (sheet 420x420).
+    this.load.spritesheet('hero_walk', (A['hero_walk'] || 'assets/sprites/hero/hero_walk_px.png'), { frameWidth: 84, frameHeight: 84 });
+    this.load.spritesheet('hero_run',  (A['hero_run']  || 'assets/sprites/hero/hero_run_px.png'),  { frameWidth: 84, frameHeight: 84 });
   }
 
   create() {
