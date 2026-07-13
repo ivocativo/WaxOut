@@ -129,6 +129,7 @@ class BootScene extends Phaser.Scene {
     // --- Armi ---
     PA.swab(this, 'swab');
     PA.hammer(this, 'hammer');
+    PA.sprayer(this, 'sprayer');   // arma a distanza tenuta in mano (layer arma)
 
     this.scene.start('MenuScene');
   }

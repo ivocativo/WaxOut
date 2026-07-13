@@ -82,5 +82,20 @@ window.PixelArt = (function () {
     g.destroy();
   }
 
-  return { fromGrid, solid, block, swab, hammer };
+  // Spruzzatore di sapone (arma a distanza tenuta in mano). Canna verso DESTRA; il grip
+  // (per il perno di rotazione) e' a sinistra-basso. Stile coerente col serbatoio del PG.
+  function sprayer(scene, key) {
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x14161f, 1); g.fillRect(1, 2, 17, 8);       // contorno scuro (blocco)
+    g.fillStyle(0x8a909c, 1); g.fillRect(2, 3, 10, 5);        // corpo
+    g.fillStyle(0xc0c6d0, 1); g.fillRect(2, 3, 10, 2);        // luce alta
+    g.fillStyle(0x6a4a2a, 1); g.fillRect(4, 7, 3, 4);         // impugnatura
+    g.fillStyle(0xc0c6d0, 1); g.fillRect(11, 4, 6, 3);        // canna
+    g.fillStyle(0x9fd8e6, 1); g.fillRect(16, 4, 2, 3);        // ugello azzurro
+    g.fillStyle(0x6fc3d6, 1); g.fillRect(3, 4, 2, 2);         // dettaglio serbatoio
+    g.generateTexture(key, 19, 12);
+    g.destroy();
+  }
+
+  return { fromGrid, solid, block, swab, hammer, sprayer };
 })();

@@ -150,6 +150,22 @@ class GameScene extends Phaser.Scene {
     if (!this.anims.exists('hero_walk_a')) this.anims.create({ key: 'hero_walk_a', frames: this.anims.generateFrameNumbers('hero_walk', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
     if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
 
+    // ---- ARMA IN MANO (layer separato, INTERCAMBIABILE) ----
+    // L'arma e' un "adesivo" distinto sopra il personaggio: a distanza RUOTA verso la mira,
+    // nel corpo a corpo ROTEA col colpo. Cambiare arma = cambiare voce nella tabella WEAPONS
+    // (nessuna ri-generazione del personaggio). Compare durante l'attacco (poi si nasconde).
+    // hand = offset [x,y] della mano dal centro fisico (x va specchiato col facing); origin =
+    // perno di rotazione dentro la texture (grip). Tutti valori da tarare a occhio.
+    this.WEAPONS = {
+      sprayer: { tex: 'sprayer', origin: [0.18, 0.6], scale: 1.0, hand: [8, -2] },
+      swab:    { tex: 'swab',    origin: [0.10, 0.5], scale: 1.0, hand: [6, -2] },
+      hammer:  { tex: 'hammer',  origin: [0.22, 0.5], scale: 0.9, hand: [6, -6] },
+    };
+    this.heroWeapon = this.add.sprite(this.player.x, this.player.y, 'sprayer').setDepth(11).setVisible(false);
+    this._weaponHideAt = 0;   // istante fino a cui l'arma resta visibile dopo un attacco
+    this._weaponMode = null;  // 'ranged' | 'melee'
+    this._weaponAim = 0;      // angolo di mira corrente (per il posizionamento in update)
+
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.blocks);
     this.physics.add.collider(this.player, this.platforms);
@@ -1385,6 +1401,7 @@ class GameScene extends Phaser.Scene {
     this.lastShot = now;
     const d = Math.hypot(adx, ady) || 1;
     const nx = adx / d, ny = ady / d;
+    this.showRangedWeapon(nx, ny);          // arma in mano puntata verso la mira
     const oy = this.crouching ? 14 : -6;   // accovacciato: il getto parte all'altezza dei piedi
     // Abilità VENTAGLIO (impilabile): spara N palline a ventaglio (N = p.jetPellets).
     const n = Math.max(1, p.jetPellets | 0);
@@ -1640,6 +1657,7 @@ class GameScene extends Phaser.Scene {
     const p = window.GameState.player;
     window.Sfx.hit();
     const isHammer = p.weapon === 'hammer';
+    this.showMeleeWeapon(isHammer);         // arma in mano che rotea col colpo
     const baseRange = isHammer ? 64 : 50;
     const range = baseRange * p.attackRange;
     const halfH = isHammer ? 46 : 30;
@@ -1692,6 +1710,44 @@ class GameScene extends Phaser.Scene {
 
   // Animazione dell'arma all'attacco: vedi GameGfx in src/gfx.js.
   showWeaponSwing(facing, isHammer) { window.GameGfx.showWeaponSwing(this, facing, isHammer); }
+
+  // ---- LAYER ARMA: arma in mano durante l'attacco (intercambiabile via this.WEAPONS) ----
+  // A distanza: la punta verso la direzione di mira (nx,ny). Resta visibile un attimo dopo
+  // lo sparo (rinnovato a ogni colpo mentre spari).
+  showRangedWeapon(nx, ny) {
+    const cfg = this.WEAPONS.sprayer;
+    const w = this.heroWeapon;
+    this.tweens.killTweensOf(w);
+    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
+    this._weaponMode = 'ranged'; this._weaponCfg = cfg;
+    this._weaponAim = Math.atan2(ny, nx); this._weaponFlip = nx < 0;
+    this._weaponHideAt = this.time.now + 220;
+    this.positionWeapon();
+  }
+
+  // Corpo a corpo: arma in mano che ROTEA nell'arco del colpo (swab o hammer).
+  showMeleeWeapon(isHammer) {
+    const cfg = isHammer ? this.WEAPONS.hammer : this.WEAPONS.swab;
+    const w = this.heroWeapon;
+    this.tweens.killTweensOf(w);
+    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
+    this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
+    this._weaponHideAt = this.time.now + 240;
+    this.positionWeapon();
+    w.setFlipY(this._weaponFlip);
+    w.rotation = -1.1;                                  // parte alto-indietro
+    this.tweens.add({ targets: w, rotation: 0.7, duration: 150, ease: 'Quad.out' });  // fino a basso-avanti
+  }
+
+  // Posiziona l'arma alla mano (la segue ogni frame finche' visibile). L'angolo lo impostano
+  // showRangedWeapon (mira) o il tween di showMeleeWeapon (arco); qui solo la posizione + mira.
+  positionWeapon() {
+    const w = this.heroWeapon; if (!w || !w.visible) return;
+    const cfg = this._weaponCfg || this.WEAPONS.sprayer;
+    const hx = cfg.hand[0] * (this.facing < 0 ? -1 : 1);
+    w.setPosition(this.player.x + hx, this.player.y + cfg.hand[1]);
+    if (this._weaponMode === 'ranged') { w.setFlipY(this._weaponFlip); w.setRotation(this._weaponAim); }
+  }
 
   damageBlock(b, dmg) {
     b.hp -= dmg;
@@ -2504,6 +2560,11 @@ class GameScene extends Phaser.Scene {
     // Il "vestito" animato segue il player (piedi = fondo del corpo fisico) e riceve il juice.
     this.heroVisual.setPosition(this.player.x, this.player.body.bottom);
     this.heroVisual.setScale(this.HERO_SCALE * this.jx, this.HERO_SCALE * this.jy);
+    // Arma in mano (layer): segue la mano finche' visibile, poi si nasconde a fine attacco.
+    if (this.heroWeapon.visible) {
+      if (this.time.now > this._weaponHideAt) this.heroWeapon.setVisible(false);
+      else this.positionWeapon();
+    }
 
     // JUICE — salva la velocita' verticale di QUESTO frame: al prossimo frame, se si atterra,
     // e' la velocita' di caduta appena prima che il pavimento la azzeri (misura l'impatto).
