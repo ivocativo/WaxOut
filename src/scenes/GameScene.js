@@ -149,6 +149,8 @@ class GameScene extends Phaser.Scene {
       .setDepth(10).setOrigin(0.5, this.HERO_ORIGIN_Y);
     if (!this.anims.exists('hero_walk_a')) this.anims.create({ key: 'hero_walk_a', frames: this.anims.generateFrameNumbers('hero_walk', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
     if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
+    if (!this.anims.exists('hero_idle_a')) this.anims.create({ key: 'hero_idle_a', frames: this.anims.generateFrameNumbers('hero_idle', { start: 0, end: 24 }), frameRate: 10, repeat: -1 });
+    if (!this.anims.exists('hero_jump_a')) this.anims.create({ key: 'hero_jump_a', frames: this.anims.generateFrameNumbers('hero_jump', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
 
     // ---- ARMA IN MANO (layer separato, INTERCAMBIABILE) ----
     // L'arma e' un "adesivo" distinto sopra il personaggio: a distanza RUOTA verso la mira,
@@ -2475,14 +2477,12 @@ class GameScene extends Phaser.Scene {
     this.heroVisual.setFlipX(this.facing < 0);
     const _vx = Math.abs(this.player.body.velocity.x);
     if (!onGround) {
-      // niente animazione di salto ancora: fotogramma fisso (placeholder) finche' non la generiamo
-      this.heroVisual.anims.stop(); this.heroVisual.setTexture('hero_walk', 0);
+      this.heroVisual.anims.play('hero_jump_a', true);
     } else if (_vx > 10) {
       const key = (_vx > p.moveSpeed * 0.85) ? 'hero_run_a' : 'hero_walk_a';
       this.heroVisual.anims.play(key, true);
     } else {
-      // fermo: niente animazione idle ancora -> primo fotogramma della camminata (placeholder)
-      this.heroVisual.anims.stop(); this.heroVisual.setTexture('hero_walk', 0);
+      this.heroVisual.anims.play('hero_idle_a', true);
     }
 
     // IA nemici + danno da contatto

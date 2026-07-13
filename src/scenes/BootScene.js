@@ -35,12 +35,16 @@ class BootScene extends Phaser.Scene {
       .forEach((k) => aimg(k, 'assets/wax/' + k + '.png'));
 
     // Sprite sheet ANIMATI del personaggio (generati con AutoSprite da UNA sola immagine AI).
-    // Griglia 5x5 = 25 frame da 256x256. Caricati da file (in preview via server); per far
-    // girare da file:// andranno incorporati come gli altri (embed) piu' avanti.
-    // Versione PIXELLATA (bake: risoluzione ridotta + colori ridotti + bordi netti) per
-    // combaciare con lo stile pixel-art dello sfondo. Frame 84x84 (sheet 420x420).
-    this.load.spritesheet('hero_walk', (A['hero_walk'] || 'assets/sprites/hero/hero_walk_px.png'), { frameWidth: 84, frameHeight: 84 });
-    this.load.spritesheet('hero_run',  (A['hero_run']  || 'assets/sprites/hero/hero_run_px.png'),  { frameWidth: 84, frameHeight: 84 });
+    // TUTTI gli sprite sheet del gioco vivono in assets/spritesheets/<entita'>/ (cartella dedicata,
+    // separata da assets/sprites/ che ha le immagini singole). Griglia 5x5 = 25 frame da 256x256.
+    // Caricati da file (in preview via server); per far girare da file:// andranno incorporati
+    // come gli altri (embed) piu' avanti. Versione PIXELLATA (bake: risoluzione ridotta + colori
+    // ridotti + bordi netti) per combaciare con lo stile pixel-art dello sfondo. Frame 84x84 (sheet 420x420).
+    const heroSheet = (key, file) => this.load.spritesheet(key, (A[key] || 'assets/spritesheets/hero/' + file), { frameWidth: 84, frameHeight: 84 });
+    heroSheet('hero_walk', 'hero_walk_px.png');
+    heroSheet('hero_run',  'hero_run_px.png');
+    heroSheet('hero_idle', 'hero_idle_px.png');
+    heroSheet('hero_jump', 'hero_jump_px.png');
   }
 
   create() {
