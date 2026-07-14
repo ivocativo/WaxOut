@@ -150,7 +150,8 @@ window.GameState = {
       lifesteal: false,      // curi vita uccidendo
       shield: false,         // para un colpo ogni tot
       homing: false,         // Mira Guidata: le palline curvano verso il nemico piu' vicino
-      secondLife: false,     // Seconda Vita: sopravvivi a un colpo mortale (si ricarica a vita piena)
+      secondLife: false,     // Seconda Vita: sopravvivi a un colpo mortale, UNA SOLA VOLTA per run
+      secondLifeUsed: false, // diventa true al primo uso; non si azzera finche' non riparte la run
       waxMult: 1,            // Cerume Extra: moltiplicatore del cerume raccolto (+0.5 a ogni pesca)
       dashStrike: false,     // Scatto Offensivo: lo scatto danneggia i nemici e pulisce il cerume
       corrosive: false,      // Sapone Corrosivo: le palline avvelenano il nemico (danno nel tempo)
@@ -173,5 +174,10 @@ window.GameState = {
     this.wax = 0;
     this.ownedAbilities = [];
     this.player = this.newPlayer();
+    // Lo sblocco permanente "Doppio Salto Innato" (UNLOCKS.djump) da' gia' l'abilita' da
+    // subito (vedi newPlayer) ma non passa mai dalla carta 'doublejump' dell'UpgradeScene:
+    // senza questo, la carta continuerebbe a essere proposta (e presa) inutilmente ogni run,
+    // visto che il filtro li' guarda solo ownedAbilities. Segnarla gia' posseduta.
+    if (this.player.doubleJump) this.ownedAbilities.push('doublejump');
   },
 };

@@ -66,7 +66,9 @@ class GameScene extends Phaser.Scene {
     this.canCutJump = false;
     this.companions = [];   // bolle-aiutante (create sotto, una per punto di companions)
     this.shieldAura = null; // alone dello scudo (creato al volo se l'abilità è posseduta)
-    this.secondLifeReady = true;   // Seconda Vita carica a inizio livello
+    // Seconda Vita: stato su window.GameState.player (secondLifeUsed), NON qui — this.* si
+    // azzererebbe ad ogni livello (create() gira ad ogni scene.start), mentre deve valere una
+    // sola volta per l'intera RUN (si azzera solo su GameState.reset()).
     this.speechCooldownUntil = 0;  // CARATTERE COMICO: azzerato ad ogni livello (vedi maybeSpeech)
     this.cleanGoal = 0.8;   // frazione di cerume da pulire per poter completare il livello
 
@@ -183,8 +185,14 @@ class GameScene extends Phaser.Scene {
     // nella callback (passa l'oggetto singolo per primo), percio' individuiamo il nemico
     // controllando quale dei due appartiene al gruppo enemies.
     const notFlyer = (a, b) => (this.enemies.contains(a) ? a : b).kind !== 'fly';
-    this.physics.add.collider(this.enemies, this.ground, null, notFlyer);
-    this.physics.add.collider(this.enemies, this.blocks, null, notFlyer);
+    this.physics.add.collider(this.enemies, this.ground, null, notFlyer);   // i volanti non toccano terra (corretto)
+    // Il cerume invece NESSUN nemico dovrebbe poterlo attraversare (era un bug: i moscerini
+    // ci passavano attraverso, esattamente come le pedane prima del fix in 00ec955). L'UNICA
+    // eccezione voluta e' il Fuggitivo Dorato (evento "acchiappalo"): resta un blob a terra
+    // (non diventa volante, che dopo QUESTO fix si incastrerebbe comunque nel cerume), ma
+    // attraversa la massa per non restarci bloccato durante la fuga a tempo.
+    const notFugitive = (a, b) => (this.enemies.contains(a) ? a : b).fugitive !== true;
+    this.physics.add.collider(this.enemies, this.blocks, null, notFugitive);
     // Le PEDANE sono solide anche per i moscerini (cosi' la loro picchiata non le attraversa).
     this.physics.add.collider(this.enemies, this.platforms);
 
@@ -1241,13 +1249,23 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(280, () => {
       if (warn.active) warn.destroy();
       const R = 74;
+      const dmg = 14 + Math.floor(window.GameState.level / 2);
       const ring = this.add.circle(x, y, R, 0xff8a4a, 0.35).setDepth(12).setScale(0.3);
       this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => ring.destroy() });
       window.Sfx.smash();
       this.cameras.main.shake(180, 0.012);
       if (Math.hypot(this.player.x - x, this.player.y - y) < R) {
-        this.hurtPlayer(14 + Math.floor(window.GameState.level / 2), x);
+        this.hurtPlayer(dmg, x);
       }
+      // Danno ad area anche a nemici e cerume vicini (prima colpiva SOLO il giocatore).
+      // Se un altro Esplosivo muore nel raggio, scoppia a sua volta (reazione a catena voluta:
+      // tema "esplosivo", niente da smorzare — il numero di nemici per livello e' comunque finito).
+      this.enemies.getChildren().forEach((e) => {
+        if (e.active && !e.spawning && Math.hypot(e.x - x, e.y - y) < R) this.damageEnemy(e, dmg);
+      });
+      this.blocks.getChildren().forEach((b) => {
+        if (b.active && Math.hypot(b.x - x, b.y - y) < R) this.damageBlock(b, dmg);
+      });
     });
   }
 
@@ -1336,7 +1354,9 @@ class GameScene extends Phaser.Scene {
   // Una pallina di cerume sputata da un nemico: vola in PARABOLA (cade per gravità)
   // mirando alla posizione attuale del giocatore. Curva = più realistica e schivabile.
   spitAt(e, aimOff) {
-    const g = window.CONFIG.GRAVITY;
+    // Gravita' REALE del mondo (non la costante CONFIG): il mutatore "poca gravita'" la cambia
+    // a runtime, e la parabola deve tenerne conto o il proiettile sbaglia completamente mira.
+    const g = this.physics.world.gravity.y;
     const dir = Math.sign(this.player.x - e.x) || 1;
     const sx = e.x + dir * 12, sy = e.y - 6;
     const dx = (this.player.x + (aimOff || 0)) - sx;
@@ -1582,7 +1602,12 @@ class GameScene extends Phaser.Scene {
       }
     });
     this.blocks.getChildren().forEach((b) => {
-      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(pb, b.getBounds())) this.damageBlock(b, p.damage);
+      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(pb, b.getBounds())) {
+        // Stesso cooldown per-bersaglio dei nemici sopra: senza, un blocco (o piu' in fila)
+        // prendeva danno a OGNI frame per tutta la durata dello scatto e spariva di colpo,
+        // saltando l'animazione di cedimento/caduta della massa di cerume.
+        if (!b._dashHitAt || now - b._dashHitAt > 300) { b._dashHitAt = now; this.damageBlock(b, p.damage); }
+      }
     });
   }
 
@@ -1666,7 +1691,6 @@ class GameScene extends Phaser.Scene {
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
     const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH + cy, range, halfH * 2);
-    this.showWeaponSwing(this.facing, isHammer);
     let hitEnemy = false, hitAny = false;
     this.blocks.getChildren().forEach((b) => {
       if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, p.damage); hitAny = true; }
@@ -1709,9 +1733,6 @@ class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     this.time.delayedCall(ms, () => this.physics.world.resume());
   }
-
-  // Animazione dell'arma all'attacco: vedi GameGfx in src/gfx.js.
-  showWeaponSwing(facing, isHammer) { window.GameGfx.showWeaponSwing(this, facing, isHammer); }
 
   // ---- LAYER ARMA: arma in mano durante l'attacco (intercambiabile via this.WEAPONS) ----
   // A distanza: la punta verso la direzione di mira (nx,ny). Resta visibile un attimo dopo
@@ -2064,9 +2085,9 @@ class GameScene extends Phaser.Scene {
     this.player.setVelocity(dir * 240, -260);
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 90, yoyo: true, repeat: 4 });
     if (window.GameState.player.hp <= 0) {
-      // Abilità SECONDA VITA: sopravvivi a un colpo mortale (si ricarica tornando a vita piena).
-      if (pl.secondLife && this.secondLifeReady) {
-        this.secondLifeReady = false;
+      // Abilità SECONDA VITA: sopravvivi a un colpo mortale, UNA SOLA VOLTA per l'intera run.
+      if (pl.secondLife && !pl.secondLifeUsed) {
+        pl.secondLifeUsed = true;
         pl.hp = Math.max(1, Math.round(pl.maxHp * 0.35));
         this.invulnUntil = now + 1300;
         this.secondLifeFx();
@@ -2546,8 +2567,6 @@ class GameScene extends Phaser.Scene {
     if (p.homing) this.updateHomingShots(now);
     if (p.dashStrike) this.updateDashStrike(now);
     this.updateShieldAura(now);
-    // Seconda Vita: si ricarica quando torni a vita piena.
-    if (p.secondLife && !this.secondLifeReady && p.hp >= p.maxHp) this.secondLifeReady = true;
 
     // JUICE — molla: i moltiplicatori di scala tornano verso 1 ogni frame (rimbalzo morbido).
     // Applicata qui, a fine update(): DOPO ogni possibile trigger di questo stesso frame

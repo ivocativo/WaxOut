@@ -239,21 +239,6 @@ window.GameGfx = {
 
   // ---------- UI a schermo (effetti) ----------
 
-  // Animazione dell'arma (swab/martello) quando si attacca.
-  showWeaponSwing(scene, facing, isHammer) {
-    const key = isHammer ? 'hammer' : 'swab';
-    const w = scene.add.sprite(scene.player.x + facing * 20, scene.player.y - (isHammer ? 6 : 2), key);
-    w.setDepth(20);
-    w.setFlipX(facing < 0);
-    w.setOrigin(facing > 0 ? 0.05 : 0.95, 0.5);
-    const fromAngle = facing > 0 ? -70 : 70;
-    const toAngle = facing > 0 ? 45 : -45;
-    w.angle = fromAngle;
-    scene.tweens.add({
-      targets: w, angle: toAngle, duration: 130, ease: 'Quad.out',
-      onComplete: () => scene.tweens.add({ targets: w, alpha: 0, duration: 90, onComplete: () => w.destroy() }),
-    });
-  },
 
   // Cartello a schermo per annunciare i livelli speciali (boss / sciame).
   showBanner(scene, text, color, yPos) {

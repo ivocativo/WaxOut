@@ -24,18 +24,20 @@ ancora chiara è segnato "da investigare" invece che indovinato a caso.
 
 ---
 
-## GRUPPO A — Bug rapidi, causa già individuata (indipendenti, si fanno uno ad uno o insieme)
+## GRUPPO A — Bug rapidi, causa già individuata ✅ TUTTI FATTI E VERIFICATI (2026-07-13)
+_Tutti e 7 corretti nella stessa sessione, verificati con test mirati in preview (dati + screenshot,_
+_zero errori console). **NON ancora committato** — in attesa di conferma dell'utente._
 
-- [ ] **A.1 — Coton fioc compare due volte nel corpo a corpo.**
+- [x] **A.1 — Coton fioc compare due volte nel corpo a corpo.**
   Causa trovata: **due sistemi disegnano l'arma in contemporanea**. Quello vecchio
   (`GameGfx.showWeaponSwing`, `src/gfx.js:243`) crea uno sprite `swab`/`hammer` con un tween
   d'angolo e si autodistrugge; quello nuovo (`this.showMeleeWeapon`, `GameScene.js`, dal prototipo
   "arma in mano" di ieri) fa la STESSA cosa col layer `this.heroWeapon`. `meleeSwing()` li chiama
-  entrambi. **Fix probabile:** eliminare la chiamata a `showWeaponSwing` (o tutto `GameGfx.
-  showWeaponSwing` se non serve più altrove) e tenere solo il layer nuovo, che è quello pensato per
-  restare ed essere intercambiabile.
+  entrambi. **FATTO:** rimossa la chiamata + il metodo wrapper in GameScene.js + la funzione morta
+  in gfx.js (nessun altro chiamante). Verificato: nella scena resta 1 solo sprite swab/hammer
+  durante l'attacco (prima 2).
 
-- [ ] **A.2 — I moscerini attraversano il cerume.**
+- [x] **A.2 — I moscerini attraversano il cerume.**
   Causa trovata: `GameScene.js:187`, `this.physics.add.collider(this.enemies, this.blocks, null,
   notFlyer)` — il filtro `notFlyer` esclude ESPRESSAMENTE i volanti dalla collisione col cerume.
   **Nota di collegamento importante (leggere prima di toccare):** questo è in TENSIONE con l'idea
@@ -45,15 +47,25 @@ ancora chiara è segnato "da investigare" invece che indovinato a caso.
   col cerume come tutti, il fix è togliere `notFlyer` dalla riga 187 — ma allora la soluzione B.1
   (fuggitivo=volante) NON risolverebbe il suo blocco contro il cerume. **Decidere A.2 e B.1
   INSIEME, nello stesso turno**, prima di implementare uno dei due.
+  **FATTO (deciso insieme a B.1):** il collider `enemies<->blocks` ora usa un filtro `notFugitive`
+  (non più `notFlyer`) — TUTTI i nemici collidono col cerume, **eccetto** il Fuggitivo Dorato
+  (bypass mirato, non "diventa volante": vedi B.1). Verificato con `physics.world.collide()`
+  isolato: moscerino normale si ferma sul blocco (prima lo attraversava), fuggitivo lo attraversa.
 
-- [ ] **A.3 — Seconda Vita si ricarica troppo spesso (dovrebbe essere una volta per PARTITA).**
+- [x] **A.3 — Seconda Vita si ricarica troppo spesso (dovrebbe essere una volta per PARTITA).**
   Causa trovata: `GameScene.js:2550`, `if (p.secondLife && !this.secondLifeReady && p.hp >=
   p.maxHp) this.secondLifeReady = true;` — si riarma ogni volta che torni a vita piena (curandoti
   con pickup/potenziamenti), quindi può salvarti più volte nella stessa run. **Fix probabile:**
   un flag `secondLifeUsed` che diventa `true` al primo uso e non si azzera mai fino al prossimo
   `GameState.reset()` (inizio nuova run); togliere la ricarica automatica a vita piena.
+  **FATTO (causa piu' profonda del previsto):** `this.secondLifeReady` era stato/scena, azzerato a
+  `true` ad OGNI `create()` (quindi a ogni LIVELLO, non solo a inizio partita) — bug ancora piu'
+  generoso della sola ricarica-a-vita-piena. Spostato lo stato su `window.GameState.player.
+  secondLifeUsed` (vera vita di RUN). Verificato: 1° colpo mortale salva (hp 35, used=true), 2°
+  colpo mortale nella STESSA run uccide anche dopo essere tornato a vita piena; nuova run
+  (`GameState.reset()`) lo azzera correttamente.
 
-- [ ] **A.4 — Potenziamenti non cumulabili (es. Doppio Salto) escono più volte anche se già presi.**
+- [x] **A.4 — Potenziamenti non cumulabili (es. Doppio Salto) escono più volte anche se già presi.**
   Causa trovata, MOLTO probabile: lo sblocco PERMANENTE da negozio "Doppio Salto Innato"
   (`UNLOCKS.djump` in `state.js`) imposta `doubleJump: lv('djump') > 0` già in `newPlayer()` — ma
   questo non viene mai registrato in `GameState.ownedAbilities` (che il filtro di `UpgradeScene.js:
@@ -64,15 +76,26 @@ ancora chiara è segnato "da investigare" invece che indovinato a caso.
   direttamente il flag `p.doubleJump`/analoghi nel filtro, non solo `ownedAbilities`). **Verificare
   se lo stesso pattern riguarda altre abilità collegate a UNLOCKS/BLUEPRINTS permanenti**, non solo
   doubleJump — da controllare quando si corregge.
+  **FATTO + verificato che NON riguarda altro:** controllate tutte le UNLOCKS (hp/dmg/speed sono
+  bonus statistici sempre cumulabili per design, nessun problema) e tutte le BLUEPRINTS (sbloccano
+  solo l'IDONEITA' della carta, non l'abilita' stessa — nessun problema). `djump` era l'UNICO caso.
+  Fix in `GameState.reset()`: se `player.doubleJump` e' gia' vero (sblocco permanente), lo segna
+  subito in `ownedAbilities`. Verificato: con lo sblocco attivo, `ownedAbilities` contiene
+  'doublejump' da inizio run e il filtro dell'UpgradeScene lo esclude correttamente.
 
-- [ ] **A.5 — I nemici Esplosivi (élite "boom") non danneggiano altri nemici/il cerume, solo il
+- [x] **A.5 — I nemici Esplosivi (élite "boom") non danneggiano altri nemici/il cerume, solo il
   giocatore.** Causa trovata: `enemyExplode()` (`GameScene.js:1238-1250`) controlla SOLO la
   distanza dal giocatore (`Math.hypot(this.player.x - x, ...)`) per applicare danno; non itera su
   `this.enemies`/`this.blocks` nel raggio. **Fix probabile:** aggiungere, nello stesso raggio `R`,
   danno ad area anche a nemici vicini (`damageEnemy`, non-elite-a-cascata per evitare esplosioni a
   catena infinite — da decidere se è un effetto voluto o da smorzare) e al cerume (`damageBlock`).
+  **FATTO:** aggiunto danno ad area (stesso raggio/danno del giocatore) a nemici e cerume vicini.
+  **Decisione presa:** reazione a catena tra Esplosivi vicini CONSENTITA (tema "esplosivo", effetto
+  soddisfacente, nessun rischio di loop essendo il numero di nemici finito). Verificato con uno
+  spy diretto: blocco e nemico piazzati nel raggio hanno preso entrambi lo stesso danno (-15 a
+  livello 3), prima restavano illesi.
 
-- [ ] **A.6 — Scatto (dash) contro le torri di cerume: spariscono ISTANTANEAMENTE, si perde
+- [x] **A.6 — Scatto (dash) contro le torri di cerume: spariscono ISTANTANEAMENTE, si perde
   l'animazione di caduta/cedimento.** Causa trovata: `updateDashStrike()` (`GameScene.js:1584-1586`)
   chiama `damageBlock(b, p.damage)` su OGNI blocco in overlap a OGNI FRAME per tutta la durata dello
   scatto — a differenza dei nemici, che hanno un cooldown per-bersaglio (`e._dashHitAt`, riga 1581),
@@ -82,28 +105,41 @@ ancora chiara è segnato "da investigare" invece che indovinato a caso.
   cooldown per-blocco analogo a `_dashHitAt` (es. `b._dashHitAt`). **Collegato al punto D.1 sotto**
   (lo scatto con danno deve anche SEMBRARE diverso da quello normale) — stessa area di codice,
   ha senso farli nello stesso turno.
+  **FATTO (solo la parte A.6, D.1 resta per il Gruppo D):** aggiunto `b._dashHitAt` identico al
+  pattern nemici. Verificato con uno spy su `damageBlock`: 10 frame simulati di overlap durante lo
+  scatto → 1 sola chiamata (prima ne avrebbe fatte fino a 10, sparendo il blocco di colpo).
 
-- [ ] **A.7 — Nemici a proiettili (gorgogliante/boss) non funzionano nei livelli a poca gravità.**
+- [x] **A.7 — Nemici a proiettili (gorgogliante/boss) non funzionano nei livelli a poca gravità.**
   Causa trovata: `spitAt()` (`GameScene.js:1339`) usa `const g = window.CONFIG.GRAVITY;` — una
   COSTANTE fissa — per calcolare la parabola balistica, invece della gravità REALE del mondo
   fisico (`this.physics.world.gravity.y`), che il mutatore "poca gravità" (`lowgrav`) modifica a
   runtime. Con gravità reale diversa da quella usata nel calcolo, la traiettoria non torna e il
   proiettile sbaglia bersaglio/si comporta a caso. **Fix:** leggere `this.physics.world.gravity.y`
   invece della costante.
+  **FATTO:** una riga (`const g = this.physics.world.gravity.y;`). Verificato: confrontata la
+  velocita' calcolata per lo stesso bersaglio a gravita' piena vs "poca gravita'" (mutatore) —
+  ora diversa e coerente (prima sarebbe stata identica, sbagliando la parabola).
 
 ---
 
-## GRUPPO B — Nemici che saltano / Fuggitivo Dorato (da decidere insieme, vedi nota in A.2)
+## GRUPPO B — Nemici che saltano / Fuggitivo Dorato
 
-- [ ] **B.1 — Il Fuggitivo Dorato si blocca contro il cerume** (è un nemico "blob" a terra, fisica
+- [x] **B.1 — Il Fuggitivo Dorato si blocca contro il cerume** (è un nemico "blob" a terra, fisica
   normale → collide col cerume come chiunque altro). Proposta dell'utente: farlo volante. **Prima
   di implementare, decidere insieme ad A.2** se i volanti devono o no attraversare il cerume — la
   risposta cambia la soluzione (volante coerente con A.2 risolto in un modo, o serve un'altra
   strada tipo "il fuggitivo ignora la collisione col cerume via `notFlyer`-style anche restando a
   terra/saltando").
-- [ ] **B.2 — Valutare nemici che SALTANO** (nuova varietà). Da decidere anche se il Fuggitivo
-  diventa uno di questi invece che volante (alternativa a B.1) — l'utente stesso lo ha proposto
-  come opzione. Conviene decidere B.1+B.2 nello stesso turno di design.
+  **FATTO — soluzione diversa dalla proposta originale, stessa esigenza risolta meglio:** NON
+  diventa volante (dopo il fix di A.2 un volante collide col cerume, quindi si incastrerebbe
+  comunque). Resta un blob a terra (gia' dorato) con un bypass MIRATO: `notFugitive` nel collider
+  blocks lo esclude specificamente (via `e.fugitive===true`), lasciando tutti gli altri nemici
+  (moscerini inclusi) a collidere normalmente. Giustificazione narrativa: e' la "preda inafferrabile"
+  dell'evento, non un volante generico. Verificato: overlap forzato su un blocco → il moscerino
+  normale si ferma, il fuggitivo lo attraversa.
+- [ ] **B.2 — Valutare nemici che SALTANO** (nuova varietà, ancora aperta — non necessaria per
+  sbloccare il Fuggitivo, che e' gia' risolto sopra in altro modo). Idea a se stante per varieta',
+  da riprendere quando si vuole.
 
 ---
 
@@ -188,14 +224,16 @@ ancora chiara è segnato "da investigare" invece che indovinato a caso.
 ---
 
 ## Ordine proposto (salvo diverso avviso dell'utente)
-1. **Gruppo A** (bug rapidi, causa già trovata) — il più veloce, più valore per il tempo speso.
-   Dentro il gruppo: A.2+B.1 vanno decisi/fatti insieme; A.6+D.1 pure.
-2. **Gruppo B** (fuggitivo/nemici saltatori) — decisione di design breve, poi implementazione.
-3. **Gruppo C** (boss) — redesign piccolo ma multi-parte.
-4. **Gruppo E** (livelli/mondo) — grande, a fasi. Probabilmente il blocco successivo a sé stante.
-5. **Gruppo F** (economia/shop) — grande, a fasi.
-6. **Gruppo G** (audio) — quando si arriva, sessione dedicata.
-7. **Gruppo H** — non ora, solo promemoria.
+1. ~~**Gruppo A**~~ **✅ FATTO** (7/7, vedi sopra) + **B.1 fatto insieme**. Tutto verificato in
+   preview, **NON ancora committato** — in attesa di conferma dell'utente prima di salvare.
+2. **Gruppo D.1** (scia diversa per lo scatto-con-danno) — rapido, stessa area di codice appena
+   toccata per A.6, ha senso farlo subito dopo se l'utente conferma.
+3. **Gruppo B.2** (nemici che saltano) — idea a se stante, quando si vuole.
+4. **Gruppo C** (boss) — redesign piccolo ma multi-parte.
+5. **Gruppo E** (livelli/mondo) — grande, a fasi. Probabilmente il blocco successivo a sé stante.
+6. **Gruppo F** (economia/shop) — grande, a fasi.
+7. **Gruppo G** (audio) — quando si arriva, sessione dedicata.
+8. **Gruppo H** — non ora, solo promemoria.
 
 Per ciascun punto, ciclo fisso come sempre: implementa → controllo qualità/`code-review` → collaudo
 dal vivo (ora si VEDE, screenshot in preview) → riferisci in italiano semplice → chiedi se
