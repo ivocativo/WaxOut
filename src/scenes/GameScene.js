@@ -1586,6 +1586,33 @@ class GameScene extends Phaser.Scene {
     e.corrodeDmg = Math.max(2, Math.round(window.GameState.player.jetDamage * 0.22));
   }
 
+  // Scia dello scatto: copie "fantasma" dell'aspetto ATTUALE del personaggio (stessa texture/
+  // frame/flip di this.heroVisual) che si dissolvono. Colore diverso per distinguere lo scatto
+  // OFFENSIVO (arancio, stessa tinta degli impatti/esplosioni nel gioco) da quello normale
+  // (azzurro, solo velocita' - prima lo scatto non aveva NESSUN feedback visivo). Throttle a
+  // ~40ms cosi' non spamma uno sprite ad ogni singolo frame.
+  spawnDashGhost(damaging) {
+    const now = this.time.now;
+    if (this._lastDashGhostAt && now - this._lastDashGhostAt < 40) return;
+    this._lastDashGhostAt = now;
+    const hv = this.heroVisual;
+    const ghost = this.add.sprite(hv.x, hv.y, hv.texture.key, hv.frame.name)
+      .setOrigin(hv.originX, hv.originY).setScale(hv.scaleX, hv.scaleY)
+      .setFlipX(hv.flipX).setDepth(hv.depth - 1).setAlpha(0.5)
+      .setTintFill(damaging ? 0xff6b3d : 0x8fe0ff);
+    this.tweens.add({
+      targets: ghost, alpha: 0, scaleX: ghost.scaleX * 1.1, scaleY: ghost.scaleY * 1.1,
+      duration: 220, ease: 'Quad.out', onComplete: () => ghost.destroy(),
+    });
+  }
+
+  // Lampo UNA TANTUM all'inizio dello scatto offensivo (oltre alla scia arancio sopra): marca
+  // bene il momento "questo scatto fa danno", lo scatto normale non ce l'ha.
+  dashStrikeFx() {
+    const ring = this.add.circle(this.player.x, this.player.y, 30, 0xff6b3d, 0.28).setDepth(11).setScale(0.4);
+    this.tweens.add({ targets: ring, scale: 1.7, alpha: 0, duration: 220, ease: 'Quad.out', onComplete: () => ring.destroy() });
+  }
+
   // Abilità SCATTO OFFENSIVO: durante lo scatto, i nemici e il cerume attraversati vengono
   // colpiti (il giocatore è già invulnerabile mentre scatta, quindi ci passa attraverso).
   updateDashStrike(now) {
@@ -2424,6 +2451,7 @@ class GameScene extends Phaser.Scene {
     if (onSlime) targetVx *= 0.5;
     if (now < this.dashUntil) {
       this.player.setVelocityX(this.facing * p.moveSpeed * 2.4);
+      this.spawnDashGhost(p.dashStrike);   // scia: azzurra normale, arancio se fa danno
     } else {
       const accel = onGround ? window.CONFIG.MOVE_ACCEL_GROUND : window.CONFIG.MOVE_ACCEL_AIR;
       this.player.setVelocityX(Phaser.Math.Linear(this.player.body.velocity.x, targetVx, accel));
@@ -2467,6 +2495,7 @@ class GameScene extends Phaser.Scene {
       this.dashReady = now + 700;
       this.invulnUntil = Math.max(this.invulnUntil, now + 160);
       window.Sfx.dash();
+      if (p.dashStrike) this.dashStrikeFx();   // lampo arancio: questo scatto fa danno
     }
 
     // Mira del getto (8 direzioni): orizzontale = verso dove guardi; su/giu coi tasti

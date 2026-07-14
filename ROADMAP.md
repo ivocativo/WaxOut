@@ -157,10 +157,18 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
 
 ## GRUPPO D — Combattimento / feel
 
-- [ ] **D.1 — Lo scatto CON danno (dashStrike) dovrebbe essere visivamente diverso dallo scatto
+- [x] **D.1 — Lo scatto CON danno (dashStrike) dovrebbe essere visivamente diverso dallo scatto
   normale** (oggi probabilmente stessa scia/animazione). Si fa insieme ad A.6 (stessa funzione
   `updateDashStrike`/dash trail): aggiungere un effetto visivo distinto (colore scia, particelle)
   quando `p.dashStrike` è attivo.
+  **FATTO (2026-07-13):** in realta' lo scatto non aveva NESSUN feedback visivo (ne' normale ne'
+  con danno) — solo suono. Aggiunta una scia di "fantasmi" (copie dell'aspetto attuale del PG,
+  stessa texture/frame/flip di `heroVisual`, che si dissolvono in 220ms): **azzurra** (`0x8fe0ff`)
+  per lo scatto normale, **arancione** (`0xff6b3d`, stessa tinta di esplosioni/impatti nel gioco)
+  per quello con danno, + un lampo/anello arancio UNA TANTUM all'inizio dello scatto offensivo
+  (`dashStrikeFx`). Nuovi metodi `spawnDashGhost(damaging)` e `dashStrikeFx()` in GameScene.js,
+  chiamati da dove parte/prosegue lo scatto. Verificato con screenshot affiancati: colori
+  chiaramente distinti, zero errori console.
 
 ---
 
