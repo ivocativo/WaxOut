@@ -54,10 +54,10 @@ window.I18n = (function () {
       mut_lowgrav: 'LOW GRAVITY!  Floaty jumps',
       mut_bonanza: 'BONANZA!  Double wax',
       mut_thickwax: 'STUBBORN WAX!  Harder to clean',
+      mut_quake: 'QUAKE!  Wax falls from the ceiling',
       event_goldfugitive_in: 'GOLDEN FUGITIVE ON THE RUN!  Catch it before it flees!',
       event_goldfugitive_caught: 'FUGITIVE CAUGHT!  +{wax}',
       event_goldfugitive_escaped: 'The fugitive got away...',
-      event_waxcollapse_in: 'WAX COLLAPSE!  Watch the ceiling!',
       event_swarmrush_in: 'SWARM INCOMING!  Brace yourself!',
       // --- Battute del personaggio (fumetto) ---
       speech_start_1: "Let's get scrubbing!",
@@ -225,10 +225,10 @@ window.I18n = (function () {
       mut_lowgrav: 'POCA GRAVITA\'!  Salti fluttuanti',
       mut_bonanza: 'CUCCAGNA!  Cerume doppio',
       mut_thickwax: 'CERUME OSTINATO!  Piu\' duro da pulire',
+      mut_quake: 'TERREMOTO!  Cade cerume dal soffitto',
       event_goldfugitive_in: 'FUGGITIVO DORATO IN FUGA!  Prendilo prima che scappi!',
       event_goldfugitive_caught: 'FUGGITIVO CATTURATO!  +{wax}',
       event_goldfugitive_escaped: 'Il fuggitivo e\' scappato...',
-      event_waxcollapse_in: 'FRANA DI CERUME!  Occhio al soffitto!',
       event_swarmrush_in: 'SCIAME IN ARRIVO!  Tieniti pronto!',
       // --- Battute del personaggio (fumetto) ---
       speech_start_1: 'Si comincia a strofinare!',

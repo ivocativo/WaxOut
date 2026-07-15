@@ -84,6 +84,7 @@ window.MUTATORS = [
   { id: 'lowgrav',  color: '#c9a0ff', apply(s) { s.physics.world.gravity.y = Math.round(window.CONFIG.GRAVITY * 0.55); } },
   { id: 'bonanza',  color: '#ffd166', apply(s) { s.mutWaxMult = 2; } },
   { id: 'thickwax', color: '#e0a83a', apply(s) { s.mutWaxHp = 1.7; } },
+  { id: 'quake',    color: '#e0a83a', apply(s) { s.mutQuake = true; s.startWaxCollapseEvent(); } },
 ];
 
 // EVENTI CASUALI di livello (indipendenti dai mutatori, possono capitare insieme): a
@@ -92,7 +93,6 @@ window.MUTATORS = [
 // per la chiave i18n (usata dai singoli eventi per i propri messaggi).
 window.EVENTS = [
   { id: 'goldfugitive', color: '#ffd700', apply(s) { s.startGoldFugitiveEvent(); } },
-  { id: 'waxcollapse', color: '#e0a83a', apply(s) { s.startWaxCollapseEvent(); } },
   { id: 'swarmrush', color: '#9be870', apply(s) { s.startSwarmRushEvent(); } },
 ];
 

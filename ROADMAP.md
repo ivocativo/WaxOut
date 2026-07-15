@@ -212,33 +212,40 @@ _Attacco nuovo scelto dall'utente: **Balzo + schiacciata con onda d'urto**._
 _E.1 = **mutatore "Terremoto"** (non feature fissa). E.2 = **solo FASE 1 ora** (soffitto visibile +_
 _piu' sfondi + protuberanze); terreno ondulato/burroni RIMANDATI a un blocco dedicato._
 
-- [ ] **E.1 — "Terremoto": cerume vero che cade, come MUTATORE.** Oggi e' un EVENTO casuale
-  (`waxcollapse` in `window.EVENTS`) con blocco-segnaposto che NON ferisce il giocatore. Trasformarlo
-  (`GameScene.js` + `state.js` + `i18n.js`):
-  - **Da evento a mutatore.** In `state.js`: TOGLIERE `waxcollapse` da `window.EVENTS`; AGGIUNGERE a
-    `window.MUTATORS` `{ id: 'quake', color: '#e0a83a', apply(s){ s.mutQuake = true; s.startWaxCollapseEvent(); } }`.
-    Cosi' capita ~1 livello su ~12 (mutatori escono ~55%, sono 7). Aggiungere `s.mutQuake` a
-    `resetMutators()`. ⚠️ Confermare che il gruppo `this.collapseChunks` esista gia' quando il
-    mutatore parte (chooseMutator gira in create; l'evento usa un delayedCall di 2-4s → livello gia' costruito).
-  - **Piu' intenso da mutatore.** In `startWaxCollapseEvent`/`spawnCollapseChunk`: se `this.mutQuake`,
-    durata ~tutto il livello e cadenza chunk piu' fitta (~1100ms invece di 1500).
-  - **Sprite vero del cerume.** In `spawnCollapseChunk` (~riga 687) sostituire `'block_hard'` con un
-    chunk vero (`wax_a/b/c/d`): leggere come `buildWaxSprites` sceglie texture/scala/tint e replicare.
-  - **Ferisce il giocatore.** Aggiungere `this.physics.add.overlap(this.collapseChunks, this.player,
-    (c) => { this.hurtPlayer(12 + window.GameState.level, c.x); this.collapseImpact(c); })` accanto
-    agli altri overlap dei collapseChunks (oggi colpisce solo il cerume via `collapseImpact`).
-  - **i18n:** `mut_quake` EN+IT (banner mutatore).
-  Verifica: forzando il mutatore quake, cadono chunk di cerume VERO che feriscono il PG e aprono
-  varchi nel cerume; niente piu' evento waxcollapse separato.
+- [x] **E.1 — "Terremoto": cerume vero che cade, come MUTATORE.** FATTO E VERIFICATO (2026-07-15).
+  **NON ancora committato.** **Scoperta in corso d'opera:** il danno al giocatore (overlap
+  `collapseChunks`↔`player` → `hurtPlayer`) c'era GIA' nel codice (presente fin dall'introduzione
+  dell'evento, commit `f0f2273`) — la nota originale qui sotto (ora archiviata) lo dava per
+  mancante per errore; nessuna modifica necessaria su quel fronte, solo verificato che
+  funzioni ancora dopo il resto dei cambi.
+  - **(a) FATTO — Da evento a mutatore.** In `state.js`: tolto `waxcollapse` da `window.EVENTS`
+    (restano `goldfugitive`+`swarmrush`), aggiunto a `window.MUTATORS` `{ id: 'quake', ... apply(s){
+    s.mutQuake = true; s.startWaxCollapseEvent(); } }` (ora 7 mutatori). `resetMutators()` azzera
+    `this.mutQuake`. Verificato: `window.MUTATORS`/`window.EVENTS` hanno gli id giusti.
+  - **(b) FATTO — Piu' intenso da mutatore.** `startWaxCollapseEvent` usa cadenza 1100ms (invece di
+    1500) quando `this.mutQuake`; tolta la scadenza a tempo (18s) che aveva l'evento — ora il timer
+    dei crolli dura finche' dura la SCENA (si ferma da solo a fine/riavvio livello), non c'e' piu'
+    un `duration` fisso. Verificato con spy diretto sul timer: cadenza 1100 con mutQuake, 1500 senza.
+  - **(c) FATTO — Sprite vero del cerume.** `spawnCollapseChunk` ora pesca a caso `wax_a/b/c/d`
+    (stesso set del muro) invece del vecchio placeholder `'block_hard'` (che era VISIBILE per il
+    chunk, a differenza del muro dove la stessa chiave e' solo hitbox invisibile), scalato a
+    `BLOCK*1.3/larghezza_texture` e tinto con `_waxTint('hard',1)` (stesso ambra del cerume duro).
+    Verificato: chunk creato con `texture.key` corretto, tint esatto (0xd59a2e), scala coerente.
+  - **(d) i18n FATTO:** `mut_quake` EN ("QUAKE! Wax falls from the ceiling") + IT ("TERREMOTO! Cade
+    cerume dal soffitto"); rimossa `event_waxcollapse_in` (non piu' usata, l'evento non esiste piu').
+    Verificato in entrambe le lingue via `I18n.setLang`.
 
-- [ ] **E.3 — Pedane non sempre raggiungibili (bugfix, si fa QUI prima di E.2).** In `buildPlatforms`
-  (~riga 550) le pedane alte (150-220px sopra il suolo) e lo scrigno segreto (fino a ~96px sopra la
-  pedana alta) possono uscire dalla portata di UN salto — e vanno raggiunte col SINGOLO salto (il
-  doppio salto e' uno sblocco, non garantito). Fix: `JUMP_H = p.jumpVelocity^2 / (2*CONFIG.GRAVITY)`,
-  `MAXUP = JUMP_H * 0.82` = dislivello massimo consentito; CLAMPARE l'altezza di ogni pedana a `MAXUP`
-  rispetto alla superficie da cui la si raggiunge (suolo per la bassa, pedana bassa per l'alta, pedana
-  alta per lo scrigno). Verifica in preview SENZA doppio salto: si arriva sempre alla pedana sopra con
-  un salto solo.
+- [x] **E.3 — Pedane non sempre raggiungibili (bugfix).** FATTO E VERIFICATO (2026-07-15). **NON
+  ancora committato.** In `buildPlatforms`: `MAXUP = (p.jumpVelocity^2 / (2*CONFIG.GRAVITY)) * 0.82`
+  (≈117px, calcolato sulla gravita' DI BASE non quella eventualmente ridotta da un mutatore — cosi'
+  resta raggiungibile nel caso peggiore) + helper `clampAbove(refY, rawY)` applicato a TUTTE le
+  pedane generate (bassa, alta, scrigno segreto, e anche la rampa d'avvio iniziale — bug della
+  stessa famiglia non esplicitamente elencato ma stesso rischio, corretto anch'esso), ciascuna
+  clampata rispetto alla superficie giusta da cui la si raggiunge (suolo per bassa/rampa, pedana
+  bassa — o suolo se assente — per l'alta, pedana alta per lo scrigno). Verificato SENZA doppio
+  salto con una chiusura di raggiungibilita' automatica (parte dal suolo, aggiunge ogni pedana
+  entro `MAXUP` da una superficie gia' raggiunta, a ripetizione) su **75 generazioni casuali di
+  livello (687 pedane totali): zero irraggiungibili**. Zero errori console.
 
 - [ ] **E.2 — FASE 1 (solo questa ora).** Terreno ondulato/burroni RIMANDATI (vedi Fase 2).
   - **(1) Soffitto visibile — CODICE, Sonnet lo fa subito.** Oggi le cose appese in alto (cumuli di
@@ -313,13 +320,13 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
 
 ## Ordine per Sonnet (deciso 2026-07-13)
 **Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
-+ drop cure + balzo-schiacciata — 2026-07-15, NON ancora committato). **Da fare, in ordine:**
-1. **E.1** (mutatore Terremoto: cerume vero + ferisce il PG) → poi **E.3** (pedane raggiungibili, rapido).
-2. **F.1a+b** (riduci cerume + palline dai nemici).
-3. **F.1c** (nuovi progetti).
-4. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
-5. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
-6. **H** — non ora, solo promemoria.
++ drop cure + balzo-schiacciata — `4913ba3`), **E.1** (mutatore Terremoto) + **E.3** (pedane
+raggiungibili) — 2026-07-15, NON ancora committati. **Da fare, in ordine:**
+1. **F.1a+b** (riduci cerume + palline dai nemici).
+2. **F.1c** (nuovi progetti).
+3. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+4. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
+5. **H** — non ora, solo promemoria.
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
 (god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri

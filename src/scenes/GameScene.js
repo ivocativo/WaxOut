@@ -553,11 +553,21 @@ class GameScene extends Phaser.Scene {
     // buildLevel), percio' usiamo una soglia su this.worldW.
     const bossArenaX = this.levelKind === 'boss' ? this.worldW - 800 : Infinity;
 
+    // Dislivello massimo raggiungibile con UN SOLO salto (il doppio salto e' uno sblocco, non
+    // garantito: le pedane devono restare a portata anche senza). Apice teorico del salto =
+    // v^2/(2g) con la gravita' DI BASE (non quella eventualmente ridotta da un mutatore
+    // "poca gravita'": cosi' il livello resta raggiungibile anche nel caso peggiore, e con
+    // gravita' ridotta e' semplicemente piu' facile). Margine di sicurezza 0.82 (non l'apice
+    // esatto: a fine salita il controllo orizzontale e' ridotto).
+    const p = window.GameState.player;
+    const MAXUP = (p.jumpVelocity * p.jumpVelocity) / (2 * window.CONFIG.GRAVITY) * 0.82;
+    const clampAbove = (refY, rawY) => Math.max(rawY, refY - MAXUP);
+
     this.membranes.forEach((m) => {
       if (m.type !== 'short') return;
       const px = Math.max(200, m.x - 110);
       if (px >= bossArenaX) return;
-      const py = this.groundTop - Phaser.Math.Between(72, 96);
+      const py = clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(72, 96));
       this.addPlatform(px, py, 110);
     });
 
@@ -565,20 +575,22 @@ class GameScene extends Phaser.Scene {
     let secretPlaced = false;
     for (let i = 0; i < xs.length - 1; i++) {
       const gapW = xs[i + 1] - xs[i];
+      let lowY = this.groundTop;   // superficie da cui si raggiunge la pedana alta (suolo se non c'e' quella bassa)
       // Pedana bassa: quasi sempre presente se il varco e' abbastanza largo.
       if (gapW > 260 && Math.random() < 0.7) {
         const lowX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.25, 0.4));
         if (lowX < bossArenaX) {
-          const py = this.groundTop - Phaser.Math.Between(90, 130);
+          const py = clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(90, 130));
           this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
           if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26, Math.random() < 0.35);   // a volte CURA
+          lowY = py;
         }
       }
       // Pedana alta: premia chi sale a cercarla.
       if (Math.random() < 0.55) {
         const midX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.5, 0.75));
         if (midX < bossArenaX) {
-          const py = this.groundTop - Phaser.Math.Between(150, 220);
+          const py = clampAbove(lowY, this.groundTop - Phaser.Math.Between(150, 220));
           this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
           if (Math.random() < 0.75) this.addWaxPickup(midX, py - 26, Math.random() < 0.45);   // pedana alta: piu' spesso CURA
           // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
@@ -586,21 +598,22 @@ class GameScene extends Phaser.Scene {
           if (!secretPlaced && Math.random() < 0.35) {
             secretPlaced = true;
             const sx = midX + Phaser.Math.Between(-20, 20);
-            const sy = py - Phaser.Math.Between(74, 96);   // raggiungibile con un salto dalla pedana alta
+            const sy = clampAbove(py, py - Phaser.Math.Between(74, 96));   // raggiungibile con un salto dalla pedana alta
             this.addPlatform(sx, sy, 70);
             for (let k = -1; k <= 1; k++) this.addWaxPickup(sx + k * 20, sy - 28, k === 0);
           }
         }
       }
     }
-    // Rampa d'avvio prima della prima membrana.
-    this.addPlatform(Math.max(200, xs[0] - 240), this.groundTop - Phaser.Math.Between(110, 150), 120);
+    // Rampa d'avvio prima della prima membrana (stesso bug delle pedane: anche questa deve
+    // restare a portata di un salto solo dal suolo).
+    this.addPlatform(Math.max(200, xs[0] - 240), clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(110, 150)), 120);
   }
 
   // Azzera i modificatori ai valori "neutri" (nessun effetto) + rimette la gravita' di default.
   resetMutators() {
     this.mutEnemySpeed = 1; this.mutEnemyHp = 1; this.mutEnemyWax = 1;
-    this.mutMaxEnemies = 0; this.mutWaxMult = 1; this.mutWaxHp = 1;
+    this.mutMaxEnemies = 0; this.mutWaxMult = 1; this.mutWaxHp = 1; this.mutQuake = false;
     this.physics.world.gravity.y = window.CONFIG.GRAVITY;
     this.mutator = null;
   }
@@ -663,22 +676,19 @@ class GameScene extends Phaser.Scene {
     e.setFlipX(false);
   }
 
-  // EVENTO "Frana di cerume": per un periodo, blocchi crollano dal soffitto in punti casuali
-  // con un breve telegrafo lampeggiante. Fanno danno da contatto E aprono un piccolo varco nel
-  // cerume dove atterrano (sfruttabile come scorciatoia) — a differenza delle gocce (permanenti,
-  // solo schizzano), qui e' un evento a tempo con una meccanica diversa all'impatto.
+  // MUTATORE "Terremoto" (`this.mutQuake`): per tutto il livello, blocchi di cerume vero
+  // crollano dal soffitto in punti casuali con un breve telegrafo lampeggiante. Fanno danno
+  // da contatto E aprono un piccolo varco nel cerume dove atterrano (sfruttabile come
+  // scorciatoia) — a differenza delle gocce (permanenti, solo schizzano), qui la cadenza e
+  // la durata sono quelle del mutatore (niente scadenza a tempo: dura finche' dura il
+  // livello, si ferma da solo quando la scena finisce/riparte, come ogni altro timer).
   startWaxCollapseEvent() {
-    const duration = 18000;
     const delay = Phaser.Math.Between(2000, 4000);
     this.time.delayedCall(delay, () => {
       if (this.locked) return;
-      this.showBanner(window.I18n.t('event_waxcollapse_in'), '#e0a83a');
       this.collapseTimer = this.time.addEvent({
-        delay: 1500, loop: true,
+        delay: this.mutQuake ? 1100 : 1500, loop: true,
         callback: () => { if (!this.locked) this.spawnCollapseChunk(); },
-      });
-      this.time.delayedCall(duration, () => {
-        if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
       });
     });
   }
@@ -694,7 +704,15 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(560, () => {
       warn.destroy();
       if (this.locked) return;
-      const chunk = this.collapseChunks.create(cx, 6, 'block_hard').setDepth(8).setScale(0.9);
+      // Sprite VERO del cerume (stesso set usato dal muro in buildWaxSprites, invece del
+      // vecchio placeholder 'block_hard' — che qui era VISIBILE, non solo hitbox).
+      const key = Phaser.Utils.Array.GetRandom(['wax_a', 'wax_b', 'wax_c', 'wax_d']);
+      const chunk = this.collapseChunks.create(cx, 6, key).setDepth(8);
+      const src = this.textures.get(key).getSourceImage();
+      chunk.setScale((window.CONFIG.BLOCK * 1.3) / src.width);
+      chunk.setAngle(Phaser.Math.Between(-20, 20));
+      if (Math.random() < 0.5) chunk.setFlipX(true);
+      chunk.setTint(this._waxTint('hard', 1));
       chunk.body.setAllowGravity(true);
       chunk.body.setSize(24, 24, true);
       chunk.setVelocityY(40);
