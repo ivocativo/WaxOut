@@ -119,6 +119,16 @@ class GameScene extends Phaser.Scene {
     this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh).setVisible(false);
     this.physics.add.existing(this.ground, true);
 
+    // Soffitto VISIBILE (E.2 Fase 1): fascia in cima, PIU' SOTTILE del pavimento, stessa
+    // palette carnosa — oggi le cose appese in alto (protuberanze, gocce) partivano da y=0
+    // senza una superficie da cui "pendere". Solo estetica: il bordo alto del mondo e' gia'
+    // a y=0 (physics.world.setBounds piu' sopra), niente collider nuovo.
+    const ch = Math.round(gh * 0.45);
+    groundGfx.fillStyle(C.ground, 1);
+    groundGfx.fillRect(0, -200, this.worldW, ch + 200);
+    groundGfx.fillStyle(C.groundDark, 1);
+    groundGfx.fillRect(0, ch - 5, this.worldW, 5);          // linea di superficie (il "bordo" del soffitto)
+
     // Gruppi
     this.blocks = this.physics.add.staticGroup();
     this.platforms = this.physics.add.staticGroup();  // pedane sospese (verticalita')

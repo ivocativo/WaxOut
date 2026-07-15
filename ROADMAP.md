@@ -248,11 +248,16 @@ _piu' sfondi + protuberanze); terreno ondulato/burroni RIMANDATI a un blocco ded
   livello (687 pedane totali): zero irraggiungibili**. Zero errori console.
 
 - [ ] **E.2 — FASE 1 (solo questa ora).** Terreno ondulato/burroni RIMANDATI (vedi Fase 2).
-  - **(1) Soffitto visibile — CODICE, Sonnet lo fa subito.** Oggi le cose appese in alto (cumuli di
-    soffitto, gocce, protuberanze) partono da y=0 senza superficie visibile. In `gfx.js` (cercare
-    dove si disegna il `ground`/pavimento), aggiungere una FASCIA di soffitto in cima, **piu' sottile
-    del pavimento**, stessa palette carnosa. Solo estetica (il bordo alto del mondo e' gia' a y=0,
-    niente collider nuovo). Verifica: striscia di "tessuto" in alto, gli oggetti appesi ci partono da sotto.
+  - **(1) FATTO E VERIFICATO (2026-07-15) — Soffitto visibile.** NON ancora committato. Non era
+    in `gfx.js` (il pavimento e' disegnato INLINE in `GameScene.create()`, non delegato a
+    GameGfx) — aggiunta la fascia li', stesso oggetto `groundGfx` gia' usato per il pavimento
+    (due `fillRect` in piu': massa + linea di bordo, stessa palette `C.ground`/`C.groundDark`).
+    Altezza fascia = 45% di quella del pavimento (81px contro 180px, "piu' sottile" come da
+    richiesta), estesa oltre y=0 come il pavimento (niente buchi con lo shake camera). Solo
+    estetica, nessun collider nuovo (il soffitto fisico del mondo era gia' a y=0 da
+    `physics.world.setBounds`). Le protuberanze/gocce di soffitto (gia' ancorate vicino a y=0)
+    ora partono visivamente da dentro la fascia, non piu' dal vuoto. Verificato: nessun errore,
+    geometria coerente (fascia 0-81px, pavimento a 360px, spazio giocabile in mezzo).
   - **(2) piu' sfondi + (3) piu' protuberanze — LOOP AI, serve l'utente.** Nuove immagini su Leonardo
     (come `bg_flesh_01` e le protuberanze): l'assistente scrive i prompt "salva-filtro", l'utente
     genera, l'assistente ritaglia (`cutout_bg.ps1`)+pixella e aggancia (fondale gia' ha settore-per-
@@ -361,9 +366,12 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
 **Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
 + drop cure + balzo-schiacciata — `4913ba3`), **E.1** (mutatore Terremoto) + **E.3** (pedane
 raggiungibili) — `672c20e`, **F.1a+b** (riduci cerume + palline dai nemici) — `3a296a9`, **F.1c**
-(4 nuovi progetti: Doppio Getto/Rabbia/Getto Stordente/Schianto) — 2026-07-15, NON ancora
-committato. **Da fare, in ordine:**
-1. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+(4 nuovi progetti: Doppio Getto/Rabbia/Getto Stordente/Schianto) — `7571519`, **E.2 Fase 1 punto (1)**
+(soffitto visibile) — 2026-07-15, NON ancora committato.
+
+**Tutto il "codice puro" della lista e' esaurito.** Restano solo:
+1. **E.2 Fase 1 punti (2)(3)** (piu' sfondi + protuberanze) — LOOP AI con l'utente (Leonardo), non
+   codice: da riprendere quando l'utente e' pronto a generare immagini.
 2. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
 3. **H** — non ora, solo promemoria.
 
