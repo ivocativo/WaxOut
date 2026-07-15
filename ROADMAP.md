@@ -160,15 +160,35 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
 
 ---
 
-## GRUPPO C — Boss
+## GRUPPO C — Boss  ✅ DECISO, pronto per Sonnet
+_Attacco nuovo scelto dall'utente: **Balzo + schiacciata con onda d'urto**._
 
-- [ ] **C.1 — Il boss è noioso** + c'è sempre una pedana comoda vicino per ripararsi senza rischio
-  (rende il fight banale) + alla morte dovrebbe rilasciare 1-2 palline di cura. Tre modifiche
-  collegate allo stesso combattimento: (a) rivedere il posizionamento/disponibilità delle pedane
-  nell'arena boss (`buildLevel`/layout boss-specifico), (b) rendere il pattern d'attacco più
-  interessante (varietà oltre "avanza + sputo telegrafato + infuria a metà vita"), (c) drop cure
-  alla morte (si aggancia al sistema pickup/cura già esistente, `addWaxBlock(...,heal=true)` o
-  simile). Da trattare come piccolo redesign, non un fix a riga singola.
+- [ ] **C.1 — Boss meno noioso + niente pedana-riparo + drop cure.** Tre modifiche allo stesso
+  combattimento, tutte in `GameScene.js`.
+  - **(a) Togliere la pedana-riparo nell'arena boss.** `buildPlatforms()` (~riga 550) sparge pedane
+    lungo tutto il condotto; nei livelli boss ne spunta una comoda vicino al timpano che rende il
+    fight banale. Fix: se `this.levelKind === 'boss'`, NON piazzare pedane nell'arena del boss (parte
+    destra vicino al timpano). ⚠️ GOTCHA: `this.goalX` NON e' ancora impostato dentro `buildPlatforms`
+    (lo imposta `buildGoal`, chiamato DOPO in `buildLevel`) → usare una soglia su `this.worldW` (zona
+    boss = `x > this.worldW - 800`) e saltare gli `addPlatform` con x li'. Verifica: livello boss →
+    nessuna pedana vicino al boss.
+  - **(b) Drop cure alla morte del boss.** In `damageEnemy`, ramo `if (e.kind === 'boss')` del blocco
+    morte (~riga 1896): dopo il banner, `this.addWaxPickup(e.x - 22, e.y - 8, true); this.addWaxPickup(
+    e.x + 22, e.y - 8, true);` (3° arg `true` = pickup CURA, firma gia' esistente). Verifica: boss
+    morto → 2 palline rosa raccoglibili.
+  - **(c) Attacco "Balzo + schiacciata" nel `bossAI` (~riga 2050).** Macchina a stati sul boss
+    (campo `e.bossAtk`), a cooldown, INTERCALATA allo sputo (non insieme). Riusa il pattern del
+    Saltatore (`hopperAI`/`hopperLandFx`):
+    - cooldown `e.slamReadyAt` (~ogni 4500ms; ~3000ms se `e._enraged`);
+    - pronto + giocatore entro ~360px + boss a terra → stato `'slamwind'`: fermo, lampeggia + si
+      accovaccia (~600ms, telegrafo lungo: e' pesante);
+    - `'slamjump'`: `setVelocity(dir * (e.speed*2 + 120), -430)` (balzo alto verso il giocatore);
+    - all'atterraggio (a terra e >250ms dallo stacco): `this.bossSlamFx(e.x, e.y)` = anello grosso
+      (R~100) + shake forte + danno ad area al giocatore se entro R (`hurtPlayer(round(e.contactDamage
+      *0.9), e.x)`) + danno al cerume vicino; poi `idle`, `e.slamReadyAt = now + cooldown`.
+    - Gate: sputa SOLO se `!e.bossAtk`; disattiva il "avanza" (setVelocityX) durante slamwind/slamjump.
+    Verifica (god-mode): ciclo idle→slamwind(telegrafo)→salto→onda→cooldown, e lo sputo continua tra
+    uno slam e l'altro. Numeri (raggio/danno/cooldown/altezza) da tarare col playtest utente.
 
 ---
 
@@ -189,49 +209,93 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
 
 ---
 
-## GRUPPO E — Livelli / mondo (visione grande, da pianificare a parte)
+## GRUPPO E — Livelli / mondo  ✅ DECISO
+_E.1 = **mutatore "Terremoto"** (non feature fissa). E.2 = **solo FASE 1 ora** (soffitto visibile +_
+_piu' sfondi + protuberanze); terreno ondulato/burroni RIMANDATI a un blocco dedicato._
 
-- [ ] **E.1 — Variante "cerume che cade" fa schifo.** Proposta utente: usare direttamente lo
-  sprite del cerume vero (quello dei cumuli da pulire, non un disegno procedurale a parte) e farlo
-  cadere OGNI TANTO dal soffitto (fa danno se colpisce). Da decidere: **feature fissa su ogni
-  livello** (piccola varietà ambientale sempre presente) **oppure variante/mutatore dedicato**
-  (es. "Terremoto"). Si lega a E.2 (soffitto visibile) — stessa area: cosa succede in alto.
+- [ ] **E.1 — "Terremoto": cerume vero che cade, come MUTATORE.** Oggi e' un EVENTO casuale
+  (`waxcollapse` in `window.EVENTS`) con blocco-segnaposto che NON ferisce il giocatore. Trasformarlo
+  (`GameScene.js` + `state.js` + `i18n.js`):
+  - **Da evento a mutatore.** In `state.js`: TOGLIERE `waxcollapse` da `window.EVENTS`; AGGIUNGERE a
+    `window.MUTATORS` `{ id: 'quake', color: '#e0a83a', apply(s){ s.mutQuake = true; s.startWaxCollapseEvent(); } }`.
+    Cosi' capita ~1 livello su ~12 (mutatori escono ~55%, sono 7). Aggiungere `s.mutQuake` a
+    `resetMutators()`. ⚠️ Confermare che il gruppo `this.collapseChunks` esista gia' quando il
+    mutatore parte (chooseMutator gira in create; l'evento usa un delayedCall di 2-4s → livello gia' costruito).
+  - **Piu' intenso da mutatore.** In `startWaxCollapseEvent`/`spawnCollapseChunk`: se `this.mutQuake`,
+    durata ~tutto il livello e cadenza chunk piu' fitta (~1100ms invece di 1500).
+  - **Sprite vero del cerume.** In `spawnCollapseChunk` (~riga 687) sostituire `'block_hard'` con un
+    chunk vero (`wax_a/b/c/d`): leggere come `buildWaxSprites` sceglie texture/scala/tint e replicare.
+  - **Ferisce il giocatore.** Aggiungere `this.physics.add.overlap(this.collapseChunks, this.player,
+    (c) => { this.hurtPlayer(12 + window.GameState.level, c.x); this.collapseImpact(c); })` accanto
+    agli altri overlap dei collapseChunks (oggi colpisce solo il cerume via `collapseImpact`).
+  - **i18n:** `mut_quake` EN+IT (banner mutatore).
+  Verifica: forzando il mutatore quake, cadono chunk di cerume VERO che feriscono il PG e aprono
+  varchi nel cerume; niente piu' evento waxcollapse separato.
 
-- [ ] **E.2 — Livelli monotoni: servono più sfondi** (varianti) **+ mostrare il SOFFITTO** (più
-  sottile del pavimento, per capire a cosa si "aggrappano" gli oggetti appesi in alto) **+ condotto
-  NON dritto** (ondulato, sali/scendi) **+ valutare protuberanze/fessure/burroni.** Il pezzo più
-  grande di tutta la lista: tocca `gfx.js` (sfondo/soffitto) E `GameScene.buildLevel`/
-  `buildPlatforms`/`buildGoal` (il terreno oggi è piatto a un'altezza fissa). Da pianificare come
-  blocco a parte con più fasi (prima soffitto visibile, poi ondulazione, poi protuberanze/burroni),
-  non un fix in un turno solo.
+- [ ] **E.3 — Pedane non sempre raggiungibili (bugfix, si fa QUI prima di E.2).** In `buildPlatforms`
+  (~riga 550) le pedane alte (150-220px sopra il suolo) e lo scrigno segreto (fino a ~96px sopra la
+  pedana alta) possono uscire dalla portata di UN salto — e vanno raggiunte col SINGOLO salto (il
+  doppio salto e' uno sblocco, non garantito). Fix: `JUMP_H = p.jumpVelocity^2 / (2*CONFIG.GRAVITY)`,
+  `MAXUP = JUMP_H * 0.82` = dislivello massimo consentito; CLAMPARE l'altezza di ogni pedana a `MAXUP`
+  rispetto alla superficie da cui la si raggiunge (suolo per la bassa, pedana bassa per l'alta, pedana
+  alta per lo scrigno). Verifica in preview SENZA doppio salto: si arriva sempre alla pedana sopra con
+  un salto solo.
 
-- [ ] **E.3 — Le pedane non sempre sono raggiungibili.** Bug di generazione livello
-  (`buildPlatforms`, dislivelli). Da investigare con test mirati (probabilmente un caso limite di
-  altezza/distanza non coperto dai vincoli attuali). **Conviene farlo insieme a E.2** dato che si
-  tocca comunque `buildPlatforms` per l'ondulazione del terreno — un solo giro di modifiche a quella
-  funzione invece di due.
+- [ ] **E.2 — FASE 1 (solo questa ora).** Terreno ondulato/burroni RIMANDATI (vedi Fase 2).
+  - **(1) Soffitto visibile — CODICE, Sonnet lo fa subito.** Oggi le cose appese in alto (cumuli di
+    soffitto, gocce, protuberanze) partono da y=0 senza superficie visibile. In `gfx.js` (cercare
+    dove si disegna il `ground`/pavimento), aggiungere una FASCIA di soffitto in cima, **piu' sottile
+    del pavimento**, stessa palette carnosa. Solo estetica (il bordo alto del mondo e' gia' a y=0,
+    niente collider nuovo). Verifica: striscia di "tessuto" in alto, gli oggetti appesi ci partono da sotto.
+  - **(2) piu' sfondi + (3) piu' protuberanze — LOOP AI, serve l'utente.** Nuove immagini su Leonardo
+    (come `bg_flesh_01` e le protuberanze): l'assistente scrive i prompt "salva-filtro", l'utente
+    genera, l'assistente ritaglia (`cutout_bg.ps1`)+pixella e aggancia (fondale gia' ha settore-per-
+    livello in `drawBackground`; protuberanze = chiavi in `GameGfx.PROTUBERANCES` + load in BootScene).
+    Si fa quando l'utente e' pronto a generare — NON codice puro. Intanto il soffitto (1) da' varieta'.
+
+### E.2 — FASE 2 (RIMANDATA, blocco Opus dedicato)
+Condotto **ondulato** (sali/scendi) + **burroni** (buchi nel pavimento). Grande e rischioso: il
+pavimento oggi e' UN collider piatto a `H - GROUND_H`; servirebbe terreno a quote variabili (collider a
+segmenti/poligono) + gestione della CADUTA del PG nei burroni (morte/respawn/danno). Tocca
+`buildLevel`/`buildPlatforms`/`buildGoal`/`buildMounds` (tutti assumono quota fissa) + camera +
+`gfx.js`. **Pianificare a fondo con Opus prima di darlo a Sonnet — non improvvisare.**
 
 ---
 
-## GRUPPO F — Economia/shop (rework grande, da pianificare a parte)
+## GRUPPO F — Economia/shop  ✅ DECISO
+_Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume resta automatica). A fasi._
 
-- [ ] **F.1 — Troppo facile comprare i potenziamenti dal negozio.** Pacchetto di modifiche
-  correlate proposte dall'utente: (a) ridurre il cerume ottenuto per livello; (b) i nemici
-  rilasciano PALLINE di cerume da raccogliere attivamente invece del cerume che si accumula da
-  solo (rimuovere l'acquisizione automatica) — tocca `damageEnemy`/kill reward, nuovo sistema
-  pickup-drop; (c) il negozio è troppo limitato → aumentare i PROGETTI sbloccabili (nuovi
-  `BLUEPRINTS` in `state.js` + voci in `ShopScene`). È il pezzo più grande dopo E.2: da pianificare
-  a fasi (prima il tasso di guadagno, poi il drop-da-raccogliere, poi i nuovi progetti).
-  **Indipendente da A.4** (quello è un bug preciso, questo è un rework di bilanciamento) ma stessa
-  area di codice (UpgradeScene/BLUEPRINTS) — occhio a non ripassarci sopra due volte a vuoto.
+- [ ] **F.1a+b — Ridurre il cerume + drop-da-raccogliere dai nemici** (`GameScene.js` + `state.js`).
+  - **(a) Ridurre il cerume.** Manopola globale `window.CONFIG.WAX_GAIN` (partire da ~0.55, poi si
+    tara) moltiplicata ai punti di guadagno automatici che restano: `grabPickup` (~riga 884) e la
+    pulizia del cerume in `damageBlock` (~riga 1819). Cosi' TUTTO il cerume passa da questi due
+    punti, scalato.
+  - **(b) Nemici → PALLINE invece di accredito automatico.** In `damageEnemy`, ramo morte (~riga
+    1889), TOGLIERE `window.GameState.wax += ...` e far cadere una pallina: nuovo helper
+    `dropWaxPellet(e.x, e.y - 8, e.waxValue)` modellato su `addWaxPickup` (ramo non-cura) — pickup nel
+    gruppo `this.pickups` (niente gravita', come gli altri), `waxValue` = quello del nemico, texture
+    `wax_glob`, piccolo "pop" di comparsa. Si raccoglie con l'overlap player↔pickups gia' esistente,
+    la Calamita lo attrae. **ECCEZIONE Fuggitivo Dorato:** accredito ISTANTANEO (ricompensa evento) →
+    `if (e.fugitive) { GameState.wax += ...; } else { this.dropWaxPellet(...); }`. Verifica: uccidere
+    un nemico lascia una pallina; totale cerume/livello piu' basso; fuggitivo da' subito il bottino.
+
+- [ ] **F.1c — Piu' progetti sbloccabili** (DOPO F.1a+b). Additivo, seguire ESATTAMENTE il pattern
+  esistente (magnet/blast/splash/companion): (1) voce in `window.BLUEPRINTS` (state.js) col costo;
+  (2) flag in `newPlayer()`; (3) carta `locked` in `UpgradeScene.ALL`; (4) riga nel negozio
+  `ShopScene`; (5) meccanica in `GameScene`; (6) i18n `bp_*`/`up_*`/`ability_*` EN+IT. **Proposta 3
+  progetti (CONFERMARE/variare con l'utente):** **Trivella** (getto/mazza attraversa piu' cerume di
+  fila), **Riflesso** (lo scudo, parando, respinge indietro il proiettile), **Doppio Getto** (una
+  seconda bocca che spara all'indietro).
 
 ---
 
-## GRUPPO G — Audio (grande, standalone)
+## GRUPPO G — Audio (grande, standalone, sessione dedicata)
 
-- [ ] **G.1 — Musica e suoni da rivedere completamente.** Tutto `src/sfx.js` (motore procedurale).
-  Non collegato a nient'altro in questa lista — merita una sessione dedicata a parte quando si
-  arriva al suo turno.
+- [ ] **G.1 — Rifare musica e suoni** (`src/sfx.js`). **Bivio da decidere con l'utente PRIMA di
+  iniziare:** (A) restare **procedurale** (Web Audio, gira da `file://`, zero peso) ma rifatto meglio,
+  oppure (B) passare a **file audio veri** (piu' belli ma da procurare/generare + incorporare per
+  `file://` + peso). Serve anche una direzione di **stile** (retro/chiptune? organico/squishy?
+  comico?). Blocco a se', quando si arriva.
 
 ---
 
@@ -248,18 +312,16 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
 
 ---
 
-## Ordine proposto (salvo diverso avviso dell'utente)
-1. ~~**Gruppo A**~~ **✅ FATTO** (7/7, vedi sopra) + **B.1 fatto insieme**. Tutto verificato in
-   preview, **NON ancora committato** — in attesa di conferma dell'utente prima di salvare.
-2. **Gruppo D.1** (scia diversa per lo scatto-con-danno) — rapido, stessa area di codice appena
-   toccata per A.6, ha senso farlo subito dopo se l'utente conferma.
-3. **Gruppo B.2** (nemici che saltano) — idea a se stante, quando si vuole.
-4. **Gruppo C** (boss) — redesign piccolo ma multi-parte.
-5. **Gruppo E** (livelli/mondo) — grande, a fasi. Probabilmente il blocco successivo a sé stante.
-6. **Gruppo F** (economia/shop) — grande, a fasi.
-7. **Gruppo G** (audio) — quando si arriva, sessione dedicata.
-8. **Gruppo H** — non ora, solo promemoria.
+## Ordine per Sonnet (deciso 2026-07-13)
+**Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`). **Da fare, in ordine:**
+1. **C** (boss: no-pedana + drop cure + balzo-schiacciata).
+2. **E.1** (mutatore Terremoto: cerume vero + ferisce il PG) → poi **E.3** (pedane raggiungibili, rapido).
+3. **F.1a+b** (riduci cerume + palline dai nemici).
+4. **F.1c** (nuovi progetti).
+5. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+6. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
+7. **H** — non ora, solo promemoria.
 
-Per ciascun punto, ciclo fisso come sempre: implementa → controllo qualità/`code-review` → collaudo
-dal vivo (ora si VEDE, screenshot in preview) → riferisci in italiano semplice → chiedi se
-committare.
+Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
+(god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri
+"sensati" (danni/raggi/cooldown/`WAX_GAIN`) da TARARE col playtest dell'utente.
