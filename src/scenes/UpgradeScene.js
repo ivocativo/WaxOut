@@ -60,6 +60,10 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'splash', rep: false, rarity: 'legendary', ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
       // Bolla-aiutante: IMPILABILE — ogni pesca aggiunge una bolla (richiede il Progetto sbloccato).
       { id: 'companion', rep: false, stack: true, rarity: 'legendary', ability: 'companion', locked: true, apply: (s) => { s.companions += 1; } },
+      { id: 'backshot', rep: false, rarity: 'legendary', ability: 'backshot', locked: true, apply: (s) => { s.backShot = true; } },
+      { id: 'rage',     rep: false, rarity: 'legendary', ability: 'rage',     locked: true, apply: (s) => { s.rage = true; } },
+      { id: 'stunshot', rep: false, rarity: 'legendary', ability: 'stunshot', locked: true, apply: (s) => { s.stunShot = true; } },
+      { id: 'slam',     rep: false, rarity: 'legendary', ability: 'slam',     locked: true, apply: (s) => { s.slam = true; } },
     ];
 
     // Peso di pesca per rarita' (piu' alto = piu' probabile) e stile della carta.

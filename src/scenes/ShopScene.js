@@ -63,12 +63,15 @@ class ShopScene extends Phaser.Scene {
     });
 
     // --- Colonna PROGETTI (blueprint: sblocchi una-tantum di abilità) ---
-    const bpIds = ['magnet', 'blast', 'splash', 'companion'];
+    // Sono 8 (F.1c ne ha aggiunti 4 ai 4 originali): righe piu' basse/compatte di quelle a
+    // sinistra (solo 4) per starci tutte senza scorrimento, che qui non esiste.
+    const bpIds = ['magnet', 'blast', 'splash', 'companion', 'backshot', 'rage', 'stunshot', 'slam'];
     const BP = window.BLUEPRINTS;
+    const bpStartY = 152, bpRowH = 44;
     bpIds.forEach((id, i) => {
       const item = BP[id];
       const owned = window.Meta.unlockLevel(id) > 0;
-      this.makeRow(rightX, startY + i * rowH, colW, {
+      this.makeRow(rightX, bpStartY + i * bpRowH, colW, {
         name: T.t('bp_' + id + '_name'),
         sub: T.t('bp_' + id + '_desc'),
         accent: '#9fe6a0',
@@ -77,6 +80,7 @@ class ShopScene extends Phaser.Scene {
         cost: item.cost,
         buyLabel: T.t('shop_unlock', { cost: item.cost }),
         onBuy: () => this.buyBlueprint(id),
+        panelH: 38, nameSize: 13, subSize: 10,
       });
     });
 
@@ -123,18 +127,22 @@ class ShopScene extends Phaser.Scene {
   }
 
   // Una riga di negozio (potenziamento o progetto): pannello + nome + sottotitolo + pulsante.
+  // panelH/nameSize/subSize opzionali (default = colonna POTENZIAMENTI): la colonna PROGETTI,
+  // che ha piu' voci, passa valori piu' compatti per starci senza scorrimento.
   makeRow(x, y, w, o) {
     const T = window.I18n;
-    const panelW = w - 16, panelH = 58;
+    const panelW = w - 16, panelH = o.panelH || 58;
+    const nameSize = o.nameSize || 18, subSize = o.subSize || 12;
+    const lineGap = Math.min(13, panelH * 0.22);
     this.add.rectangle(x, y, panelW, panelH, 0x2b1d12, 1).setStrokeStyle(3, o.accent === '#9fe6a0' ? 0x6fbf6f : 0xffd166);
 
     const textX = x - panelW / 2 + 14;
-    this.add.text(textX, y - 13, o.name, {
-      fontFamily: 'monospace', fontSize: '18px', color: o.accent || '#ffe2b0',
+    this.add.text(textX, y - lineGap, o.name, {
+      fontFamily: 'monospace', fontSize: nameSize + 'px', color: o.accent || '#ffe2b0',
       wordWrap: { width: panelW - 130 },
     }).setOrigin(0, 0.5);
-    this.add.text(textX, y + 13, o.sub, {
-      fontFamily: 'monospace', fontSize: '12px', color: '#fff7e8',
+    this.add.text(textX, y + lineGap, o.sub, {
+      fontFamily: 'monospace', fontSize: subSize + 'px', color: '#fff7e8',
       wordWrap: { width: panelW - 130 },
     }).setOrigin(0, 0.5);
 
@@ -147,8 +155,8 @@ class ShopScene extends Phaser.Scene {
     else { label = T.t('shop_need', { cost: o.cost }); bg = '#6a3030'; fg = '#ffd9d9'; }
 
     const btn = this.add.text(bx, y, label, {
-      fontFamily: 'monospace', fontSize: '14px', color: fg, align: 'center',
-      backgroundColor: bg, padding: { x: 12, y: 7 },
+      fontFamily: 'monospace', fontSize: (o.panelH ? 11 : 14) + 'px', color: fg, align: 'center',
+      backgroundColor: bg, padding: { x: o.panelH ? 8 : 12, y: o.panelH ? 4 : 7 },
     }).setOrigin(0.5);
 
     if (clickable) {

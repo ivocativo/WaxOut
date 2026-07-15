@@ -291,13 +291,46 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
     → applica `WAX_GAIN` come le altre; fuggitivo → accredito istantaneo invariato, NESSUNA
     pallina in piu'. Zero errori console.
 
-- [ ] **F.1c — Piu' progetti sbloccabili** (DOPO F.1a+b). Additivo, seguire ESATTAMENTE il pattern
-  esistente (magnet/blast/splash/companion): (1) voce in `window.BLUEPRINTS` (state.js) col costo;
-  (2) flag in `newPlayer()`; (3) carta `locked` in `UpgradeScene.ALL`; (4) riga nel negozio
-  `ShopScene`; (5) meccanica in `GameScene`; (6) i18n `bp_*`/`up_*`/`ability_*` EN+IT. **Proposta 3
-  progetti (CONFERMARE/variare con l'utente):** **Trivella** (getto/mazza attraversa piu' cerume di
-  fila), **Riflesso** (lo scudo, parando, respinge indietro il proiettile), **Doppio Getto** (una
-  seconda bocca che spara all'indietro).
+- [x] **F.1c — Piu' progetti sbloccabili.** FATTO E VERIFICATO (2026-07-15). **NON ancora
+  committato.** **Proposta iniziale rivista con l'utente:** Trivella scartata (ricopiava Getto
+  Perforante gia' esistente), Riflesso scartata (il gioco non ha un meccanismo di parata/tempismo
+  — lo Scudo e' un blocco passivo automatico, non richiede input). Set finale confermato (4, non
+  3): **Doppio Getto**, **Rabbia**, **Getto Stordente**, **Schianto** — seguito ESATTAMENTE il
+  pattern esistente per tutti e 4: `window.BLUEPRINTS` (costi 260/280/300/450), flag in
+  `newPlayer()`, carta `locked` in `UpgradeScene.ALL` (nessuna modifica al filtro: gia' generico),
+  riga nel negozio, meccanica in `GameScene`, i18n `bp_*`/`up_*`/`ability_*` EN+IT.
+  - **Doppio Getto** (`backShot`): `fireJet` spara ANCHE una pallina all'indietro (1 sola, non
+    moltiplicata dal Ventaglio — e' una bocca in piu', non un secondo ventaglio).
+  - **Rabbia** (`rage`): `hurtPlayer` arma una finestra di 4s quando incassi un colpo VERO (non
+    parato/invulnerabile); il PROSSIMO attacco (corpo a corpo O a distanza, qualunque parta
+    prima) fa danno ×1.6 e si consuma — nuovo helper `consumeRage()`, agganciato in `meleeSwing`
+    e `fireJet` (un solo consumo anche se il ventaglio spara piu' palline insieme: e' UN
+    attacco). Si consuma al TENTATIVO di attacco, non solo se va a segno (stesso spirito dello
+    scatto che consuma il cooldown a prescindere).
+  - **Getto Stordente** (`stunShot`): le palline portano `s.stun`; all'impatto (`hitFoe`) nuovo
+    `applyStun(e)` marca `e.stunnedUntil`; nel loop nemici, gate aggiunto PRIMA della normale
+    dispatch IA (`now >= e.knockUntil && now < stunnedUntil` → fermo, niente IA) cosi' lo
+    stordimento si somma al knockback esistente invece di sostituirlo.
+  - **Schianto** (`slam`): nuova mossa per il giocatore — in aria, premere GIU' di fresco (fronte
+    di pressione su `downHeld`, gia' unificato tastiera/touch, non tenuto: altrimenti mirare in
+    giu' in volo lo farebbe scattare da solo) avvia una caduta veloce (`this.slamming`); l'onda
+    d'urto (`playerSlamFx`, stesso trattamento del boss in C.1 — "impari dal boss" la stessa
+    mossa) scatta esattamente all'atterraggio nel blocco `landed` gia' esistente: danno ad area
+    (80% del danno base) a nemici vicini, danno ridotto (60% di quello) al cerume, schiacciata
+    piu' forte del normale atterraggio.
+  - **Layout negozio:** la colonna PROGETTI passa da 4 a 8 voci — non ci stavano piu' nello
+    spazio originale (righe da 58px, 4 bastavano). `makeRow` ora accetta `panelH`/`nameSize`/
+    `subSize` opzionali; la colonna progetti usa righe compatte (44px) — verificato con
+    ispezione diretta delle 8 righe generate: nessuna sovrapposizione, testo (incluse le
+    descrizioni piu' lunghe) su una riga sola, margine pulito prima dei pulsanti in basso.
+  - **Effetto collaterale gia' corretto:** i `bp_*_desc` iniziali erano frasi lunghe (pensate
+    prima di sapere che la colonna sarebbe diventata compatta) — accorciate per stare su una riga
+    sola nel nuovo spazio.
+  Verificato con test mirati (come gli altri fix): Doppio Getto → 2 palline (avanti+indietro);
+  Rabbia → danno 16→26 sul colpo successivo, poi torna normale; Getto Stordente → `stun` sulle
+  palline, nemico colpito resta fermo; Schianto → trigger corretto in aria, danno ad area
+  21 (nemico) / 13 (cerume) coerenti con le formule. i18n EN+IT verificate per tutte le 4 chiavi
+  (`bp_`/`up_`/`ability_`). Zero errori console.
 
 ---
 
@@ -327,12 +360,12 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
 ## Ordine per Sonnet (deciso 2026-07-13)
 **Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
 + drop cure + balzo-schiacciata — `4913ba3`), **E.1** (mutatore Terremoto) + **E.3** (pedane
-raggiungibili) — `672c20e`, **F.1a+b** (riduci cerume + palline dai nemici) — 2026-07-15, NON ancora
+raggiungibili) — `672c20e`, **F.1a+b** (riduci cerume + palline dai nemici) — `3a296a9`, **F.1c**
+(4 nuovi progetti: Doppio Getto/Rabbia/Getto Stordente/Schianto) — 2026-07-15, NON ancora
 committato. **Da fare, in ordine:**
-1. **F.1c** (nuovi progetti — **serve CONFERMARE/variare con l'utente** i 3 proposti prima di partire).
-2. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
-3. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
-4. **H** — non ora, solo promemoria.
+1. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+2. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
+3. **H** — non ora, solo promemoria.
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
 (god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri

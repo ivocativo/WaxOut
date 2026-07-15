@@ -74,6 +74,10 @@ window.BLUEPRINTS = {
   blast:     { cost: 220, ability: 'blast'     },
   splash:    { cost: 320, ability: 'splash'    },
   companion: { cost: 500, ability: 'companion' },
+  backshot:  { cost: 260, ability: 'backshot'  },
+  rage:      { cost: 280, ability: 'rage'      },
+  stunshot:  { cost: 300, ability: 'stunshot'  },
+  slam:      { cost: 450, ability: 'slam'      },
 };
 
 // MODIFICATORI di livello (mutatori, stile Hades/Nuclear Throne): una regola casuale
@@ -170,6 +174,10 @@ window.GameState = {
       meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
       jetSplash: false,      // le palline del getto scoppiano all'impatto (piccola area)
       companions: 0,         // n. bolle-aiutante (+1 a ogni pesca della carta)
+      backShot: false,       // Doppio Getto: una seconda bocca spara anche all'indietro
+      rage: false,           // Rabbia: un colpo subito potenzia il prossimo attacco
+      stunShot: false,       // Getto Stordente: i colpi a distanza stordiscono un attimo
+      slam: false,           // Schianto: in aria, giu' per schiantarti a terra con un'onda d'urto
     };
   },
 

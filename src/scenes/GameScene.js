@@ -139,6 +139,10 @@ class GameScene extends Phaser.Scene {
     // l'atterraggio; _lastFacing per rilevare l'inversione di corsa.
     this.jx = 1; this.jy = 1;
     this._wasOnGround = true; this._prevVelY = 0; this._lastFacing = 1;
+    // Abilità SCHIANTO: this.slamming = caduta veloce in corso (l'onda scatta all'atterraggio,
+    // vedi 'landed' in update()); _slamPrevDown per rilevare la pressione FRESCA di giu' (non
+    // tenuta) mentre sei in aria.
+    this.slamming = false; this._slamPrevDown = false;
 
     // ---- Personaggio ANIMATO (sprite sheet AutoSprite) ----
     // La FISICA resta su this.player, reso INVISIBILE: hitbox/collisioni/scala-juice invariati.
@@ -259,6 +263,7 @@ class GameScene extends Phaser.Scene {
       if (en.spawning || this.time.now < (sh.pierceGrace || 0)) return;
       this.damageEnemy(en, sh.dmg);
       if (sh.corrosive) this.applyCorrosion(en);   // abilità SAPONE CORROSIVO: danno nel tempo
+      if (sh.stun) this.applyStun(en);             // abilità GETTO STORDENTE
       consumeShot(sh);
     };
     const hitSolid = (a, b) => {
@@ -1479,30 +1484,37 @@ class GameScene extends Phaser.Scene {
     const nx = adx / d, ny = ady / d;
     this.showRangedWeapon(nx, ny);          // arma in mano puntata verso la mira
     const oy = this.crouching ? 14 : -6;   // accovacciato: il getto parte all'altezza dei piedi
+    // Abilità RABBIA: se armata, TUTTE le palline di questo colpo (anche il ventaglio) fanno
+    // piu' danno — un solo colpo "vale" da attacco unico, si consuma qui una volta sola.
+    const rageMult = this.consumeRage();
     // Abilità VENTAGLIO (impilabile): spara N palline a ventaglio (N = p.jetPellets).
     const n = Math.max(1, p.jetPellets | 0);
     const a0 = Math.atan2(ny, nx);
     const step = 0.16;   // apertura tra una pallina e l'altra
     for (let i = 0; i < n; i++) {
       const da = (i - (n - 1) / 2) * step;   // simmetrico attorno alla direzione di mira
-      this.spawnPellet(Math.cos(a0 + da), Math.sin(a0 + da), oy, p);
+      this.spawnPellet(Math.cos(a0 + da), Math.sin(a0 + da), oy, p, rageMult);
     }
+    // Abilità DOPPIO GETTO: una seconda bocca spara ANCHE all'indietro, sempre 1 pallina sola
+    // (non moltiplicata dal Ventaglio — e' una bocca in piu', non un altro ventaglio).
+    if (p.backShot) this.spawnPellet(-nx, -ny, oy, p, rageMult);
     window.Sfx.spray();
   }
 
-  // Crea una singola pallina di getto (usata da fireJet, anche a ventaglio).
-  spawnPellet(nx, ny, oy, p) {
+  // Crea una singola pallina di getto (usata da fireJet, anche a ventaglio/doppio getto).
+  spawnPellet(nx, ny, oy, p, rageMult) {
     const sp = 580;
     const s = this.shots.create(this.player.x + nx * 18, this.player.y + oy + ny * 14, 'soap').setDepth(9);
     s.body.setAllowGravity(false);
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
-    s.dmg = p.jetDamage;
+    s.dmg = Math.round(p.jetDamage * (rageMult || 1));
     // EVOLUZIONE "Lama d'Acqua": perfora TUTTO; altrimenti abilità PERFORANTE normale.
     s.pierceLeft = p.evoPierceAll ? 999 : (p.jetPierce ? 3 : 1);
     s.splash = p.jetSplash;                // abilità SCOPPIO DI SAPONE (area all'impatto)
     s.homing = p.homing;                   // abilità MIRA GUIDATA (curva verso il nemico)
     s.corrosive = p.corrosive;             // abilità SAPONE CORROSIVO (avvelena all'impatto)
+    s.stun = p.stunShot;                   // abilità GETTO STORDENTE (stordisce all'impatto)
     s.bounceLeft = p.bounce | 0;           // abilità RIMBALZO (rimbalza N volte sui muri/suolo)
     s.bounceGrace = 0;
     if (p.corrosive) s.setTint(0x9be86b);  // pallina verde = corrosiva
@@ -1640,6 +1652,24 @@ class GameScene extends Phaser.Scene {
     e.corrodeDmg = Math.max(2, Math.round(window.GameState.player.jetDamage * 0.22));
   }
 
+  // Abilità GETTO STORDENTE: il nemico colpito resta fermo un attimo (si somma all'eventuale
+  // knockback, non lo sostituisce — vedi il gate in update()).
+  applyStun(e) {
+    if (!e.active) return;
+    e.stunnedUntil = Math.max(e.stunnedUntil || 0, this.time.now + 500);
+  }
+
+  // Abilità RABBIA: dopo un colpo subito, il PROSSIMO attacco (corpo a corpo o a distanza) fa
+  // danno maggiorato; si consuma con quel singolo attacco, o scade da solo se non attacchi in
+  // tempo (armata da hurtPlayer). Ritorna il moltiplicatore da applicare a QUESTO attacco.
+  consumeRage() {
+    if (this.rageReadyUntil && this.time.now < this.rageReadyUntil) {
+      this.rageReadyUntil = 0;
+      return 1.6;
+    }
+    return 1;
+  }
+
   // Scia dello scatto: copie "fantasma" dell'aspetto ATTUALE del personaggio (stessa texture/
   // frame/flip di this.heroVisual) che si dissolvono. Colore diverso per distinguere lo scatto
   // OFFENSIVO (arancio, stessa tinta degli impatti/esplosioni nel gioco) da quello normale
@@ -1772,18 +1802,20 @@ class GameScene extends Phaser.Scene {
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
     const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH + cy, range, halfH * 2);
+    // Abilità RABBIA: se armata (colpo subito di recente), QUESTO colpo fa piu' danno.
+    const dmg = Math.round(p.damage * this.consumeRage());
     let hitEnemy = false, hitAny = false;
     this.blocks.getChildren().forEach((b) => {
-      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, p.damage); hitAny = true; }
+      if (b.active && Phaser.Geom.Intersects.RectangleToRectangle(rect, b.getBounds())) { this.damageBlock(b, dmg); hitAny = true; }
     });
     const hitSet = new Set();
     this.enemies.getChildren().forEach((e) => {
-      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, p.damage, true); hitEnemy = true; hitAny = true; hitSet.add(e); }
+      if (e.active && !e.spawning && Phaser.Geom.Intersects.RectangleToRectangle(rect, e.getBounds())) { this.damageEnemy(e, dmg, true); hitEnemy = true; hitAny = true; hitSet.add(e); }
     });
     // Abilità ONDA D'URTO: la bastonata colpisce ANCHE i nemici in un raggio attorno a te
     // (danno ridotto), non solo quelli davanti. Ottima contro i gruppi.
     if (p.meleeBlast) {
-      const R = 84, bd = Math.max(6, Math.round(p.damage * 0.55));
+      const R = 84, bd = Math.max(6, Math.round(dmg * 0.55));
       let blasted = false;
       this.enemies.getChildren().forEach((e) => {
         if (e.active && !e.spawning && !hitSet.has(e) && Math.hypot(e.x - this.player.x, e.y - this.player.y) < R) {
@@ -2199,6 +2231,27 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // Onda d'urto dello SCHIANTO (Abilità del giocatore): stesso trattamento del boss (C.1), ma
+  // dal giocatore verso i nemici — "impari dal boss" la stessa mossa. Danno ad area a nemici e
+  // cerume vicini, niente danno al giocatore stesso ovviamente.
+  playerSlamFx() {
+    const p = window.GameState.player;
+    const x = this.player.x, y = this.player.body.bottom;
+    const R = 100;
+    const dmg = Math.round(p.damage * 0.8);
+    const ring = this.add.circle(x, y, R, 0xff6b3d, 0.35).setDepth(12).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    window.Sfx.smash();
+    this.cameras.main.shake(180, 0.012);
+    this.setJuice(1.32, 0.7);   // schiacciamento forte all'impatto (piu' dell'atterraggio normale)
+    this.enemies.getChildren().forEach((e) => {
+      if (e.active && !e.spawning && Math.hypot(e.x - x, e.y - y) < R) this.damageEnemy(e, dmg, true);
+    });
+    this.blocks.getChildren().forEach((b) => {
+      if (b.active && Math.hypot(b.x - x, b.y - y) < R) this.damageBlock(b, Math.round(dmg * 0.6));
+    });
+  }
+
   // IA del GORGOGLIANTE (nemico azzurrino a distanza): avanza lento verso il giocatore;
   // quando è pronto e il giocatore è NELL'INQUADRATURA, si CARICA (si comprime + lampeggia
   // ~0,3s) e poi ESPELLE la pallina. Fuori campo NON spara (range d'attacco limitato).
@@ -2302,6 +2355,7 @@ class GameScene extends Phaser.Scene {
     }
     this.invulnUntil = now + 900;
     window.GameState.player.hp -= dmg;
+    if (pl.rage) this.rageReadyUntil = now + 4000;   // Abilità RABBIA: arma il prossimo attacco
     window.Sfx.hurt();
     this.cameras.main.shake(120, 0.01);
     // JUICE — colpo incassato: schiacciata netta (solo quando il danno e' REALMENTE applicato,
@@ -2597,6 +2651,9 @@ class GameScene extends Phaser.Scene {
       const impact = Phaser.Math.Clamp(this._prevVelY / p.jumpVelocity, 0, 1.4);
       const a = window.CONFIG.JUICE_LAND * (0.5 + 0.5 * impact);
       this.setJuice(1 + a, 1 - a);
+      // Abilità SCHIANTO: se stavi cadendo veloce per lo schianto, l'onda d'urto scatta qui,
+      // esattamente all'atterraggio (non prima: deve colpire quando tocchi terra).
+      if (this.slamming) { this.slamming = false; this.playerSlamFx(); }
     }
 
     // Rifornisci i salti SOLO quando sei davvero appoggiato e non stai già salendo: subito
@@ -2632,6 +2689,16 @@ class GameScene extends Phaser.Scene {
     // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In
     // aria GIU' resta la mira verso il basso del getto (gestita più sotto).
     const downHeld = k.DOWN.isDown || k.S.isDown || this.touch.aimDown;
+    // Abilità SCHIANTO: in aria, premere GIU' di fresco (non tenuto: altrimenti mirare in giù
+    // in volo lo farebbe scattare da solo) ti fa cadere veloce; l'onda d'urto parte quando
+    // atterri (vedi il blocco 'landed' piu' sopra). "_slamPrevDown" rileva il fronte di
+    // pressione sullo stesso downHeld gia' unificato tastiera/touch.
+    if (p.slam && !onGround && downHeld && !this._slamPrevDown && !this.slamming) {
+      this.slamming = true;
+      this.player.setVelocityY(Math.max(this.player.body.velocity.y, 0) + 900);
+      window.Sfx.dash();
+    }
+    this._slamPrevDown = downHeld;
     // L'accovacciamento resta valido per un attimo dopo aver perso il contatto col suolo
     // (dossi/bordi mentre ci si muove), COSI' il getto non passa a "mira in giù" sparando
     // nel pavimento. NON vale durante un vero salto (velocità decisa verso l'alto).
@@ -2758,7 +2825,9 @@ class GameScene extends Phaser.Scene {
         return;
       }
 
-      if (now >= e.knockUntil) {
+      if (now >= e.knockUntil && now < (e.stunnedUntil || 0)) {
+        e.setVelocityX(0);   // Abilità GETTO STORDENTE: fermo, niente IA finche' dura lo stordimento
+      } else if (now >= e.knockUntil) {
         if (e.fugitive) {
           this.fugitiveAI(e, now);   // ignora tutto il resto: corre sempre verso il timpano
         } else if (e.kind === 'boss') {
