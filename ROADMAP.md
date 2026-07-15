@@ -271,19 +271,25 @@ segmenti/poligono) + gestione della CADUTA del PG nei burroni (morte/respawn/dan
 ## GRUPPO F — Economia/shop  ✅ DECISO
 _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume resta automatica). A fasi._
 
-- [ ] **F.1a+b — Ridurre il cerume + drop-da-raccogliere dai nemici** (`GameScene.js` + `state.js`).
-  - **(a) Ridurre il cerume.** Manopola globale `window.CONFIG.WAX_GAIN` (partire da ~0.55, poi si
-    tara) moltiplicata ai punti di guadagno automatici che restano: `grabPickup` (~riga 884) e la
-    pulizia del cerume in `damageBlock` (~riga 1819). Cosi' TUTTO il cerume passa da questi due
-    punti, scalato.
-  - **(b) Nemici → PALLINE invece di accredito automatico.** In `damageEnemy`, ramo morte (~riga
-    1889), TOGLIERE `window.GameState.wax += ...` e far cadere una pallina: nuovo helper
-    `dropWaxPellet(e.x, e.y - 8, e.waxValue)` modellato su `addWaxPickup` (ramo non-cura) — pickup nel
-    gruppo `this.pickups` (niente gravita', come gli altri), `waxValue` = quello del nemico, texture
-    `wax_glob`, piccolo "pop" di comparsa. Si raccoglie con l'overlap player↔pickups gia' esistente,
-    la Calamita lo attrae. **ECCEZIONE Fuggitivo Dorato:** accredito ISTANTANEO (ricompensa evento) →
-    `if (e.fugitive) { GameState.wax += ...; } else { this.dropWaxPellet(...); }`. Verifica: uccidere
-    un nemico lascia una pallina; totale cerume/livello piu' basso; fuggitivo da' subito il bottino.
+- [x] **F.1a+b — Ridurre il cerume + drop-da-raccogliere dai nemici.** FATTO E VERIFICATO
+  (2026-07-15). **NON ancora committato.**
+  - **(a) FATTO — Ridurre il cerume.** Aggiunta `window.CONFIG.WAX_GAIN = 0.55` (`state.js`),
+    moltiplicata nei due punti di guadagno automatico rimasti: `grabPickup` e la pulizia del
+    cerume in `damageBlock`. `cleanedWax` (per la % "pulito") resta sul valore GREZZO, non
+    scalato — corretto, misura la pulizia non i soldi. Verificato con spy diretto: pickup da 5 →
+    +3 (5×0.55 arrotondato), blocco da 4 → +2, coerenti.
+  - **(b) FATTO — Nemici → PALLINE invece di accredito automatico.** In `damageEnemy` (ramo
+    morte) tolto l'accredito diretto; nuovo helper `dropWaxPellet(x,y,value)` (vicino ad
+    `addWaxPickup`) crea una pallina raccoglibile nel gruppo `this.pickups` (stesso overlap
+    player↔pickups gia' esistente → la Calamita la attrae come le altre) con un piccolo "pop" di
+    comparsa. **ECCEZIONE Fuggitivo Dorato:** accredito ISTANTANEO invariato (ricompensa
+    evento). **Effetto collaterale corretto in corsa:** il banner di morte del boss mostrava
+    `+{wax}` come se fosse istantaneo — ora che anche il boss lascia una pallina da raccogliere
+    (oltre alle 2 cure di C.1) quel numero sarebbe stato fuorviante, tolto dal banner (EN+IT),
+    resta solo l'annuncio "distrutto". Verificato con spy diretto: nemico normale → 0 cerume
+    istantaneo + 1 pallina nuova (valore = `waxValue` del nemico, texture `wax_glob`), raccolta
+    → applica `WAX_GAIN` come le altre; fuggitivo → accredito istantaneo invariato, NESSUNA
+    pallina in piu'. Zero errori console.
 
 - [ ] **F.1c — Piu' progetti sbloccabili** (DOPO F.1a+b). Additivo, seguire ESATTAMENTE il pattern
   esistente (magnet/blast/splash/companion): (1) voce in `window.BLUEPRINTS` (state.js) col costo;
@@ -321,12 +327,12 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
 ## Ordine per Sonnet (deciso 2026-07-13)
 **Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
 + drop cure + balzo-schiacciata — `4913ba3`), **E.1** (mutatore Terremoto) + **E.3** (pedane
-raggiungibili) — 2026-07-15, NON ancora committati. **Da fare, in ordine:**
-1. **F.1a+b** (riduci cerume + palline dai nemici).
-2. **F.1c** (nuovi progetti).
-3. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
-4. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
-5. **H** — non ora, solo promemoria.
+raggiungibili) — `672c20e`, **F.1a+b** (riduci cerume + palline dai nemici) — 2026-07-15, NON ancora
+committato. **Da fare, in ordine:**
+1. **F.1c** (nuovi progetti — **serve CONFERMARE/variare con l'utente** i 3 proposti prima di partire).
+2. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+3. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
+4. **H** — non ora, solo promemoria.
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
 (god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri

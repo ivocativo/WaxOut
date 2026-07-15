@@ -909,9 +909,21 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut' });
   }
 
+  // Pallina di cerume lasciata da un nemico alla morte (F.1b): come addWaxPickup ma con
+  // valore VARIABILE (quello del nemico, non il fisso 5 delle pedane) + un piccolo "pop" di
+  // comparsa (parte piu' piccola e cresce), per segnalare che e' appena spuntata dal nemico.
+  dropWaxPellet(x, y, value) {
+    const p = this.pickups.create(x, y, 'wax_glob').setDepth(7).setScale(0.4);
+    p.body.setAllowGravity(false);
+    p.body.setSize(14, 14, true);
+    p.waxValue = value;
+    this.tweens.add({ targets: p, scale: 1, duration: 160, ease: 'Back.out' });
+    this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut', delay: 160 });
+  }
+
   grabPickup(pk) {
     if (!pk || !pk.active) return;
-    window.GameState.wax += Math.round(pk.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
+    window.GameState.wax += Math.round(pk.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1) * window.CONFIG.WAX_GAIN);   // Cerume Extra + mutatore + manopola globale
     if (pk.isHeal) {
       const pl = window.GameState.player;
       pl.hp = Math.min(pl.maxHp, pl.hp + pk.healValue);
@@ -1848,7 +1860,7 @@ class GameScene extends Phaser.Scene {
       window.Sfx.smash();
       this.burst(b.bitKey, b.x, b.y, 14);
       this.splat(b.x, b.y, b.waxType);
-      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
+      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1) * window.CONFIG.WAX_GAIN);   // Cerume Extra + mutatore + manopola globale
       this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito" (valore GREZZO, il moltiplicatore non conta)
       const dcol = b.col;
       if (b.waxImg) b.waxImg.destroy();
@@ -1918,7 +1930,11 @@ class GameScene extends Phaser.Scene {
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
       const pl = window.GameState.player;
-      window.GameState.wax += Math.round(e.waxValue * (pl.waxMult || 1) * (this.mutWaxMult || 1));   // Cerume Extra + mutatore
+      // Il cerume dei nemici ora si RACCOGLIE (pallina, come le pedane) invece di accreditarsi
+      // da solo — l'economia passa quasi tutta da qui (F.1b). ECCEZIONE Fuggitivo Dorato:
+      // ricompensa EVENTO, accredito istantaneo come prima (niente pallina da rincorrere).
+      if (e.fugitive) window.GameState.wax += Math.round(e.waxValue * (pl.waxMult || 1) * (this.mutWaxMult || 1));
+      else this.dropWaxPellet(e.x, e.y - 8, e.waxValue);
       // Abilità VITA RUBATA: uccidere cura un po' (piu' col boss).
       if (pl.lifesteal) {
         const heal = e.kind === 'boss' ? 25 : 3;
@@ -1928,7 +1944,7 @@ class GameScene extends Phaser.Scene {
       if (e.kind === 'boss') {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
-        this.showBanner(window.I18n.t('game_boss_dead', { wax: e.waxValue }), '#ffd166');
+        this.showBanner(window.I18n.t('game_boss_dead'), '#ffd166');
         this.addWaxPickup(e.x - 22, e.y - 8, true);
         this.addWaxPickup(e.x + 22, e.y - 8, true);
       } else {

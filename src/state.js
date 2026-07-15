@@ -25,6 +25,10 @@ window.CONFIG = {
   BLOCK: 32,            // lato di un blocco del muro (px display)
   PIXEL_SCALE_PLAYER: 3,
   PIXEL_SCALE_ENEMY: 3,
+  // Manopola globale sul cerume guadagnato AUTOMATICAMENTE (pulizia del muro + raccolta
+  // pickup, incluse le palline lasciate dai nemici morti): scala TUTTO il guadagno passivo,
+  // cosi' l'economia si tara da un punto solo. Da aggiustare col playtest (F.1a).
+  WAX_GAIN: 0.55,
 
   // Palette a tema "orecchio / cerume / sporco"
   COLORS: {
