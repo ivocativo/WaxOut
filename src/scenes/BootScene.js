@@ -93,6 +93,49 @@ class BootScene extends Phaser.Scene {
     ];
     PA.fromGrid(this, 'enemy_spit', gorgogliante, gPal, sE);
 
+    // --- Nemico "Pulce" (salta di continuo, piccola e fastidiosa) ---
+    const pPal = {
+      w: 0x5a6b2e,   // corpo verde-oliva "acaro"
+      L: 0x8fae4a,   // riflesso chiaro
+      g: 0x3a4a1e,   // zampe posteriori (piu' scure)
+      o: C.outline,
+    };
+    const pulce = [
+      '....o.o....',
+      '...wwwww...',
+      '..wwowoww..',
+      '.wwLwwwLww.',
+      '.wwwwwwwww.',
+      '.wwwwwwwww.',
+      '..wwwwwww..',
+      '.g.......g.',
+      'gg.......gg',
+      'g.........g',
+    ];
+    PA.fromGrid(this, 'enemy_flea', pulce, pPal, sE);
+
+    // --- Nemico "Saltatore" (balzo enorme e telegrafato, atterraggio ad onda) ---
+    const hPal = {
+      w: 0x8a6a3a,   // corpo bruno-cricket
+      L: 0xc9a86a,   // riflesso chiaro
+      g: 0x5c4420,   // zampe posteriori (piu' scure, piu' grosse della Pulce)
+      o: C.outline,
+    };
+    const saltatore = [
+      '.....o.o.......',
+      '....wwwwww.....',
+      '...wwowowww....',
+      '..wwLwwwwLww...',
+      '..wwwwwwwwww...',
+      '..wwwwwwwwww...',
+      '...wwwwwwww....',
+      '..g........g...',
+      '.gg........gg..',
+      'gg..........gg.',
+      'g............g.',
+    ];
+    PA.fromGrid(this, 'enemy_hopper', saltatore, hPal, sE);
+
     // --- BOSS "Tappo di Cerume" (grande, due volte la scala) ---
     const bPal = {
       w: C.waxHard,

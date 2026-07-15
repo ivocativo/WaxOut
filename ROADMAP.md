@@ -137,9 +137,26 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
   (moscerini inclusi) a collidere normalmente. Giustificazione narrativa: e' la "preda inafferrabile"
   dell'evento, non un volante generico. Verificato: overlap forzato su un blocco → il moscerino
   normale si ferma, il fuggitivo lo attraversa.
-- [ ] **B.2 — Valutare nemici che SALTANO** (nuova varietà, ancora aperta — non necessaria per
+- [x] **B.2 — Valutare nemici che SALTANO** (nuova varietà, ancora aperta — non necessaria per
   sbloccare il Fuggitivo, che e' gia' risolto sopra in altro modo). Idea a se stante per varieta',
   da riprendere quando si vuole.
+  **FATTO (2026-07-13): 2 nemici nuovi, entrambi implementati** (il cerumino gia' faceva un
+  affondo-balzo singolo da vicino: questi si sentono diversi apposta).
+  - **Pulce** (`enemy_flea`, kind `'flea'`, dal lvl 2, peso 3): piccola e debole, salta di
+    CONTINUO verso il giocatore (nessun telegrafo) — fastidiosa, non pericolosa. `fleaAI(e, now)`.
+    **Tarata su richiesta utente (2026-07-13):** balzo piu' alto e meno frequente — `vy:-380`
+    (era -260, ~2x l'altezza: da ~31px a ~67px di apice) e cooldown 950ms (era 550ms, circa 1
+    balzo/sec invece di ~1.8/sec). Verificato: 2 balzi in 2s (prima ~3-4), picco velocita' -380.
+  - **Saltatore** (`enemy_hopper`, kind `'hopper'`, dal lvl 3, peso 2): stesso schema a stati del
+    cerumino (carica->balzo->recupero) ma ESAGERATO — carica piu' lunga (550ms, piu' tempo per
+    reagire), balzo molto piu' alto/lungo (`vy:-420` contro `-190` del cerumino, puo' scavalcarti
+    o atterrarti sopra), onda d'urto all'atterraggio (danno ad area se troppo vicino, oltre al
+    contatto diretto). `hopperAI(e, now)` + `hopperLandFx(x,y)`.
+  Texture procedurali nuove (`enemy_flea`/`enemy_hopper` in `BootScene.js`, stile coerente con gli
+  altri nemici). Compatibili col sistema élite (verificato: aura visibile, stato IA regolare anche
+  da corazzati). Verificato con test mirati (log velocita', stati, screenshot) + zero errori
+  console: la Pulce salta ~2 volte/secondo, il Saltatore fa il ciclo completo idle->windup->lunge
+  (picco vy -420)->atterraggio(onda)->idle.
 
 ---
 

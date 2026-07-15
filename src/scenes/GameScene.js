@@ -1086,7 +1086,9 @@ class GameScene extends Phaser.Scene {
     const lvl = window.GameState.level;
     const pool = [['blob', 5]];
     if (lvl >= 2) pool.push(['crust', 3]);
+    if (lvl >= 2) pool.push(['flea', 3]);    // presto in partita: fastidiosa, poco minacciosa
     if (lvl >= 3) pool.push(['spit', 2]);
+    if (lvl >= 3) pool.push(['hopper', 2]);  // dal lvl 3: minaccia seria, balzo enorme
     if (lvl >= 4) pool.push(['fly', 2]);
     let total = 0;
     pool.forEach((p) => { total += p[1]; });
@@ -1116,6 +1118,14 @@ class GameScene extends Phaser.Scene {
       cfg = { tex: 'enemy_spit', hp: 45 + lvl * 5, speed: 28, dmg: 12 + lvl, wax: 9, bit: 'bit_dirt', body: [26, 24], spit: true, projDmg: 9 + lvl * 2, spitEvery: 2200 };
     } else if (kind === 'boss') {
       cfg = { tex: 'enemy_boss', hp: 420 + lvl * 40, speed: 34, dmg: 20 + lvl * 2, wax: 60 + lvl * 6, bit: 'bit_hard', body: [60, 54], spit: true, projDmg: 12 + lvl * 2, spitEvery: 1500, boss: true };
+    } else if (kind === 'flea') {
+      // Pulce: piccola, debole, salta di CONTINUO verso il giocatore (non un singolo affondo
+      // come il cerumino) - fastidiosa piu' che pericolosa, presto in partita per varieta'.
+      cfg = { tex: 'enemy_flea', hp: 14 + lvl * 2, speed: 40, dmg: 6 + lvl, wax: 3, bit: 'bit_wax', body: [16, 14] };
+    } else if (kind === 'hopper') {
+      // Saltatore: un balzo enorme e telegrafato (molto piu' del cerumino), atterraggio ad
+      // onda d'urto - minaccia seria, dal livello 3.
+      cfg = { tex: 'enemy_hopper', hp: 55 + lvl * 6, speed: 30, dmg: 16 + lvl * 2, wax: 10, bit: 'bit_dirt', body: [30, 24], scale: 1.3 };
     } else {
       cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22], scale: 1.6 };
     }
@@ -1963,6 +1973,84 @@ class GameScene extends Phaser.Scene {
     e.setFlipX(dir < 0);
   }
 
+  // IA della PULCE: a differenza del cerumino (un affondo telegrafato solo quando sei vicino),
+  // la Pulce saltella SEMPRE verso il giocatore, un balzo BASSO e frequente dopo l'altro -
+  // nessun telegrafo, non e' un'imboscata: e' solo fastidiosa e imprevedibile da colpire mentre
+  // e' in aria. Riparte da terra appena atterra e il cooldown e' scaduto.
+  fleaAI(e, now) {
+    const dir = Math.sign(this.player.x - e.x) || (e.hopDir || 1);
+    const onGround = e.body.blocked.down || e.body.touching.down;
+    if (onGround && now >= (e.hopReadyAt || 0)) {
+      e.hopDir = dir;
+      e.setVelocity(dir * e.speed * 2.2, -380);   // balzo piu' alto (era -260)
+      e.hopReadyAt = now + 950;                    // meno frequente (era 550ms)
+    }
+    e.setFlipX(dir < 0);
+  }
+
+  // IA del SALTATORE: stesso schema a stati del cerumino (carica telegrafata -> balzo ->
+  // recupero) ma ESAGERATO - carica piu' lunga (piu' tempo per reagire, il balzo e' pericoloso),
+  // balzo molto piu' alto/lungo (puo' scavalcarti o atterrarti sopra), e all'atterraggio una
+  // piccola onda d'urto (danno se sei troppo vicino, oltre al contatto diretto).
+  hopperAI(e, now) {
+    const dx = this.player.x - e.x;
+    const dir = Math.sign(dx) || (e.lungeDir || 1);
+
+    if (e.atkState === 'windup') {
+      e.setVelocityX(0);
+      e.setTint((Math.floor(now / 90) % 2) ? 0xffb066 : 0xffffff);
+      if (now >= e.windupUntil) {
+        e.atkState = 'lunge';
+        e.lungeUntil = now + 520;
+        e.clearTint();
+        if (e._baseScale) e.setScale(e._baseScale);
+        e.setVelocity(e.lungeDir * (e.speed * 2.4 + 160), -420);
+      }
+      return;
+    }
+    if (e.atkState === 'lunge') {
+      e.setFlipX(e.lungeDir < 0);
+      // Atterrato per davvero (non nel primo istante del balzo, dove il corpo tocca ancora
+      // terra per un frame): stesso accorgimento gia' usato altrove per l'accovacciamento.
+      const landed = (e.body.blocked.down || e.body.touching.down) && now - e.lungeStartAt > 200;
+      if (now >= e.lungeUntil || landed) {
+        e.atkState = 'idle';
+        e.atkReadyAt = now + 900;
+        e.setVelocityX(0);
+        this.hopperLandFx(e.x, e.y);
+      }
+      return;
+    }
+
+    const near = Math.abs(dx) < 260 && Math.abs(this.player.y - e.y) < 90;
+    if (near && now >= (e.atkReadyAt || 0) && (e.body.blocked.down || e.body.touching.down)) {
+      e.atkState = 'windup';
+      e.windupUntil = now + 550;   // carica piu' lunga del cerumino: il balzo e' molto piu' grosso
+      e.lungeDir = dir;
+      e.lungeStartAt = now;
+      e.setVelocityX(0);
+      e.setTint(0xffb066);
+      const bs = e._baseScale || (e._baseScale = e.scaleX);
+      e.setScale(bs * 1.28, bs * 0.75);
+      e.setFlipX(dir < 0);
+      return;
+    }
+    e.setVelocityX(dir * e.speed);
+    e.setFlipX(dir < 0);
+  }
+
+  // Onda d'urto all'atterraggio del Saltatore: danno ad area se sei troppo vicino (oltre
+  // all'eventuale contatto diretto, gia' gestito centralmente per tutti i nemici).
+  hopperLandFx(x, y) {
+    const R = 60;
+    const ring = this.add.circle(x, y, R, 0xff8a4a, 0.3).setDepth(11).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 260, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    this.cameras.main.shake(90, 0.006);
+    if (Math.hypot(this.player.x - x, this.player.y - y) < R) {
+      this.hurtPlayer(Math.round(6 + window.GameState.level * 1.5), x);
+    }
+  }
+
   // IA del BOSS (Tappo di Cerume): avanza lento e SPUTA con telegrafo (breve carica
   // lampeggiante prima del lancio). A META' VITA si INFURIA: sputo piu' frequente e a
   // VENTAGLIO (3 vie) ed evoca ogni tanto un cerumino. Chiamato dal loop nemici.
@@ -2581,6 +2669,10 @@ class GameScene extends Phaser.Scene {
           const dir = Math.sign(this.player.x - e.x);
           e.setVelocityX(dir * e.speed);
           e.setFlipX(dir < 0);
+        } else if (e.kind === 'flea') {
+          this.fleaAI(e, now);     // Pulce: saltella di continuo verso il giocatore
+        } else if (e.kind === 'hopper') {
+          this.hopperAI(e, now);   // Saltatore: balzo enorme telegrafato + onda d'urto
         } else {
           // Cerumino (blob): cammina + AFFONDO telegrafato.
           this.groundEnemyAI(e, now);
