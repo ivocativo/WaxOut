@@ -160,35 +160,34 @@ _zero errori console). **NON ancora committato** — in attesa di conferma dell'
 
 ---
 
-## GRUPPO C — Boss  ✅ DECISO, pronto per Sonnet
+## GRUPPO C — Boss  ✅ FATTO E VERIFICATO (2026-07-15)
 _Attacco nuovo scelto dall'utente: **Balzo + schiacciata con onda d'urto**._
 
-- [ ] **C.1 — Boss meno noioso + niente pedana-riparo + drop cure.** Tre modifiche allo stesso
-  combattimento, tutte in `GameScene.js`.
-  - **(a) Togliere la pedana-riparo nell'arena boss.** `buildPlatforms()` (~riga 550) sparge pedane
-    lungo tutto il condotto; nei livelli boss ne spunta una comoda vicino al timpano che rende il
-    fight banale. Fix: se `this.levelKind === 'boss'`, NON piazzare pedane nell'arena del boss (parte
-    destra vicino al timpano). ⚠️ GOTCHA: `this.goalX` NON e' ancora impostato dentro `buildPlatforms`
-    (lo imposta `buildGoal`, chiamato DOPO in `buildLevel`) → usare una soglia su `this.worldW` (zona
-    boss = `x > this.worldW - 800`) e saltare gli `addPlatform` con x li'. Verifica: livello boss →
-    nessuna pedana vicino al boss.
-  - **(b) Drop cure alla morte del boss.** In `damageEnemy`, ramo `if (e.kind === 'boss')` del blocco
-    morte (~riga 1896): dopo il banner, `this.addWaxPickup(e.x - 22, e.y - 8, true); this.addWaxPickup(
-    e.x + 22, e.y - 8, true);` (3° arg `true` = pickup CURA, firma gia' esistente). Verifica: boss
-    morto → 2 palline rosa raccoglibili.
-  - **(c) Attacco "Balzo + schiacciata" nel `bossAI` (~riga 2050).** Macchina a stati sul boss
-    (campo `e.bossAtk`), a cooldown, INTERCALATA allo sputo (non insieme). Riusa il pattern del
-    Saltatore (`hopperAI`/`hopperLandFx`):
-    - cooldown `e.slamReadyAt` (~ogni 4500ms; ~3000ms se `e._enraged`);
-    - pronto + giocatore entro ~360px + boss a terra → stato `'slamwind'`: fermo, lampeggia + si
-      accovaccia (~600ms, telegrafo lungo: e' pesante);
-    - `'slamjump'`: `setVelocity(dir * (e.speed*2 + 120), -430)` (balzo alto verso il giocatore);
-    - all'atterraggio (a terra e >250ms dallo stacco): `this.bossSlamFx(e.x, e.y)` = anello grosso
-      (R~100) + shake forte + danno ad area al giocatore se entro R (`hurtPlayer(round(e.contactDamage
-      *0.9), e.x)`) + danno al cerume vicino; poi `idle`, `e.slamReadyAt = now + cooldown`.
-    - Gate: sputa SOLO se `!e.bossAtk`; disattiva il "avanza" (setVelocityX) durante slamwind/slamjump.
-    Verifica (god-mode): ciclo idle→slamwind(telegrafo)→salto→onda→cooldown, e lo sputo continua tra
-    uno slam e l'altro. Numeri (raggio/danno/cooldown/altezza) da tarare col playtest utente.
+- [x] **C.1 — Boss meno noioso + niente pedana-riparo + drop cure.** Tre modifiche allo stesso
+  combattimento, tutte in `GameScene.js`. **NON ancora committato** — in attesa di conferma
+  dell'utente. Numeri (raggio/danno/cooldown/altezza) FISSATI al primo tentativo (non ancora
+  tarati da un vero playtest): da aggiustare se il boss risulta troppo facile/difficile.
+  - **(a) FATTO — Niente pedana-riparo nell'arena boss.** `buildPlatforms()` ora salta ogni
+    `addPlatform` con `x >= this.worldW - 800` quando `this.levelKind === 'boss'` (soglia su
+    `worldW` perche' `goalX` non e' ancora pronto a quel punto). Verificato in preview: livello
+    boss forzato → tutte le pedane generate sotto la soglia, zero nell'arena vicino al timpano.
+  - **(b) FATTO — Drop cure alla morte del boss.** Aggiunte `this.addWaxPickup(e.x-22, e.y-8,
+    true)` + `(e.x+22, e.y-8, true)` nel ramo morte boss di `damageEnemy`. Verificato: colpo
+    letale al boss → 2 pickup CURA comparsi esattamente a quelle coordinate.
+  - **(c) FATTO — Attacco "Balzo + schiacciata"** in `bossAI` (nuovo campo `e.bossAtk`:
+    `null|'slamwind'|'slamjump'`) + nuovo metodo `bossSlamFx(e,x,y)`. Cooldown `e.slamReadyAt`
+    (4500ms normale, 3000ms infuriato, inizializzato a spawn con un ritardo 2500-4000ms per non
+    aprire il fight con uno slam). Ciclo: giocatore entro 360px + boss a terra → `'slamwind'`
+    (fermo, lampeggia arancio, si accovaccia 600ms) → `'slamjump'` (balzo `dir*(speed*2+120),
+    -430` verso il giocatore) → atterraggio (>250ms dallo stacco) → `bossSlamFx` = anello +
+    shake forte + danno ad area (`round(contactDamage*0.9)` al giocatore entro R=100, 20 al
+    cerume vicino). Sputo e avanzata GATATI durante `e.bossAtk` (early return in cima al
+    metodo). Verificato con chiamate dirette a `bossAI(boss, now)` a tempo simulato (stesso
+    approccio "spy" del Gruppo A): transizione slamwind→slamjump con velocita' corrette,
+    atterraggio → danno player (-27, coerente con contactDamage 30 del boss lvl5) + danno
+    blocco cerume (-20), cooldown post-atterraggio corretto sia a freddo (4500) che infuriato
+    (3000), sputo confermato SILENZIATO (zero proiettili) mentre `bossAtk` e' attivo. Zero
+    errori console.
 
 ---
 
@@ -313,14 +312,14 @@ _Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume res
 ---
 
 ## Ordine per Sonnet (deciso 2026-07-13)
-**Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`). **Da fare, in ordine:**
-1. **C** (boss: no-pedana + drop cure + balzo-schiacciata).
-2. **E.1** (mutatore Terremoto: cerume vero + ferisce il PG) → poi **E.3** (pedane raggiungibili, rapido).
-3. **F.1a+b** (riduci cerume + palline dai nemici).
-4. **F.1c** (nuovi progetti).
-5. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
-6. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
-7. **H** — non ora, solo promemoria.
+**Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
++ drop cure + balzo-schiacciata — 2026-07-15, NON ancora committato). **Da fare, in ordine:**
+1. **E.1** (mutatore Terremoto: cerume vero + ferisce il PG) → poi **E.3** (pedane raggiungibili, rapido).
+2. **F.1a+b** (riduci cerume + palline dai nemici).
+3. **F.1c** (nuovi progetti).
+4. **E.2 Fase 1 punto (1)** (soffitto visibile — codice puro). Punti (2)(3) (sfondi/protuberanze) = loop AI con l'utente.
+5. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
+6. **H** — non ora, solo promemoria.
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
 (god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri

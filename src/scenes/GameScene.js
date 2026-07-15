@@ -548,9 +548,15 @@ class GameScene extends Phaser.Scene {
   // cerume sopra. Una volta a livello, sopra una pedana alta si nasconde uno SCRIGNO
   // segreto (un'altra pedana ancora piu' su, raggiungibile con un salto extra).
   buildPlatforms() {
+    // Arena boss (parte destra vicino al timpano): nessuna pedana-riparo, per non rendere
+    // banale il fight. this.goalX non e' ancora impostato qui (lo fa buildGoal, DOPO in
+    // buildLevel), percio' usiamo una soglia su this.worldW.
+    const bossArenaX = this.levelKind === 'boss' ? this.worldW - 800 : Infinity;
+
     this.membranes.forEach((m) => {
       if (m.type !== 'short') return;
       const px = Math.max(200, m.x - 110);
+      if (px >= bossArenaX) return;
       const py = this.groundTop - Phaser.Math.Between(72, 96);
       this.addPlatform(px, py, 110);
     });
@@ -562,24 +568,28 @@ class GameScene extends Phaser.Scene {
       // Pedana bassa: quasi sempre presente se il varco e' abbastanza largo.
       if (gapW > 260 && Math.random() < 0.7) {
         const lowX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.25, 0.4));
-        const py = this.groundTop - Phaser.Math.Between(90, 130);
-        this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
-        if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26, Math.random() < 0.35);   // a volte CURA
+        if (lowX < bossArenaX) {
+          const py = this.groundTop - Phaser.Math.Between(90, 130);
+          this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
+          if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26, Math.random() < 0.35);   // a volte CURA
+        }
       }
       // Pedana alta: premia chi sale a cercarla.
       if (Math.random() < 0.55) {
         const midX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.5, 0.75));
-        const py = this.groundTop - Phaser.Math.Between(150, 220);
-        this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
-        if (Math.random() < 0.75) this.addWaxPickup(midX, py - 26, Math.random() < 0.45);   // pedana alta: piu' spesso CURA
-        // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
-        // in alto — un salto in piu' rispetto al percorso ovvio. Una sola volta a livello.
-        if (!secretPlaced && Math.random() < 0.35) {
-          secretPlaced = true;
-          const sx = midX + Phaser.Math.Between(-20, 20);
-          const sy = py - Phaser.Math.Between(74, 96);   // raggiungibile con un salto dalla pedana alta
-          this.addPlatform(sx, sy, 70);
-          for (let k = -1; k <= 1; k++) this.addWaxPickup(sx + k * 20, sy - 28, k === 0);
+        if (midX < bossArenaX) {
+          const py = this.groundTop - Phaser.Math.Between(150, 220);
+          this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
+          if (Math.random() < 0.75) this.addWaxPickup(midX, py - 26, Math.random() < 0.45);   // pedana alta: piu' spesso CURA
+          // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
+          // in alto — un salto in piu' rispetto al percorso ovvio. Una sola volta a livello.
+          if (!secretPlaced && Math.random() < 0.35) {
+            secretPlaced = true;
+            const sx = midX + Phaser.Math.Between(-20, 20);
+            const sy = py - Phaser.Math.Between(74, 96);   // raggiungibile con un salto dalla pedana alta
+            this.addPlatform(sx, sy, 70);
+            for (let k = -1; k <= 1; k++) this.addWaxPickup(sx + k * 20, sy - 28, k === 0);
+          }
         }
       }
     }
@@ -1218,6 +1228,10 @@ class GameScene extends Phaser.Scene {
       e.diveState = 'hover';                                    // stato IA volo (vedi flyAI)
       e.diveReadyAt = this.time.now + Phaser.Math.Between(1000, 1800);
       e.bobPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);    // sfasa l'ondeggio tra i moscerini
+    }
+    if (cfg.boss) {
+      e.bossAtk = null;                                         // stato attacco balzo+schiacciata (vedi bossAI)
+      e.slamReadyAt = this.time.now + Phaser.Math.Between(2500, 4000);   // niente slam nei primissimi istanti
     }
 
     // ELITE: aura colorata dietro il nemico (segnale visivo, niente tint per non confliggere
@@ -1897,6 +1911,8 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
         this.showBanner(window.I18n.t('game_boss_dead', { wax: e.waxValue }), '#ffd166');
+        this.addWaxPickup(e.x - 22, e.y - 8, true);
+        this.addWaxPickup(e.x + 22, e.y - 8, true);
       } else {
         this.cameras.main.shake(110, 0.009);
         this.hitStop(85);
@@ -2052,10 +2068,43 @@ class GameScene extends Phaser.Scene {
   }
 
   // IA del BOSS (Tappo di Cerume): avanza lento e SPUTA con telegrafo (breve carica
-  // lampeggiante prima del lancio). A META' VITA si INFURIA: sputo piu' frequente e a
-  // VENTAGLIO (3 vie) ed evoca ogni tanto un cerumino. Chiamato dal loop nemici.
+  // lampeggiante prima del lancio), INTERCALATO a un "Balzo + schiacciata" a cooldown
+  // (macchina a stati in e.bossAtk: null|'slamwind'|'slamjump'). A META' VITA si INFURIA:
+  // sputo piu' frequente e a VENTAGLIO (3 vie), slam piu' frequente, evoca un cerumino ogni
+  // tanto. Chiamato dal loop nemici.
   bossAI(e, now) {
     const dir = Math.sign(this.player.x - e.x) || 1;
+
+    // Balzo+schiacciata IN CORSO: fermo/immobile durante il telegrafo, poi balza verso il
+    // giocatore; niente avanzata "normale" ne' sputo finche' non e' finito (gate e.bossAtk).
+    if (e.bossAtk === 'slamwind') {
+      e.setVelocityX(0);
+      e.setTint((Math.floor(now / 90) % 2) ? 0xff8a4a : 0xffffff);
+      if (now >= e.slamWindupUntil) {
+        e.clearTint();
+        if (e._baseScale) e.setScale(e._baseScale);
+        e.bossAtk = 'slamjump';
+        e.slamStartAt = now;
+        e.slamDir = dir;
+        e.setFlipX(dir < 0);
+        e.setVelocity(dir * (e.speed * 2 + 120), -430);
+      }
+      return;
+    }
+    if (e.bossAtk === 'slamjump') {
+      e.setFlipX(e.slamDir < 0);
+      // Atterrato per davvero (non nel primo istante del balzo, dove il corpo tocca ancora
+      // terra per un frame): stesso accorgimento gia' usato per il Saltatore.
+      const landed = (e.body.blocked.down || e.body.touching.down) && now - e.slamStartAt > 250;
+      if (landed) {
+        e.bossAtk = null;
+        e.setVelocityX(0);
+        this.bossSlamFx(e, e.x, e.y);
+        e.slamReadyAt = now + (e._enraged ? 3000 : 4500);
+      }
+      return;
+    }
+
     e.setVelocityX(dir * e.speed);
     e.setFlipX(dir < 0);
 
@@ -2066,6 +2115,18 @@ class GameScene extends Phaser.Scene {
       this.showBanner(window.I18n.t('game_boss_enrage'), '#ff7043');
       e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
       e._summonAt = now + 2500;
+    }
+
+    // Pronto + giocatore abbastanza vicino + boss a terra: parte il telegrafo dello slam.
+    if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 360 &&
+        (e.body.blocked.down || e.body.touching.down)) {
+      e.bossAtk = 'slamwind';
+      e.slamWindupUntil = now + 600;   // telegrafo lungo: e' pesante, si vede arrivare
+      e.setVelocityX(0);
+      e.setTint(0xff8a4a);
+      const bs = e._baseScale || (e._baseScale = e.scaleX);
+      e.setScale(bs * 1.22, bs * 0.72);   // si accovaccia
+      return;
     }
 
     // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
@@ -2085,6 +2146,23 @@ class GameScene extends Phaser.Scene {
       if (this.enemies.countActive(true) < 4) this.spawnEnemy('blob');
       e._summonAt = now + 5000;
     }
+  }
+
+  // Onda d'urto all'atterraggio dello slam del boss: anello grosso + shake forte + danno ad
+  // area al giocatore (se entro raggio) e al cerume vicino (stesso pattern di hopperLandFx,
+  // ma piu' intenso: il boss e' molto piu' pesante del Saltatore).
+  bossSlamFx(e, x, y) {
+    const R = 100;
+    const ring = this.add.circle(x, y, R, 0xff6b3d, 0.35).setDepth(12).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    window.Sfx.smash();
+    this.cameras.main.shake(220, 0.014);
+    if (Math.hypot(this.player.x - x, this.player.y - y) < R) {
+      this.hurtPlayer(Math.round(e.contactDamage * 0.9), x);
+    }
+    this.blocks.getChildren().forEach((b) => {
+      if (b.active && Math.hypot(b.x - x, b.y - y) < R) this.damageBlock(b, 20);
+    });
   }
 
   // IA del GORGOGLIANTE (nemico azzurrino a distanza): avanza lento verso il giocatore;
