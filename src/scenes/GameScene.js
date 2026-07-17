@@ -98,10 +98,17 @@ class GameScene extends Phaser.Scene {
     // dimensione della "finestra" visibile; il mondo fisico e' molto piu' ampio.
     this.worldW = Phaser.Math.Clamp(2400 + levelNum * 220, 2400, 5200);
     if (this.levelKind === 'swarm') this.worldW += 300;
+    const gh = window.CONFIG.GROUND_H;
+    // Soffitto TANGIBILE (round 2, B.1): fascia piu' SOTTILE di quella del round 1 (28% del
+    // pavimento, era 45%) e stavolta il bordo ALTO del mondo fisico coincide col suo fondo
+    // (CEIL_Y), non piu' y=0 — cosi' il giocatore/nemici (collideWorldBounds) sbattono la
+    // testa invece di sparire nel vuoto sopra. `CEIL_Y` e' salvato sulla scena: lo riusa anche
+    // `buildPlatforms` (B.2) per non far salire le pedane oltre lo spazio per testa+salto.
+    this.CEIL_Y = Math.round(gh * 0.28);
     // Il "fondo" del mondo fisico coincide con la SUPERFICIE del pavimento (H-gh):
     // rete di sicurezza: chi ha collideWorldBounds (giocatore e nemici) non puo' mai
     // cadere sotto il pavimento, qualunque cosa accada al suo corpo fisico.
-    this.physics.world.setBounds(0, 0, this.worldW, H - window.CONFIG.GROUND_H);
+    this.physics.world.setBounds(0, this.CEIL_Y, this.worldW, H - gh - this.CEIL_Y);
 
     this.drawBackground();
 
@@ -109,7 +116,6 @@ class GameScene extends Phaser.Scene {
     // sfondo) e non con un grande Shape rettangolare: su alcune GPU i rettangoli Shape
     // molto larghi non venivano disegnati e il pavimento "spariva". Si estende sotto il
     // bordo del mondo cosi' il tremolio della camera non scopre mai un buco.
-    const gh = window.CONFIG.GROUND_H;
     const groundGfx = this.add.graphics().setDepth(4);
     groundGfx.fillStyle(C.ground, 1);
     groundGfx.fillRect(0, H - gh, this.worldW, gh + 200);
@@ -119,15 +125,13 @@ class GameScene extends Phaser.Scene {
     this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh).setVisible(false);
     this.physics.add.existing(this.ground, true);
 
-    // Soffitto VISIBILE (E.2 Fase 1): fascia in cima, PIU' SOTTILE del pavimento, stessa
-    // palette carnosa — oggi le cose appese in alto (protuberanze, gocce) partivano da y=0
-    // senza una superficie da cui "pendere". Solo estetica: il bordo alto del mondo e' gia'
-    // a y=0 (physics.world.setBounds piu' sopra), niente collider nuovo.
-    const ch = Math.round(gh * 0.45);
+    // Soffitto VISIBILE, stessa palette carnosa del pavimento — le cose appese in alto
+    // (protuberanze, gocce) hanno cosi' una superficie vera da cui "pendere". Solo estetica
+    // (il collider vero e' `physics.world.setBounds` qui sopra, a `CEIL_Y`).
     groundGfx.fillStyle(C.ground, 1);
-    groundGfx.fillRect(0, -200, this.worldW, ch + 200);
+    groundGfx.fillRect(0, -200, this.worldW, this.CEIL_Y + 200);
     groundGfx.fillStyle(C.groundDark, 1);
-    groundGfx.fillRect(0, ch - 5, this.worldW, 5);          // linea di superficie (il "bordo" del soffitto)
+    groundGfx.fillRect(0, this.CEIL_Y - 5, this.worldW, 5);  // linea di superficie (il "bordo" del soffitto)
 
     // Gruppi
     this.blocks = this.physics.add.staticGroup();
@@ -576,7 +580,11 @@ class GameScene extends Phaser.Scene {
     // esatto: a fine salita il controllo orizzontale e' ridotto).
     const p = window.GameState.player;
     const MAXUP = (p.jumpVelocity * p.jumpVelocity) / (2 * window.CONFIG.GRAVITY) * 0.82;
-    const clampAbove = (refY, rawY) => Math.max(rawY, refY - MAXUP);
+    // TETTO (round 2, B.2): nessuna pedana puo' salire cosi' tanto da non lasciare spazio a
+    // testa+salto sotto il soffitto tangibile (B.1) — altrimenti diventa irraggiungibile (il
+    // giocatore sbatte la testa prima di arrivarci). Corpo del PG alto ~40px + margine 16px.
+    const minY = this.CEIL_Y + 56;
+    const clampAbove = (refY, rawY) => Math.max(rawY, refY - MAXUP, minY);
 
     this.membranes.forEach((m) => {
       if (m.type !== 'short') return;

@@ -87,31 +87,29 @@ _errori). **NON ancora committato** — in attesa di conferma dell'utente._
 _Questi due punti si CONDIZIONANO: rendere il soffitto "tangibile" (B.1) toglie spazio in alto, il_
 _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nello stesso turno._
 
-- [ ] **B.1 — Il soffitto è troppo basso e intangibile.**
-  Causa (verificata): l'ho aggiunto io nel round 1 (`GameScene.js` ~122) come `ch = round(gh*0.45)`
-  = **81px** di fascia puramente ESTETICA (nessun collider; il bordo fisico del mondo è a y=0). Due
-  problemi: (a) 81px = il 22% dell'altezza giocabile (360px) → "pende" troppo in basso; (b) è
-  attraversabile (il giocatore/nemici possono stare sopra la fascia, fin su a y=0). **Fix:** (a)
-  fascia più SOTTILE (es. `gh*0.28` ≈ 50px, si tara); (b) renderla TANGIBILE — spostare il bordo
-  superiore del mondo fisico da y=0 al fondo della fascia: in `create` cambiare `this.physics.world.
-  setBounds(0, 0, worldW, H - GROUND_H)` in modo che il top sia `CEIL_Y` (fondo del soffitto), così
-  giocatore e nemici (che hanno `collideWorldBounds`) sbattono contro il soffitto invece di
-  sparire nel vuoto sopra. ⚠️ Controllare i volanti: `dropFromCeiling` (~1406) li fa planare a
-  `restY = Between(90,170)` → devono restare SOTTO `CEIL_Y` (con fascia ~50px sono già a posto, ma
-  verificare). Verifica: il PG salta e sbatte la testa sul soffitto (non passa oltre); la fascia
-  occupa meno spazio.
+- [x] **B.1 — Il soffitto è troppo basso e intangibile.** FATTO E VERIFICATO (2026-07-17).
+  **NON ancora committato.**
+  **FATTO:** fascia visibile piu' sottile (`CEIL_Y = round(gh*0.28)` ≈ 50px, era 81px = `gh*0.45`)
+  **e** tangibile — `this.CEIL_Y` salvato sulla scena (lo riusa anche B.2) e riordinato `create()`
+  per calcolarlo PRIMA di `physics.world.setBounds`, che ora parte da `(0, CEIL_Y, worldW, H-gh-
+  CEIL_Y)` invece che da `(0,0,...)`: il bordo fisico alto del mondo coincide col fondo del
+  soffitto, non piu' con lo schermo. La camera resta `setBounds(0,0,worldW,H)` (invariata:
+  continua a mostrare la fascia visivamente, cambia solo dove si FERMANO i corpi fisici). I
+  volanti (`dropFromCeiling`, `restY` 90-170) restano comodamente sotto `CEIL_Y=50`, nessuna
+  modifica necessaria. Le gocce (`movers`) non hanno `collideWorldBounds`, non toccate.
+  Verificato: PG lanciato verso l'alto (velocita' enorme) si ferma esattamente a `body.top=50` =
+  `CEIL_Y`, `blocked.up` scatta correttamente.
 
-- [ ] **B.2 — La pedana più in alto a volte è irraggiungibile per il limite dello schermo in alto.**
-  Causa (verificata): nel round 1 (E.3) ho clampato le pedane a `MAXUP` (≈117px, altezza di UN
-  salto) rispetto alla superficie da cui le raggiungi, MA senza un limite MINIMO in alto. Concateno
-  suolo→bassa→alta→scrigno: lo scrigno segreto può finire fino a ~9px dal bordo (`buildPlatforms`
-  ~554, `clampAbove`). Per ATTERRARCI il PG (alto ~40px, `collideWorldBounds` col top del mondo a
-  y=0) dovrebbe portare la testa sopra y=0 → impossibile, il bordo lo blocca. **Fix (insieme a
-  B.1):** definire `CEIL_Y` una sola volta (fondo del soffitto tangibile di B.1) e nel clamp delle
-  pedane imporre anche un TETTO: `platformY ≥ CEIL_Y + PLAYER_H + margine` (~40+16), così nessuna
-  pedana (né lo scrigno) può salire tanto da non lasciare spazio a testa+salto sotto il soffitto.
-  Verifica in preview SENZA doppio salto: la pedana/scrigno più in alto è sempre raggiungibile e il
-  PG non sbatte la testa prima di arrivarci. **Collegamento:** dipende dal `CEIL_Y` fissato in B.1.
+- [x] **B.2 — La pedana più in alto a volte è irraggiungibile per il limite dello schermo in alto.**
+  FATTO E VERIFICATO (2026-07-17), insieme a B.1. **NON ancora committato.**
+  **FATTO:** aggiunto un TETTO a `clampAbove` in `buildPlatforms` — `minY = this.CEIL_Y + 56`
+  (corpo del PG ~40px + margine 16px) — `clampAbove = (refY, rawY) => Math.max(rawY, refY-MAXUP,
+  minY)`, cosi' nessuna pedana (ne' lo scrigno segreto) puo' finire sopra quella quota, qualunque
+  sia la catena di riferimenti (suolo→bassa→alta→scrigno). Verificato con la stessa chiusura di
+  raggiungibilita' del round 1 (E.3) SENZA doppio salto, su **45 generazioni di livello (397
+  pedane totali): zero irraggiungibili, zero sopra il nuovo limite del soffitto.** Volante testato
+  di rimbalzo: si assesta a y≈89-90 (dentro il range atteso 90-170), ben sotto `CEIL_Y=50`. Zero
+  errori console in tutta la verifica.
 
 ---
 
@@ -284,9 +282,9 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 ## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
 1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17, committato (`2db4ecf`).
 2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17, committato (`bf7c206`).
-3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17 (scia scatto più densa/differenziata). NON ancora committato.
-4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **PROSSIMO** — **INSIEME**, fissa `CEIL_Y`.
-5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **dopo B** (usa `CEIL_Y`).
+3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17, committato (`8c5c938`).
+4. ~~**Gruppo B**~~ ✅ FATTO 2026-07-17 (soffitto tangibile+più sottile + pedane sotto il soffitto, `CEIL_Y` fissato). NON ancora committato.
+5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **PROSSIMO** — usa `CEIL_Y` appena fissato.
 6. **Gruppo F** — F.1 (timer Corsa) + F.2 parte (a) (timer Assedio grande/lampeggiante, widget condiviso). ⚠️ **F.2 parte (b) ARENA assedio = blocco a sé, va pianificato con Opus prima** (non farlo qui).
 7. **Gruppo G** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.
 8. **Gruppo H** (menu) — **Sonnet propone una bozza e si itera con l'utente** (deciso).
