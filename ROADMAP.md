@@ -117,18 +117,21 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 
 ## GRUPPO C — Scatto (dash): feedback visivo
 
-- [ ] **C.1 — Durante lo scatto la scia è poco visibile + serve più differenza tra scatto normale
-  e scatto con danno.** Causa (verificata): `spawnDashGhost` (`GameScene.js` ~1688) crea fantasmi
-  con `alpha 0.5`, throttle 40ms (→ pochi fantasmi in 160ms di scatto), che sfumano in 220ms; colori
-  `0x8fe0ff` (azzurro, normale) vs `0xff6b3d` (arancio, danno). Lo scatto offensivo ha in più solo un
-  anello una-tantum (`dashStrikeFx` ~1705). Troppo tenue e poco distinguibili. **Fix (estetico, da
-  tarare):** (a) rendere la scia più marcata — throttle più basso (~20-25ms = più copie), `alpha`
-  iniziale più alto (~0.75), magari 2-3 fantasmi persistenti; (b) DIFFERENZIARE forte i due scatti:
-  normale = scia azzurra sobria, SENZA anello; con danno = scia arancione PIÙ densa/luminosa +
-  l'anello iniziale + qualche particella/scintilla arancio lungo il tragitto (riusa `burst`), così
-  "questo scatto fa male" è inequivocabile. Verifica: screenshot affiancati dei due scatti,
-  differenza evidente; nessun calo di frame. **Collegamento:** stessa area di A.4 (lo scatto con
-  danno ora è un vero sblocco a valle): il feedback deve rendere giustizia al fatto che è "avanzato".
+- [x] **C.1 — Durante lo scatto la scia è poco visibile + serve più differenza tra scatto normale
+  e scatto con danno.** FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
+  **FATTO:** in `spawnDashGhost` — (a) throttle dimezzato (40ms→20ms: quasi doppi fantasmi nella
+  scia); (b) DIFFERENZIATI per intensita', non solo colore: alpha iniziale 0.65 (normale, era
+  0.5) contro 0.85 (con danno) — non solo arancio invece di azzurro, anche visibilmente PIÙ
+  luminoso; (c) scintille (`burst('bit_hard', ...)`) lungo il tragitto SOLO nello scatto
+  offensivo, throttle 60ms indipendente da quello dei fantasmi. L'anello una-tantum
+  (`dashStrikeFx`, gia' esclusivo del danno, invariato) resta l'unica cosa che lo scatto normale
+  non ha, come richiesto. Verificato con test a tempo reale (`game.step()`): in una finestra di
+  ~167ms (durata di uno scatto), 5 fantasmi per entrambi (prima ne sarebbero usciti meno, throttle
+  piu' alto); alpha range normale 0.34→0.65, con danno 0.72→0.85 (nettamente piu' alto in ogni
+  istante); tinte esatte (0x8fe0ff azzurro / 0xff6b3d arancio); 3 scintille generate nello scatto
+  con danno, 0 in quello normale; l'anello si crea correttamente. Zero errori console.
+  **Collegamento:** stessa area di A.4 (lo scatto con danno ora è un vero sblocco a valle): il
+  feedback ora rende giustizia al fatto che è "avanzato".
 
 ---
 
@@ -280,9 +283,9 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 
 ## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
 1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17, committato (`2db4ecf`).
-2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17 (boss: arco del salto più verticale + stretch/ombra). NON ancora committato.
-3. **Gruppo C** (scia scatto più visibile + differenza normale/danno) — **PROSSIMO** — estetico, si sposa con A.4.
-4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **INSIEME**, fissa `CEIL_Y`.
+2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17, committato (`bf7c206`).
+3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17 (scia scatto più densa/differenziata). NON ancora committato.
+4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **PROSSIMO** — **INSIEME**, fissa `CEIL_Y`.
 5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **dopo B** (usa `CEIL_Y`).
 6. **Gruppo F** — F.1 (timer Corsa) + F.2 parte (a) (timer Assedio grande/lampeggiante, widget condiviso). ⚠️ **F.2 parte (b) ARENA assedio = blocco a sé, va pianificato con Opus prima** (non farlo qui).
 7. **Gruppo G** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.

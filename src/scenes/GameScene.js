@@ -1683,23 +1683,30 @@ class GameScene extends Phaser.Scene {
   }
 
   // Scia dello scatto: copie "fantasma" dell'aspetto ATTUALE del personaggio (stessa texture/
-  // frame/flip di this.heroVisual) che si dissolvono. Colore diverso per distinguere lo scatto
-  // OFFENSIVO (arancio, stessa tinta degli impatti/esplosioni nel gioco) da quello normale
-  // (azzurro, solo velocita' - prima lo scatto non aveva NESSUN feedback visivo). Throttle a
-  // ~40ms cosi' non spamma uno sprite ad ogni singolo frame.
+  // frame/flip di this.heroVisual) che si dissolvono. DIFFERENZIATA forte tra i due scatti
+  // (round 2, C.1): quello normale resta sobrio (azzurro, pochi fantasmi); quello OFFENSIVO e'
+  // vistosamente piu' denso/luminoso (arancio, piu' fantasmi, scintille lungo il tragitto) cosi'
+  // "questo scatto fa male" si legge a colpo d'occhio, non solo dal colore. Throttle piu' basso
+  // (20ms, era 40ms) per lasciare piu' copie nella scia dei ~160ms di scatto.
   spawnDashGhost(damaging) {
     const now = this.time.now;
-    if (this._lastDashGhostAt && now - this._lastDashGhostAt < 40) return;
+    if (this._lastDashGhostAt && now - this._lastDashGhostAt < 20) return;
     this._lastDashGhostAt = now;
     const hv = this.heroVisual;
     const ghost = this.add.sprite(hv.x, hv.y, hv.texture.key, hv.frame.name)
       .setOrigin(hv.originX, hv.originY).setScale(hv.scaleX, hv.scaleY)
-      .setFlipX(hv.flipX).setDepth(hv.depth - 1).setAlpha(0.5)
+      .setFlipX(hv.flipX).setDepth(hv.depth - 1).setAlpha(damaging ? 0.85 : 0.65)
       .setTintFill(damaging ? 0xff6b3d : 0x8fe0ff);
     this.tweens.add({
       targets: ghost, alpha: 0, scaleX: ghost.scaleX * 1.1, scaleY: ghost.scaleY * 1.1,
       duration: 220, ease: 'Quad.out', onComplete: () => ghost.destroy(),
     });
+    // Scintille lungo il tragitto: SOLO nello scatto offensivo, throttle piu' largo del
+    // fantasma (60ms) cosi' non affoga la scia in particelle.
+    if (damaging && (!this._lastDashSparkAt || now - this._lastDashSparkAt >= 60)) {
+      this._lastDashSparkAt = now;
+      this.burst('bit_hard', hv.x, hv.y, 2);
+    }
   }
 
   // Lampo UNA TANTUM all'inizio dello scatto offensivo (oltre alla scia arancio sopra): marca
