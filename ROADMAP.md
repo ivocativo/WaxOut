@@ -1,380 +1,258 @@
-# Earwax War — Piano esecutivo (blocco "Correzioni playtest — round 1")
+# Earwax War — Piano esecutivo (blocco "Correzioni playtest — round 2")
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" del blocco in corso (con le caselle da
 > spuntare), usa e getta. Per lo **stato generale** del progetto, come collaudare e le regole vedi
 > **`HANDOFF.md`**; per la descrizione del gioco vedi **`README.md`**.
 
-_Aggiornato 2026-07-13, dopo un playtest dell'utente su telefono con 21 segnalazioni (bug +_
-_migliorie). Qui sotto sono **annotate e raggruppate** (non ancora corrette) — si affrontano_
-_una alla volta o a gruppetti, nell'ordine proposto sotto salvo diverso avviso dell'utente._
-_Regole: god-mode nei test SEMPRE, i18n EN+IT per stringhe nuove, commit solo su richiesta._
+_Preparato 2026-07-17 da Opus dopo il 2° playtest telefono dell'utente (15 segnalazioni). Le cause_
+_qui sotto sono **già verificate nel codice** (file:riga) o **dal vivo in preview** dove non bastava_
+_leggere — si affrontano una alla volta o a gruppetti, nell'ordine in fondo salvo diverso avviso._
+_Regole invariate: god-mode nei test SEMPRE, i18n EN+IT per stringhe nuove, commit solo su richiesta._
 
-> ✅ **Blocco precedente ("Personaggio AI animato") sostanzialmente chiuso**: camminata/corsa/idle/
-> salto integrati e giocati (commit `9c9cf84`, `afd6b5c`), arma-in-mano prototipata (`b2e167c`).
-> Restano solo, per dopo: pose dedicate per l'attacco coordinato corpo+arma, embed per `file://`,
-> stesso trattamento per i nemici. Vedi `HANDOFF.md` §DA FARE. Notare: il bug "coton fioc doppio"
-> qui sotto (§A.1) è proprio un effetto collaterale del prototipo arma-in-mano — primo indiziato.
+> ✅ **Blocco precedente ("Correzioni playtest — round 1") CHIUSO e pushato.** Fatti e in
+> `origin/main`: Gruppo A (7 bug) `cbd4fe2`, B.1+D.1+B.2, **C.1** boss `4913ba3`, **E.1+E.3**
+> `672c20e`, **F.1a+b** `3a296a9`, **F.1c** (4 progetti) `7571519`, **soffitto** `9b43c73`. Il
+> dettaglio di quel blocco è nella cronologia git (non più qui: questo file è usa e getta).
 
 ---
 
 ## Come leggere questa lista
-Ogni punto ha: **cosa ha segnalato l'utente** → **causa probabile** (se trovata con una verifica
-veloce nel codice, file:riga) → **nota su come si collega ad altri punti**. Quando una causa non è
-ancora chiara è segnato "da investigare" invece che indovinato a caso.
+Ogni punto: **cosa ha segnalato l'utente** → **causa** (file:riga, verificata) → **cosa fare** →
+**note di collegamento**. Numeri "sensati" (velocità/altezze/tempi/colori) da TARARE col playtest.
 
 ---
 
-## GRUPPO A — Bug rapidi, causa già individuata ✅ TUTTI FATTI E VERIFICATI (2026-07-13)
-_Tutti e 7 corretti nella stessa sessione, verificati con test mirati in preview (dati + screenshot,_
-_zero errori console). **NON ancora committato** — in attesa di conferma dell'utente._
+## GRUPPO A — Fix rapidi, causa già individuata
 
-- [x] **A.1 — Coton fioc compare due volte nel corpo a corpo.**
-  Causa trovata: **due sistemi disegnano l'arma in contemporanea**. Quello vecchio
-  (`GameGfx.showWeaponSwing`, `src/gfx.js:243`) crea uno sprite `swab`/`hammer` con un tween
-  d'angolo e si autodistrugge; quello nuovo (`this.showMeleeWeapon`, `GameScene.js`, dal prototipo
-  "arma in mano" di ieri) fa la STESSA cosa col layer `this.heroWeapon`. `meleeSwing()` li chiama
-  entrambi. **FATTO:** rimossa la chiamata + il metodo wrapper in GameScene.js + la funzione morta
-  in gfx.js (nessun altro chiamante). Verificato: nella scena resta 1 solo sprite swab/hammer
-  durante l'attacco (prima 2).
+- [ ] **A.1 — L'animazione del coton fioc va SEMPRE verso destra.**
+  Causa (verificata): `showMeleeWeapon` (`GameScene.js` ~1875) fa ruotare l'arma con un tween
+  d'angolo FISSO da `-1.1` a `0.7` (un arco orario) e applica solo `setFlipY(this._weaponFlip)` in
+  base al facing. Il flip verticale non cambia il VERSO della rotazione, quindi l'arco "spazza"
+  sempre verso destra anche quando guardi a sinistra. **Fix:** specchiare anche la rotazione col
+  facing — quando `this.facing < 0`, invertire i due angoli del tween (es. da `+1.1` a `-0.7`) e/o
+  usare `setFlipX` invece di `setFlipY`, così l'arco segue la direzione del colpo. Verifica: colpo
+  a sinistra → l'arco spazza verso sinistra; a destra → verso destra.
 
-- [x] **A.2 — I moscerini attraversano il cerume.**
-  Causa trovata: `GameScene.js:187`, `this.physics.add.collider(this.enemies, this.blocks, null,
-  notFlyer)` — il filtro `notFlyer` esclude ESPRESSAMENTE i volanti dalla collisione col cerume.
-  **Nota di collegamento importante (leggere prima di toccare):** questo è in TENSIONE con l'idea
-  di trasformare il Fuggitivo Dorato in un nemico volante (vedi B.1) — se i volanti *devono* poter
-  attraversare il cerume (comportamento voluto, "volano sopra tutto"), allora il fix qui è solo
-  documentare/confermare che è INTENZIONALE e non un bug; se invece i volanti *devono* collidere
-  col cerume come tutti, il fix è togliere `notFlyer` dalla riga 187 — ma allora la soluzione B.1
-  (fuggitivo=volante) NON risolverebbe il suo blocco contro il cerume. **Decidere A.2 e B.1
-  INSIEME, nello stesso turno**, prima di implementare uno dei due.
-  **FATTO (deciso insieme a B.1):** il collider `enemies<->blocks` ora usa un filtro `notFugitive`
-  (non più `notFlyer`) — TUTTI i nemici collidono col cerume, **eccetto** il Fuggitivo Dorato
-  (bypass mirato, non "diventa volante": vedi B.1). Verificato con `physics.world.collide()`
-  isolato: moscerino normale si ferma sul blocco (prima lo attraversava), fuggitivo lo attraversa.
+- [ ] **A.2 — Dare alle Pulci balzi ancora più alti.**
+  Causa: `fleaAI` (`GameScene.js` ~2077) usa `setVelocity(dir*speed*2.2, -380)`. **Fix:** alzare
+  la componente verticale (es. `-460`/`-500`; apice ≈ v²/(2·1100) → -380=66px, -480=105px). Valuta
+  se allungare di poco anche il cooldown `hopReadyAt` (ora 950ms) se diventano troppo insistenti.
+  Verifica: la Pulce scavalca ostacoli più alti; picco velocità verticale = il nuovo valore.
 
-- [x] **A.3 — Seconda Vita si ricarica troppo spesso (dovrebbe essere una volta per PARTITA).**
-  Causa trovata: `GameScene.js:2550`, `if (p.secondLife && !this.secondLifeReady && p.hp >=
-  p.maxHp) this.secondLifeReady = true;` — si riarma ogni volta che torni a vita piena (curandoti
-  con pickup/potenziamenti), quindi può salvarti più volte nella stessa run. **Fix probabile:**
-  un flag `secondLifeUsed` che diventa `true` al primo uso e non si azzera mai fino al prossimo
-  `GameState.reset()` (inizio nuova run); togliere la ricarica automatica a vita piena.
-  **FATTO (causa piu' profonda del previsto):** `this.secondLifeReady` era stato/scena, azzerato a
-  `true` ad OGNI `create()` (quindi a ogni LIVELLO, non solo a inizio partita) — bug ancora piu'
-  generoso della sola ricarica-a-vita-piena. Spostato lo stato su `window.GameState.player.
-  secondLifeUsed` (vera vita di RUN). Verificato: 1° colpo mortale salva (hp 35, used=true), 2°
-  colpo mortale nella STESSA run uccide anche dopo essere tornato a vita piena; nuova run
-  (`GameState.reset()`) lo azzera correttamente.
+- [ ] **A.3 — I proiettili dei nemici sono identici al cerume che raccogli.**
+  Causa (verificata): `spitAt` (`GameScene.js` ~1437) crea la pallina sputata con `this.projectiles.
+  create(sx, sy, 'wax_glob')` — la STESSA texture `wax_glob` usata sia dai pickup di cerume sulle
+  pedane sia dalle palline lasciate dai nemici morti (F.1b). A colpo d'occhio "sparo nemico" e
+  "bottino da raccogliere" si confondono. **Fix:** dare ai proiettili una texture PROPRIA,
+  chiaramente "ostile" e diversa dal cerume dorato — es. una pallina generata a codice in `BootScene`
+  (come le altre texture procedurali: cerca `PixelArt`/`generateTexture`), tono verde-acido/viola
+  "velenoso" con un piccolo bordo scuro, così si legge come minaccia. Usarla in `spitAt` (e
+  verificare che il boss usi la stessa via `spitAt`). Verifica: proiettili nemici visivamente
+  distinti dai pickup; nessun errore. **Collegamento:** tema condiviso col round 1 (F.1b ha reso i
+  nemici "sorgente di palline"): ora serve separare NETTAMENTE le palline-bottino da quelle-danno.
 
-- [x] **A.4 — Potenziamenti non cumulabili (es. Doppio Salto) escono più volte anche se già presi.**
-  Causa trovata, MOLTO probabile: lo sblocco PERMANENTE da negozio "Doppio Salto Innato"
-  (`UNLOCKS.djump` in `state.js`) imposta `doubleJump: lv('djump') > 0` già in `newPlayer()` — ma
-  questo non viene mai registrato in `GameState.ownedAbilities` (che il filtro di `UpgradeScene.js:
-  98-103` usa per NON riproporre una carta una-tantum già presa). Chi ha comprato lo sblocco al
-  negozio si ritrova quindi la carta "Doppio Salto" offerta a vuoto ogni run (pesca sprecata, non fa
-  nulla). **Fix probabile:** all'inizio della run (o nel filtro `avail`), pre-popolare
-  `ownedAbilities` con le abilità equivalenti già garantite dai permanenti (o controllare
-  direttamente il flag `p.doubleJump`/analoghi nel filtro, non solo `ownedAbilities`). **Verificare
-  se lo stesso pattern riguarda altre abilità collegate a UNLOCKS/BLUEPRINTS permanenti**, non solo
-  doubleJump — da controllare quando si corregge.
-  **FATTO + verificato che NON riguarda altro:** controllate tutte le UNLOCKS (hp/dmg/speed sono
-  bonus statistici sempre cumulabili per design, nessun problema) e tutte le BLUEPRINTS (sbloccano
-  solo l'IDONEITA' della carta, non l'abilita' stessa — nessun problema). `djump` era l'UNICO caso.
-  Fix in `GameState.reset()`: se `player.doubleJump` e' gia' vero (sblocco permanente), lo segna
-  subito in `ownedAbilities`. Verificato: con lo sblocco attivo, `ownedAbilities` contiene
-  'doublejump' da inizio run e il filtro dell'UpgradeScene lo esclude correttamente.
-
-- [x] **A.5 — I nemici Esplosivi (élite "boom") non danneggiano altri nemici/il cerume, solo il
-  giocatore.** Causa trovata: `enemyExplode()` (`GameScene.js:1238-1250`) controlla SOLO la
-  distanza dal giocatore (`Math.hypot(this.player.x - x, ...)`) per applicare danno; non itera su
-  `this.enemies`/`this.blocks` nel raggio. **Fix probabile:** aggiungere, nello stesso raggio `R`,
-  danno ad area anche a nemici vicini (`damageEnemy`, non-elite-a-cascata per evitare esplosioni a
-  catena infinite — da decidere se è un effetto voluto o da smorzare) e al cerume (`damageBlock`).
-  **FATTO:** aggiunto danno ad area (stesso raggio/danno del giocatore) a nemici e cerume vicini.
-  **Decisione presa:** reazione a catena tra Esplosivi vicini CONSENTITA (tema "esplosivo", effetto
-  soddisfacente, nessun rischio di loop essendo il numero di nemici finito). Verificato con uno
-  spy diretto: blocco e nemico piazzati nel raggio hanno preso entrambi lo stesso danno (-15 a
-  livello 3), prima restavano illesi.
-
-- [x] **A.6 — Scatto (dash) contro le torri di cerume: spariscono ISTANTANEAMENTE, si perde
-  l'animazione di caduta/cedimento.** Causa trovata: `updateDashStrike()` (`GameScene.js:1584-1586`)
-  chiama `damageBlock(b, p.damage)` su OGNI blocco in overlap a OGNI FRAME per tutta la durata dello
-  scatto — a differenza dei nemici, che hanno un cooldown per-bersaglio (`e._dashHitAt`, riga 1581),
-  i blocchi non ce l'hanno: in pochi frame consecutivi (scatto dura più frame) lo stesso blocco (o
-  più blocchi in fila) prende danno decine di volte, sparendo di colpo invece di cedere un pezzo
-  alla volta con l'animazione già esistente (collasso a celle). **Fix probabile:** aggiungere un
-  cooldown per-blocco analogo a `_dashHitAt` (es. `b._dashHitAt`). **Collegato al punto D.1 sotto**
-  (lo scatto con danno deve anche SEMBRARE diverso da quello normale) — stessa area di codice,
-  ha senso farli nello stesso turno.
-  **FATTO (solo la parte A.6, D.1 resta per il Gruppo D):** aggiunto `b._dashHitAt` identico al
-  pattern nemici. Verificato con uno spy su `damageBlock`: 10 frame simulati di overlap durante lo
-  scatto → 1 sola chiamata (prima ne avrebbe fatte fino a 10, sparendo il blocco di colpo).
-
-- [x] **A.7 — Nemici a proiettili (gorgogliante/boss) non funzionano nei livelli a poca gravità.**
-  Causa trovata: `spitAt()` (`GameScene.js:1339`) usa `const g = window.CONFIG.GRAVITY;` — una
-  COSTANTE fissa — per calcolare la parabola balistica, invece della gravità REALE del mondo
-  fisico (`this.physics.world.gravity.y`), che il mutatore "poca gravità" (`lowgrav`) modifica a
-  runtime. Con gravità reale diversa da quella usata nel calcolo, la traiettoria non torna e il
-  proiettile sbaglia bersaglio/si comporta a caso. **Fix:** leggere `this.physics.world.gravity.y`
-  invece della costante.
-  **FATTO:** una riga (`const g = this.physics.world.gravity.y;`). Verificato: confrontata la
-  velocita' calcolata per lo stesso bersaglio a gravita' piena vs "poca gravita'" (mutatore) —
-  ora diversa e coerente (prima sarebbe stata identica, sbagliando la parabola).
+- [ ] **A.4 — Lo Scatto con danno va sbloccato solo DOPO lo scatto normale.**
+  Causa (verificata): la carta `dashstrike` (`UpgradeScene.js` ~52) fa `apply: (s) => { s.dashStrike
+  = true; if (!s.dash) s.dash = true; }` — cioè REGALA lo scatto base se non ce l'hai. E il filtro
+  `avail` (`UpgradeScene.js` ~102) non ha un concetto di "prerequisito" per le carte normali (solo
+  le EVOLUZIONI usano `needs`). **Fix (2 righe):** (1) aggiungere il supporto `needs` alle carte nel
+  filtro `avail` — `if (u.needs && owned.indexOf(u.needs) === -1) return false;`; (2) su `dashstrike`
+  mettere `needs: 'dash'` e TOGLIERE l'auto-regalo (`if (!s.dash)...`). Verifica: senza `dash` in
+  `ownedAbilities`, la carta Scatto Offensivo NON esce; presa la carta Scatto, comincia a comparire.
+  **Nota:** controllare che nessun'altra carta si appoggiasse a quell'auto-grant (non risulta: è
+  l'unico caso).
 
 ---
 
-## GRUPPO B — Nemici che saltano / Fuggitivo Dorato
+## GRUPPO B — Soffitto + pedane alte  ⚠️ DA FARE INSIEME (sono in tensione)
 
-- [x] **B.1 — Il Fuggitivo Dorato si blocca contro il cerume** (è un nemico "blob" a terra, fisica
-  normale → collide col cerume come chiunque altro). Proposta dell'utente: farlo volante. **Prima
-  di implementare, decidere insieme ad A.2** se i volanti devono o no attraversare il cerume — la
-  risposta cambia la soluzione (volante coerente con A.2 risolto in un modo, o serve un'altra
-  strada tipo "il fuggitivo ignora la collisione col cerume via `notFlyer`-style anche restando a
-  terra/saltando").
-  **FATTO — soluzione diversa dalla proposta originale, stessa esigenza risolta meglio:** NON
-  diventa volante (dopo il fix di A.2 un volante collide col cerume, quindi si incastrerebbe
-  comunque). Resta un blob a terra (gia' dorato) con un bypass MIRATO: `notFugitive` nel collider
-  blocks lo esclude specificamente (via `e.fugitive===true`), lasciando tutti gli altri nemici
-  (moscerini inclusi) a collidere normalmente. Giustificazione narrativa: e' la "preda inafferrabile"
-  dell'evento, non un volante generico. Verificato: overlap forzato su un blocco → il moscerino
-  normale si ferma, il fuggitivo lo attraversa.
-- [x] **B.2 — Valutare nemici che SALTANO** (nuova varietà, ancora aperta — non necessaria per
-  sbloccare il Fuggitivo, che e' gia' risolto sopra in altro modo). Idea a se stante per varieta',
-  da riprendere quando si vuole.
-  **FATTO (2026-07-13): 2 nemici nuovi, entrambi implementati** (il cerumino gia' faceva un
-  affondo-balzo singolo da vicino: questi si sentono diversi apposta).
-  - **Pulce** (`enemy_flea`, kind `'flea'`, dal lvl 2, peso 3): piccola e debole, salta di
-    CONTINUO verso il giocatore (nessun telegrafo) — fastidiosa, non pericolosa. `fleaAI(e, now)`.
-    **Tarata su richiesta utente (2026-07-13):** balzo piu' alto e meno frequente — `vy:-380`
-    (era -260, ~2x l'altezza: da ~31px a ~67px di apice) e cooldown 950ms (era 550ms, circa 1
-    balzo/sec invece di ~1.8/sec). Verificato: 2 balzi in 2s (prima ~3-4), picco velocita' -380.
-  - **Saltatore** (`enemy_hopper`, kind `'hopper'`, dal lvl 3, peso 2): stesso schema a stati del
-    cerumino (carica->balzo->recupero) ma ESAGERATO — carica piu' lunga (550ms, piu' tempo per
-    reagire), balzo molto piu' alto/lungo (`vy:-420` contro `-190` del cerumino, puo' scavalcarti
-    o atterrarti sopra), onda d'urto all'atterraggio (danno ad area se troppo vicino, oltre al
-    contatto diretto). `hopperAI(e, now)` + `hopperLandFx(x,y)`.
-  Texture procedurali nuove (`enemy_flea`/`enemy_hopper` in `BootScene.js`, stile coerente con gli
-  altri nemici). Compatibili col sistema élite (verificato: aura visibile, stato IA regolare anche
-  da corazzati). Verificato con test mirati (log velocita', stati, screenshot) + zero errori
-  console: la Pulce salta ~2 volte/secondo, il Saltatore fa il ciclo completo idle->windup->lunge
-  (picco vy -420)->atterraggio(onda)->idle.
+_Questi due punti si CONDIZIONANO: rendere il soffitto "tangibile" (B.1) toglie spazio in alto, il_
+_che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nello stesso turno._
+
+- [ ] **B.1 — Il soffitto è troppo basso e intangibile.**
+  Causa (verificata): l'ho aggiunto io nel round 1 (`GameScene.js` ~122) come `ch = round(gh*0.45)`
+  = **81px** di fascia puramente ESTETICA (nessun collider; il bordo fisico del mondo è a y=0). Due
+  problemi: (a) 81px = il 22% dell'altezza giocabile (360px) → "pende" troppo in basso; (b) è
+  attraversabile (il giocatore/nemici possono stare sopra la fascia, fin su a y=0). **Fix:** (a)
+  fascia più SOTTILE (es. `gh*0.28` ≈ 50px, si tara); (b) renderla TANGIBILE — spostare il bordo
+  superiore del mondo fisico da y=0 al fondo della fascia: in `create` cambiare `this.physics.world.
+  setBounds(0, 0, worldW, H - GROUND_H)` in modo che il top sia `CEIL_Y` (fondo del soffitto), così
+  giocatore e nemici (che hanno `collideWorldBounds`) sbattono contro il soffitto invece di
+  sparire nel vuoto sopra. ⚠️ Controllare i volanti: `dropFromCeiling` (~1406) li fa planare a
+  `restY = Between(90,170)` → devono restare SOTTO `CEIL_Y` (con fascia ~50px sono già a posto, ma
+  verificare). Verifica: il PG salta e sbatte la testa sul soffitto (non passa oltre); la fascia
+  occupa meno spazio.
+
+- [ ] **B.2 — La pedana più in alto a volte è irraggiungibile per il limite dello schermo in alto.**
+  Causa (verificata): nel round 1 (E.3) ho clampato le pedane a `MAXUP` (≈117px, altezza di UN
+  salto) rispetto alla superficie da cui le raggiungi, MA senza un limite MINIMO in alto. Concateno
+  suolo→bassa→alta→scrigno: lo scrigno segreto può finire fino a ~9px dal bordo (`buildPlatforms`
+  ~554, `clampAbove`). Per ATTERRARCI il PG (alto ~40px, `collideWorldBounds` col top del mondo a
+  y=0) dovrebbe portare la testa sopra y=0 → impossibile, il bordo lo blocca. **Fix (insieme a
+  B.1):** definire `CEIL_Y` una sola volta (fondo del soffitto tangibile di B.1) e nel clamp delle
+  pedane imporre anche un TETTO: `platformY ≥ CEIL_Y + PLAYER_H + margine` (~40+16), così nessuna
+  pedana (né lo scrigno) può salire tanto da non lasciare spazio a testa+salto sotto il soffitto.
+  Verifica in preview SENZA doppio salto: la pedana/scrigno più in alto è sempre raggiungibile e il
+  PG non sbatte la testa prima di arrivarci. **Collegamento:** dipende dal `CEIL_Y` fissato in B.1.
 
 ---
 
-## GRUPPO C — Boss  ✅ FATTO E VERIFICATO (2026-07-15)
-_Attacco nuovo scelto dall'utente: **Balzo + schiacciata con onda d'urto**._
+## GRUPPO C — Scatto (dash): feedback visivo
 
-- [x] **C.1 — Boss meno noioso + niente pedana-riparo + drop cure.** Tre modifiche allo stesso
-  combattimento, tutte in `GameScene.js`. **NON ancora committato** — in attesa di conferma
-  dell'utente. Numeri (raggio/danno/cooldown/altezza) FISSATI al primo tentativo (non ancora
-  tarati da un vero playtest): da aggiustare se il boss risulta troppo facile/difficile.
-  - **(a) FATTO — Niente pedana-riparo nell'arena boss.** `buildPlatforms()` ora salta ogni
-    `addPlatform` con `x >= this.worldW - 800` quando `this.levelKind === 'boss'` (soglia su
-    `worldW` perche' `goalX` non e' ancora pronto a quel punto). Verificato in preview: livello
-    boss forzato → tutte le pedane generate sotto la soglia, zero nell'arena vicino al timpano.
-  - **(b) FATTO — Drop cure alla morte del boss.** Aggiunte `this.addWaxPickup(e.x-22, e.y-8,
-    true)` + `(e.x+22, e.y-8, true)` nel ramo morte boss di `damageEnemy`. Verificato: colpo
-    letale al boss → 2 pickup CURA comparsi esattamente a quelle coordinate.
-  - **(c) FATTO — Attacco "Balzo + schiacciata"** in `bossAI` (nuovo campo `e.bossAtk`:
-    `null|'slamwind'|'slamjump'`) + nuovo metodo `bossSlamFx(e,x,y)`. Cooldown `e.slamReadyAt`
-    (4500ms normale, 3000ms infuriato, inizializzato a spawn con un ritardo 2500-4000ms per non
-    aprire il fight con uno slam). Ciclo: giocatore entro 360px + boss a terra → `'slamwind'`
-    (fermo, lampeggia arancio, si accovaccia 600ms) → `'slamjump'` (balzo `dir*(speed*2+120),
-    -430` verso il giocatore) → atterraggio (>250ms dallo stacco) → `bossSlamFx` = anello +
-    shake forte + danno ad area (`round(contactDamage*0.9)` al giocatore entro R=100, 20 al
-    cerume vicino). Sputo e avanzata GATATI durante `e.bossAtk` (early return in cima al
-    metodo). Verificato con chiamate dirette a `bossAI(boss, now)` a tempo simulato (stesso
-    approccio "spy" del Gruppo A): transizione slamwind→slamjump con velocita' corrette,
-    atterraggio → danno player (-27, coerente con contactDamage 30 del boss lvl5) + danno
-    blocco cerume (-20), cooldown post-atterraggio corretto sia a freddo (4500) che infuriato
-    (3000), sputo confermato SILENZIATO (zero proiettili) mentre `bossAtk` e' attivo. Zero
-    errori console.
+- [ ] **C.1 — Durante lo scatto la scia è poco visibile + serve più differenza tra scatto normale
+  e scatto con danno.** Causa (verificata): `spawnDashGhost` (`GameScene.js` ~1688) crea fantasmi
+  con `alpha 0.5`, throttle 40ms (→ pochi fantasmi in 160ms di scatto), che sfumano in 220ms; colori
+  `0x8fe0ff` (azzurro, normale) vs `0xff6b3d` (arancio, danno). Lo scatto offensivo ha in più solo un
+  anello una-tantum (`dashStrikeFx` ~1705). Troppo tenue e poco distinguibili. **Fix (estetico, da
+  tarare):** (a) rendere la scia più marcata — throttle più basso (~20-25ms = più copie), `alpha`
+  iniziale più alto (~0.75), magari 2-3 fantasmi persistenti; (b) DIFFERENZIARE forte i due scatti:
+  normale = scia azzurra sobria, SENZA anello; con danno = scia arancione PIÙ densa/luminosa +
+  l'anello iniziale + qualche particella/scintilla arancio lungo il tragitto (riusa `burst`), così
+  "questo scatto fa male" è inequivocabile. Verifica: screenshot affiancati dei due scatti,
+  differenza evidente; nessun calo di frame. **Collegamento:** stessa area di A.4 (lo scatto con
+  danno ora è un vero sblocco a valle): il feedback deve rendere giustizia al fatto che è "avanzato".
 
 ---
 
-## GRUPPO D — Combattimento / feel
+## GRUPPO D — Boss
 
-- [x] **D.1 — Lo scatto CON danno (dashStrike) dovrebbe essere visivamente diverso dallo scatto
-  normale** (oggi probabilmente stessa scia/animazione). Si fa insieme ad A.6 (stessa funzione
-  `updateDashStrike`/dash trail): aggiungere un effetto visivo distinto (colore scia, particelle)
-  quando `p.dashStrike` è attivo.
-  **FATTO (2026-07-13):** in realta' lo scatto non aveva NESSUN feedback visivo (ne' normale ne'
-  con danno) — solo suono. Aggiunta una scia di "fantasmi" (copie dell'aspetto attuale del PG,
-  stessa texture/frame/flip di `heroVisual`, che si dissolvono in 220ms): **azzurra** (`0x8fe0ff`)
-  per lo scatto normale, **arancione** (`0xff6b3d`, stessa tinta di esplosioni/impatti nel gioco)
-  per quello con danno, + un lampo/anello arancio UNA TANTUM all'inizio dello scatto offensivo
-  (`dashStrikeFx`). Nuovi metodi `spawnDashGhost(damaging)` e `dashStrikeFx()` in GameScene.js,
-  chiamati da dove parte/prosegue lo scatto. Verificato con screenshot affiancati: colori
-  chiaramente distinti, zero errori console.
-
----
-
-## GRUPPO E — Livelli / mondo  ✅ DECISO
-_E.1 = **mutatore "Terremoto"** (non feature fissa). E.2 = **solo FASE 1 ora** (soffitto visibile +_
-_piu' sfondi + protuberanze); terreno ondulato/burroni RIMANDATI a un blocco dedicato._
-
-- [x] **E.1 — "Terremoto": cerume vero che cade, come MUTATORE.** FATTO E VERIFICATO (2026-07-15).
-  **NON ancora committato.** **Scoperta in corso d'opera:** il danno al giocatore (overlap
-  `collapseChunks`↔`player` → `hurtPlayer`) c'era GIA' nel codice (presente fin dall'introduzione
-  dell'evento, commit `f0f2273`) — la nota originale qui sotto (ora archiviata) lo dava per
-  mancante per errore; nessuna modifica necessaria su quel fronte, solo verificato che
-  funzioni ancora dopo il resto dei cambi.
-  - **(a) FATTO — Da evento a mutatore.** In `state.js`: tolto `waxcollapse` da `window.EVENTS`
-    (restano `goldfugitive`+`swarmrush`), aggiunto a `window.MUTATORS` `{ id: 'quake', ... apply(s){
-    s.mutQuake = true; s.startWaxCollapseEvent(); } }` (ora 7 mutatori). `resetMutators()` azzera
-    `this.mutQuake`. Verificato: `window.MUTATORS`/`window.EVENTS` hanno gli id giusti.
-  - **(b) FATTO — Piu' intenso da mutatore.** `startWaxCollapseEvent` usa cadenza 1100ms (invece di
-    1500) quando `this.mutQuake`; tolta la scadenza a tempo (18s) che aveva l'evento — ora il timer
-    dei crolli dura finche' dura la SCENA (si ferma da solo a fine/riavvio livello), non c'e' piu'
-    un `duration` fisso. Verificato con spy diretto sul timer: cadenza 1100 con mutQuake, 1500 senza.
-  - **(c) FATTO — Sprite vero del cerume.** `spawnCollapseChunk` ora pesca a caso `wax_a/b/c/d`
-    (stesso set del muro) invece del vecchio placeholder `'block_hard'` (che era VISIBILE per il
-    chunk, a differenza del muro dove la stessa chiave e' solo hitbox invisibile), scalato a
-    `BLOCK*1.3/larghezza_texture` e tinto con `_waxTint('hard',1)` (stesso ambra del cerume duro).
-    Verificato: chunk creato con `texture.key` corretto, tint esatto (0xd59a2e), scala coerente.
-  - **(d) i18n FATTO:** `mut_quake` EN ("QUAKE! Wax falls from the ceiling") + IT ("TERREMOTO! Cade
-    cerume dal soffitto"); rimossa `event_waxcollapse_in` (non piu' usata, l'evento non esiste piu').
-    Verificato in entrambe le lingue via `I18n.setLang`.
-
-- [x] **E.3 — Pedane non sempre raggiungibili (bugfix).** FATTO E VERIFICATO (2026-07-15). **NON
-  ancora committato.** In `buildPlatforms`: `MAXUP = (p.jumpVelocity^2 / (2*CONFIG.GRAVITY)) * 0.82`
-  (≈117px, calcolato sulla gravita' DI BASE non quella eventualmente ridotta da un mutatore — cosi'
-  resta raggiungibile nel caso peggiore) + helper `clampAbove(refY, rawY)` applicato a TUTTE le
-  pedane generate (bassa, alta, scrigno segreto, e anche la rampa d'avvio iniziale — bug della
-  stessa famiglia non esplicitamente elencato ma stesso rischio, corretto anch'esso), ciascuna
-  clampata rispetto alla superficie giusta da cui la si raggiunge (suolo per bassa/rampa, pedana
-  bassa — o suolo se assente — per l'alta, pedana alta per lo scrigno). Verificato SENZA doppio
-  salto con una chiusura di raggiungibilita' automatica (parte dal suolo, aggiunge ogni pedana
-  entro `MAXUP` da una superficie gia' raggiunta, a ripetizione) su **75 generazioni casuali di
-  livello (687 pedane totali): zero irraggiungibili**. Zero errori console.
-
-- [ ] **E.2 — FASE 1 (solo questa ora).** Terreno ondulato/burroni RIMANDATI (vedi Fase 2).
-  - **(1) FATTO E VERIFICATO (2026-07-15) — Soffitto visibile.** NON ancora committato. Non era
-    in `gfx.js` (il pavimento e' disegnato INLINE in `GameScene.create()`, non delegato a
-    GameGfx) — aggiunta la fascia li', stesso oggetto `groundGfx` gia' usato per il pavimento
-    (due `fillRect` in piu': massa + linea di bordo, stessa palette `C.ground`/`C.groundDark`).
-    Altezza fascia = 45% di quella del pavimento (81px contro 180px, "piu' sottile" come da
-    richiesta), estesa oltre y=0 come il pavimento (niente buchi con lo shake camera). Solo
-    estetica, nessun collider nuovo (il soffitto fisico del mondo era gia' a y=0 da
-    `physics.world.setBounds`). Le protuberanze/gocce di soffitto (gia' ancorate vicino a y=0)
-    ora partono visivamente da dentro la fascia, non piu' dal vuoto. Verificato: nessun errore,
-    geometria coerente (fascia 0-81px, pavimento a 360px, spazio giocabile in mezzo).
-  - **(2) piu' sfondi + (3) piu' protuberanze — LOOP AI, serve l'utente.** Nuove immagini su Leonardo
-    (come `bg_flesh_01` e le protuberanze): l'assistente scrive i prompt "salva-filtro", l'utente
-    genera, l'assistente ritaglia (`cutout_bg.ps1`)+pixella e aggancia (fondale gia' ha settore-per-
-    livello in `drawBackground`; protuberanze = chiavi in `GameGfx.PROTUBERANCES` + load in BootScene).
-    Si fa quando l'utente e' pronto a generare — NON codice puro. Intanto il soffitto (1) da' varieta'.
-
-### E.2 — FASE 2 (RIMANDATA, blocco Opus dedicato)
-Condotto **ondulato** (sali/scendi) + **burroni** (buchi nel pavimento). Grande e rischioso: il
-pavimento oggi e' UN collider piatto a `H - GROUND_H`; servirebbe terreno a quote variabili (collider a
-segmenti/poligono) + gestione della CADUTA del PG nei burroni (morte/respawn/danno). Tocca
-`buildLevel`/`buildPlatforms`/`buildGoal`/`buildMounds` (tutti assumono quota fissa) + camera +
-`gfx.js`. **Pianificare a fondo con Opus prima di darlo a Sonnet — non improvvisare.**
+- [ ] **D.1 — Il boss non si stacca da terra quando salta (balzo+schiacciata di C.1).**
+  Causa (VERIFICATA DAL VIVO, non solo letta): fisicamente il balzo c'è — misurato in preview, il
+  boss si alza di **71px**, cioè ~il 100% della sua altezza (il boss è alto solo 72px). Il problema è
+  che l'ARCO è troppo ORIZZONTALE: `bossAI` (`GameScene.js` ~2166) fa `setVelocity(dir*(speed*2+120),
+  -430)` = ~188px/s orizzontali → **~147px in avanti** contro 71px in su, un arco piatto che si legge
+  come "scivolata/carica in avanti" più che come un salto; e senza uno "stiramento" al decollo/ombra
+  che si stacca, l'occhio non percepisce lo stacco. **Fix:** (a) arco più VERTICALE e drammatico —
+  alzare la componente su (es. `-560`/`-620`) e ridurre/limitare quella orizzontale così ATTERRA
+  SUL giocatore invece di superarlo (calcolare l'orizzontale in base alla distanza dal PG, non fissa);
+  (b) VENDERE il salto: al decollo un piccolo "stretch" (scaleY su, scaleX giù, l'opposto
+  dell'accovacciamento del windup) e un'OMBRA a terra che si rimpicciolisce mentre sale (cerchio
+  scuro sotto il boss). Ricontrollare che `landed` (~2174) scatti ancora bene col nuovo arco.
+  Verifica DAL VIVO in god-mode (campionare `boss.body.bottom` sui frame reali, come ho fatto io):
+  apice ben visibile, il boss ATTERRA vicino al giocatore, l'onda d'urto (`bossSlamFx`) parte a
+  terra. **Nota:** valutare anche se il raggio di innesco (ora 360px, `~2197`) è troppo corto — in
+  un combattimento a distanza il boss potrebbe non arrivare mai a distanza-slam e non saltare mai:
+  se serve, allargarlo o farlo avvicinare prima di caricare.
 
 ---
 
-## GRUPPO F — Economia/shop  ✅ DECISO
-_Le palline di cerume le rilasciano **solo i nemici** (la pulizia del cerume resta automatica). A fasi._
+## GRUPPO E — Terremoto (mutatore)
 
-- [x] **F.1a+b — Ridurre il cerume + drop-da-raccogliere dai nemici.** FATTO E VERIFICATO
-  (2026-07-15). **NON ancora committato.**
-  - **(a) FATTO — Ridurre il cerume.** Aggiunta `window.CONFIG.WAX_GAIN = 0.55` (`state.js`),
-    moltiplicata nei due punti di guadagno automatico rimasti: `grabPickup` e la pulizia del
-    cerume in `damageBlock`. `cleanedWax` (per la % "pulito") resta sul valore GREZZO, non
-    scalato — corretto, misura la pulizia non i soldi. Verificato con spy diretto: pickup da 5 →
-    +3 (5×0.55 arrotondato), blocco da 4 → +2, coerenti.
-  - **(b) FATTO — Nemici → PALLINE invece di accredito automatico.** In `damageEnemy` (ramo
-    morte) tolto l'accredito diretto; nuovo helper `dropWaxPellet(x,y,value)` (vicino ad
-    `addWaxPickup`) crea una pallina raccoglibile nel gruppo `this.pickups` (stesso overlap
-    player↔pickups gia' esistente → la Calamita la attrae come le altre) con un piccolo "pop" di
-    comparsa. **ECCEZIONE Fuggitivo Dorato:** accredito ISTANTANEO invariato (ricompensa
-    evento). **Effetto collaterale corretto in corsa:** il banner di morte del boss mostrava
-    `+{wax}` come se fosse istantaneo — ora che anche il boss lascia una pallina da raccogliere
-    (oltre alle 2 cure di C.1) quel numero sarebbe stato fuorviante, tolto dal banner (EN+IT),
-    resta solo l'annuncio "distrutto". Verificato con spy diretto: nemico normale → 0 cerume
-    istantaneo + 1 pallina nuova (valore = `waxValue` del nemico, texture `wax_glob`), raccolta
-    → applica `WAX_GAIN` come le altre; fuggitivo → accredito istantaneo invariato, NESSUNA
-    pallina in piu'. Zero errori console.
-
-- [x] **F.1c — Piu' progetti sbloccabili.** FATTO E VERIFICATO (2026-07-15). **NON ancora
-  committato.** **Proposta iniziale rivista con l'utente:** Trivella scartata (ricopiava Getto
-  Perforante gia' esistente), Riflesso scartata (il gioco non ha un meccanismo di parata/tempismo
-  — lo Scudo e' un blocco passivo automatico, non richiede input). Set finale confermato (4, non
-  3): **Doppio Getto**, **Rabbia**, **Getto Stordente**, **Schianto** — seguito ESATTAMENTE il
-  pattern esistente per tutti e 4: `window.BLUEPRINTS` (costi 260/280/300/450), flag in
-  `newPlayer()`, carta `locked` in `UpgradeScene.ALL` (nessuna modifica al filtro: gia' generico),
-  riga nel negozio, meccanica in `GameScene`, i18n `bp_*`/`up_*`/`ability_*` EN+IT.
-  - **Doppio Getto** (`backShot`): `fireJet` spara ANCHE una pallina all'indietro (1 sola, non
-    moltiplicata dal Ventaglio — e' una bocca in piu', non un secondo ventaglio).
-  - **Rabbia** (`rage`): `hurtPlayer` arma una finestra di 4s quando incassi un colpo VERO (non
-    parato/invulnerabile); il PROSSIMO attacco (corpo a corpo O a distanza, qualunque parta
-    prima) fa danno ×1.6 e si consuma — nuovo helper `consumeRage()`, agganciato in `meleeSwing`
-    e `fireJet` (un solo consumo anche se il ventaglio spara piu' palline insieme: e' UN
-    attacco). Si consuma al TENTATIVO di attacco, non solo se va a segno (stesso spirito dello
-    scatto che consuma il cooldown a prescindere).
-  - **Getto Stordente** (`stunShot`): le palline portano `s.stun`; all'impatto (`hitFoe`) nuovo
-    `applyStun(e)` marca `e.stunnedUntil`; nel loop nemici, gate aggiunto PRIMA della normale
-    dispatch IA (`now >= e.knockUntil && now < stunnedUntil` → fermo, niente IA) cosi' lo
-    stordimento si somma al knockback esistente invece di sostituirlo.
-  - **Schianto** (`slam`): nuova mossa per il giocatore — in aria, premere GIU' di fresco (fronte
-    di pressione su `downHeld`, gia' unificato tastiera/touch, non tenuto: altrimenti mirare in
-    giu' in volo lo farebbe scattare da solo) avvia una caduta veloce (`this.slamming`); l'onda
-    d'urto (`playerSlamFx`, stesso trattamento del boss in C.1 — "impari dal boss" la stessa
-    mossa) scatta esattamente all'atterraggio nel blocco `landed` gia' esistente: danno ad area
-    (80% del danno base) a nemici vicini, danno ridotto (60% di quello) al cerume, schiacciata
-    piu' forte del normale atterraggio.
-  - **Layout negozio:** la colonna PROGETTI passa da 4 a 8 voci — non ci stavano piu' nello
-    spazio originale (righe da 58px, 4 bastavano). `makeRow` ora accetta `panelH`/`nameSize`/
-    `subSize` opzionali; la colonna progetti usa righe compatte (44px) — verificato con
-    ispezione diretta delle 8 righe generate: nessuna sovrapposizione, testo (incluse le
-    descrizioni piu' lunghe) su una riga sola, margine pulito prima dei pulsanti in basso.
-  - **Effetto collaterale gia' corretto:** i `bp_*_desc` iniziali erano frasi lunghe (pensate
-    prima di sapere che la colonna sarebbe diventata compatta) — accorciate per stare su una riga
-    sola nel nuovo spazio.
-  Verificato con test mirati (come gli altri fix): Doppio Getto → 2 palline (avanti+indietro);
-  Rabbia → danno 16→26 sul colpo successivo, poi torna normale; Getto Stordente → `stun` sulle
-  palline, nemico colpito resta fermo; Schianto → trigger corretto in aria, danno ad area
-  21 (nemico) / 13 (cerume) coerenti con le formule. i18n EN+IT verificate per tutte le 4 chiavi
-  (`bp_`/`up_`/`ability_`). Zero errori console.
+- [ ] **E.1 — La scossa si deve PERCEPIRE + i blocchi che cadono devono essere già VISIBILI
+  attaccati al soffitto, e a ogni scossa ne cade qualcuno.** Oggi (round 1, E.1) il "Terremoto"
+  (`startWaxCollapseEvent`/`spawnCollapseChunk`, `GameScene.js` ~670-703) fa comparire chunk di
+  cerume dal nulla in cima con un telegrafo lampeggiante, senza scossa percepita. **Cosa vuole
+  l'utente (ridisegno):**
+  - **(a) Cerume già appeso al soffitto.** All'inizio di un livello col mutatore `quake`, PIAZZARE
+    una fila di "stalattiti" di cerume attaccate al soffitto (sprite `wax_a/b/c/d` tintati come il
+    cerume duro, ancorati a `CEIL_Y` di B.1 — origin in alto, pendono giù), in punti sparsi. Sono
+    scenografia INERTE finché non arriva la scossa.
+  - **(b) Scossa percepibile a impulsi.** Sostituire la cadenza fissa dei chunk con vere "SCOSSE"
+    periodiche (es. ogni ~2.5-3.5s): a ogni scossa → `cameras.main.shake` deciso (es. 400ms,
+    0.012-0.016) + un rombo (`Sfx`, valutare cosa c'è) + STACCARE qualcuno dei blocchi appesi (quelli
+    più vicini al giocatore o a caso), che da lì cadono col sistema già esistente (gravità, danno da
+    contatto via overlap `collapseChunks`↔player già presente, `collapseImpact` sul cerume). Quando
+    le stalattiti finiscono, o si ripopolano piano, o la scossa smette.
+  - **Nota:** riusare il più possibile l'infrastruttura `collapseChunks` esistente (overlap/danno/
+    impatto già fatti nel round 1); il lavoro nuovo è (1) le stalattiti pre-appese e (2) il ritmo a
+    scosse con lo shake. **Collegamento:** dipende da `CEIL_Y` (B.1) per l'ancoraggio al soffitto —
+    ha senso farlo DOPO il Gruppo B.
+  Verifica: forzando il mutatore quake, si vedono blocchi appesi al soffitto; a ogni scossa lo
+  schermo trema e cade qualche blocco (che ferisce il PG e apre varchi); nessun errore.
 
 ---
 
-## GRUPPO G — Audio (grande, standalone, sessione dedicata)
+## GRUPPO F — Modalità a tempo (Corsa + Assedio)
 
-- [ ] **G.1 — Rifare musica e suoni** (`src/sfx.js`). **Bivio da decidere con l'utente PRIMA di
-  iniziare:** (A) restare **procedurale** (Web Audio, gira da `file://`, zero peso) ma rifatto meglio,
-  oppure (B) passare a **file audio veri** (piu' belli ma da procurare/generare + incorporare per
-  `file://` + peso). Serve anche una direzione di **stile** (retro/chiptune? organico/squishy?
-  comico?). Blocco a se', quando si arriva.
+- [ ] **F.1 — Corsa contro il tempo: manca un timer ben visibile che lampeggi negli ultimi
+  secondi.** Causa (verificata): la modalità `rush` OGGI NON È A TEMPO — in `create` (`GameScene.js`
+  ~336-344) è solo "attraversa fino al timpano senza dover pulire" (`cleanGoal=0`), niente
+  cronometro. **Fix:** (a) renderla davvero una corsa a tempo — dare un limite (es. `rushEndAt =
+  now + tempo_in_base_alla_lunghezza`) e se scade prima del timpano → fallimento (o penalità, da
+  decidere); (b) TIMER ben visibile in HUD, grande e centrato in alto, che negli ultimi ~5s
+  LAMPEGGIA (rosso/scala). **Collegamento con F.2:** conviene creare UN widget-timer riutilizzabile
+  (grande, centrato, con modalità "lampeggio finale") e usarlo sia per la Corsa sia per l'Assedio,
+  invece dell'attuale `siegeText` minuscolo. Verifica: in Corsa il timer scorre, lampeggia negli
+  ultimi secondi, e scadere prima del timpano ha una conseguenza chiara.
+
+- [ ] **F.2 — Assedio: timer poco visibile + la stessa mappa non è un granché.**
+  Causa (verificata): il timer assedio è `siegeText` (`GameScene.js` ~369) — testo piccolo (20px)
+  a y=96, poco leggibile; l'aggiornamento è in update ~2625. E l'assedio riusa lo stesso condotto
+  orizzontale dei livelli normali. **Fix:** (a) timer → usare il widget grande/lampeggiante di F.1;
+  (b) **DECISO con l'utente (2026-07-17): ARENA DEDICATA** — l'assedio "difendi la posizione a
+  tempo" va in un'arena (mondo più stretto/chiuso, nemici da più lati, niente il lungo corridoio da
+  attraversare) invece del solito livello. ⚠️ **È un lavoro di DESIGN grosso** (tocca `buildLevel`/
+  `worldW`/spawn/camera): **prima di implementarlo va progettato a fondo con Opus** (forma
+  dell'arena, da dove arrivano i nemici, come si vince) — NON improvvisare. La parte (a) timer si
+  può fare subito; la (b) arena è un blocco a sé da pianificare. Verifica: timer assedio grande e
+  chiaro; (arena) l'assedio si SENTE diverso da un livello normale.
 
 ---
 
-## GRUPPO H — Estetica futura (note, non azioni immediate)
+## GRUPPO G — Contenuti / progressione
 
-- [ ] **H.1 — Il PG dovrebbe "sporcarsi" di cerume** (visivamente, mentre pulisce/combatte).
-  Si aggancia alla pipeline hero AI/AutoSprite già in uso (tint o overlay sul `heroVisual`, o una
-  variante di sprite sheet "sporco"). Da fare quando si torna sul personaggio.
-- [ ] **H.2 — Le aureole colorate delle varianti élite dovranno sparire quando i nemici avranno
-  sprite AI veri** (oggi sono l'unico modo per distinguere a colpo d'occhio Corazzato/Esplosivo/
-  Split). **Non è un'azione da fare ora** — è solo una nota per non dimenticare di rimuoverle
-  quando arriverà quel lavoro (stesso trattamento AI+AutoSprite del personaggio, vedi
-  `HANDOFF.md`).
+- [ ] **G.1 — Carte base "corpo a corpo" poco chiare (Braccio Lungo, Riflessi, Affilatura).**
+  **RADICE del problema (emersa parlando con l'utente 2026-07-17):** TRE carte comuni toccano solo il
+  CORPO A CORPO (coton fioc) ma hanno nomi "generali", quindi il giocatore non capisce cosa facciano
+  e le crede inutili o doppie:
+  - `range` "Braccio Lungo" (`UpgradeScene.js` ~38): `s.attackRange += 0.25`, usato SOLO in
+    `meleeSwing` (`range = baseRange * p.attackRange`, ~1810). Su un coton fioc corto è impercettibile.
+  - `attspd` "Riflessi" (~36): `s.attackCooldown -= 45`, SOLO il colpo corpo a corpo (il getto usa
+    `shotCooldown`, altra cosa). Il nome/descrizione non dicono QUALE attacco.
+  - `damage` "Affilatura" (~34): `s.damage += 8`, usato in melee/dash/onde d'urto — NON tocca il
+    getto (che usa `p.jetDamage`, separato). Da qui la confusione dell'utente ("+danno esiste già,
+    che differenza con un getto più potente?" → risposta: sono cose diverse, +danno è corpo a corpo).
+  **DECISIONI dell'utente:**
+  - **Braccio Lungo → RENDERLO EVIDENTE:** allungare di più la portata melee (es. +40%/pesca) E
+    mostrarlo (arco/flash del colpo visibilmente più lungo). Resta una carta corpo a corpo.
+  - **Riflessi → CHIARIRE:** nome/descrizione i18n che dicano esplicitamente che velocizza il COLPO
+    CORPO A CORPO (coton fioc), non il getto (es. IT "Coton fioc più rapido").
+  - **Affilatura → CHIARIRE lo scope** nella descrizione (è danno corpo a corpo/mischia, non getto),
+    così non sembra coprire tutto. (Meccanica invariata.)
+  i18n EN+IT per i testi ritoccati. Verifica: le tre carte comunicano chiaramente cosa potenziano;
+  Braccio Lungo si vede all'uso. **Collegamento:** stessa famiglia "melee-only poco leggibile".
+
+- [ ] **G.2 — Aggiungere UN nuovo potenziamento base: "Getto più rapido".**
+  **DECISO con l'utente (2026-07-17):** i comuni sono pochi, ma NON si aggiungono né "+Salto" (il
+  salto va bene com'è, non toccarlo) né "+Danno Getto" (eviterebbe il doppione concettuale con
+  Affilatura — il danno del getto cresce già coi permanenti del negozio e con le abilità). Si
+  aggiunge SOLO **"Getto più rapido"**: nuova carta comune `rep:true, rarity:'common'` che riduce
+  `shotCooldown` (es. `s.shotCooldown = Math.max(120, s.shotCooldown - 40)`), il parallelo di
+  "Riflessi" ma per il GETTO a distanza (oggi il getto non ha nessun comune che lo velocizzi).
+  i18n `up_jetspd_name/_desc` EN+IT (IT es. "Getto Rapido / Raffiche più veloci"). Verifica: la
+  carta esce a fine livello e accorcia davvero il tempo tra uno spruzzo e l'altro.
 
 ---
 
-## Ordine per Sonnet (deciso 2026-07-13)
-**Fatti:** Gruppo A (7/7) + B.1 (`cbd4fe2`), D.1 (`5e81dec`), B.2 (`a29f1c4`), **C.1** (boss: no-pedana
-+ drop cure + balzo-schiacciata — `4913ba3`), **E.1** (mutatore Terremoto) + **E.3** (pedane
-raggiungibili) — `672c20e`, **F.1a+b** (riduci cerume + palline dai nemici) — `3a296a9`, **F.1c**
-(4 nuovi progetti: Doppio Getto/Rabbia/Getto Stordente/Schianto) — `7571519`, **E.2 Fase 1 punto (1)**
-(soffitto visibile) — 2026-07-15, NON ancora committato.
+## GRUPPO H — Menu (grafica)
 
-**Tutto il "codice puro" della lista e' esaurito.** Restano solo:
-1. **E.2 Fase 1 punti (2)(3)** (piu' sfondi + protuberanze) — LOOP AI con l'utente (Leonardo), non
-   codice: da riprendere quando l'utente e' pronto a generare immagini.
-2. **[RIMANDATI a planning Opus dedicato]** E.2 Fase 2 (ondulato + burroni), G (audio).
-3. **H** — non ora, solo promemoria.
+- [ ] **H.1 — I menu vanno rivisti: grafica obsoleta + togliere le scritte inutili dalla schermata
+  principale.** Causa (verificata): `MenuScene.js` mostra, tutto insieme, titolo + sottotitolo +
+  riga banca + 2 mascotte + un BLOCCO di 9 righe di controlli/obiettivo (`menu_ctrl_*`/`menu_goal_*`,
+  ~38-52) + pulsanti; sfondo = gradiente + ellissi disegnati a mano (`drawBackground`, ~90-107),
+  pulsanti = testo monospace piatto su giallo. Affollato e datato. **Fix (estetico, in parte
+  soggettivo):** (a) ALLEGGERIRE la schermata principale — togliere il blocco controlli/obiettivo
+  (i comandi touch sono già a schermo in gioco e ovvi; al massimo spostarli in un pannellino "?"
+  o in un tutorial al primo avvio); tenere l'essenziale (titolo, START, NEGOZIO, lingua, audio,
+  banca); (b) svecchiare il LOOK — titolo più caratterizzato, pulsanti più curati, palette coerente
+  con l'interno "carnoso" del gioco. **DECISO con l'utente (2026-07-17): SONNET PROPONE UNA BOZZA
+  e poi si itera guardandola** (niente direzione d'arte prima). Sonnet faccia una prima versione
+  rinnovata + alleggerita, screenshot, e la si aggiusta insieme all'utente.
+  Verifica: schermata principale pulita (poche scritte), aspetto più moderno/coeso; nessuna
+  regressione ai pulsanti/lingua/audio.
 
-Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo dal vivo
-(god-mode, screenshot in preview) → riferisci in italiano semplice → chiedi se committare. Numeri
-"sensati" (danni/raggi/cooldown/`WAX_GAIN`) da TARARE col playtest dell'utente.
+---
+
+## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
+1. **Gruppo A** (A.1 arco coton fioc, A.2 pulci, A.3 texture proiettili, A.4 gate scatto-danno) — 4 fix rapidi, cause certe.
+2. **Gruppo D** (boss: arco del salto più verticale + stretch/ombra) — rapido, causa certa, verifica dal vivo.
+3. **Gruppo C** (scia scatto più visibile + differenza normale/danno) — estetico, si sposa con A.4.
+4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **INSIEME**, fissa `CEIL_Y`.
+5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **dopo B** (usa `CEIL_Y`).
+6. **Gruppo F** — F.1 (timer Corsa) + F.2 parte (a) (timer Assedio grande/lampeggiante, widget condiviso). ⚠️ **F.2 parte (b) ARENA assedio = blocco a sé, va pianificato con Opus prima** (non farlo qui).
+7. **Gruppo G** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.
+8. **Gruppo H** (menu) — **Sonnet propone una bozza e si itera con l'utente** (deciso).
+
+Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo DAL VIVO
+(god-mode, screenshot/campionamento in preview) → riferisci in italiano semplice → chiedi se
+committare. Numeri "sensati" (altezze/tempi/colori/portate) da TARARE col playtest dell'utente.
