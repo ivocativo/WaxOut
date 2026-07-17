@@ -35,7 +35,10 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'hp', rep: true, rarity: 'common', apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
       { id: 'attspd', rep: true, rarity: 'common', apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
       { id: 'speed', rep: true, rarity: 'common', apply: (s) => { s.moveSpeed += 30; } },
-      { id: 'range', rep: true, rarity: 'common', apply: (s) => { s.attackRange += 0.25; } },
+      { id: 'range', rep: true, rarity: 'common', apply: (s) => { s.attackRange += 0.4; } },
+      // Getto Rapido (round 2, G.2): parallelo di Riflessi ma per il getto a distanza (che
+      // prima non aveva NESSUN comune a velocizzarlo).
+      { id: 'jetspd', rep: true, rarity: 'common', apply: (s) => { s.shotCooldown = Math.max(120, s.shotCooldown - 40); } },
       { id: 'doublejump', rep: false, rarity: 'rare', ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
       { id: 'dash', rep: false, rarity: 'rare', ability: 'dash', apply: (s) => { s.dash = true; } },
       { id: 'hammer', rep: false, rarity: 'rare', ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },

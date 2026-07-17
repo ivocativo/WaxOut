@@ -240,7 +240,8 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 
 ## GRUPPO G — Contenuti / progressione
 
-- [ ] **G.1 — Carte base "corpo a corpo" poco chiare (Braccio Lungo, Riflessi, Affilatura).**
+- [x] **G.1 — Carte base "corpo a corpo" poco chiare (Braccio Lungo, Riflessi, Affilatura).**
+  FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
   **RADICE del problema (emersa parlando con l'utente 2026-07-17):** TRE carte comuni toccano solo il
   CORPO A CORPO (coton fioc) ma hanno nomi "generali", quindi il giocatore non capisce cosa facciano
   e le crede inutili o doppie:
@@ -260,35 +261,51 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
     così non sembra coprire tutto. (Meccanica invariata.)
   i18n EN+IT per i testi ritoccati. Verifica: le tre carte comunicano chiaramente cosa potenziano;
   Braccio Lungo si vede all'uso. **Collegamento:** stessa famiglia "melee-only poco leggibile".
+  **FATTO:**
+  - **Braccio Lungo → RESO EVIDENTE.** `range` ora da' `+0.4` invece di `+0.25` per pesca. E,
+    novita': l'arma DISEGNATA (`showMeleeWeapon`) ora si ingrandisce con `p.attackRange`
+    (smorzato a meta': `1 + (attackRange-1)*0.5`, altrimenti dopo tante pescate — e' una carta
+    "comune" ripescabile all'infinito — diventerebbe assurda) — prima la portata extra era
+    invisibile: allungava solo il rettangolo di danno, l'arma disegnata restava sempre uguale.
+  - **Riflessi → RINOMINATA "Coton Fioc Rapido"/"Quick Swab"** (era troppo generico), descrizione
+    esplicita "Attacco corpo a corpo più rapido". Meccanica invariata.
+  - **Affilatura → descrizione chiarita** ("+8 danno CORPO A CORPO", non solo "+8 danno").
+    Meccanica invariata.
+  Verificato: scala dell'arma disegnata cresce correttamente con `attackRange` (1.0 → 1.2 dopo 1
+  pescata → 1.6 dopo 3, formula confermata); tutte le stringhe EN+IT risolvono correttamente.
 
-- [ ] **G.2 — Aggiungere UN nuovo potenziamento base: "Getto più rapido".**
-  **DECISO con l'utente (2026-07-17):** i comuni sono pochi, ma NON si aggiungono né "+Salto" (il
-  salto va bene com'è, non toccarlo) né "+Danno Getto" (eviterebbe il doppione concettuale con
-  Affilatura — il danno del getto cresce già coi permanenti del negozio e con le abilità). Si
-  aggiunge SOLO **"Getto più rapido"**: nuova carta comune `rep:true, rarity:'common'` che riduce
-  `shotCooldown` (es. `s.shotCooldown = Math.max(120, s.shotCooldown - 40)`), il parallelo di
-  "Riflessi" ma per il GETTO a distanza (oggi il getto non ha nessun comune che lo velocizzi).
-  i18n `up_jetspd_name/_desc` EN+IT (IT es. "Getto Rapido / Raffiche più veloci"). Verifica: la
-  carta esce a fine livello e accorcia davvero il tempo tra uno spruzzo e l'altro.
+- [x] **G.2 — Aggiungere UN nuovo potenziamento base: "Getto più rapido".** FATTO E VERIFICATO
+  (2026-07-17). **NON ancora committato.**
+  **FATTO:** nuova carta comune `jetspd` "Getto Rapido"/"Fast Jet" (`rep:true, rarity:'common'`)
+  che riduce `shotCooldown` di 40 (minimo 120), parallelo di Riflessi ma per il getto a distanza.
+  i18n `up_jetspd_name/_desc` EN+IT. Verificato: la carta compare regolarmente nel mazzo (vista
+  su 20/20 aperture testate a campione), applicarla 1 volta riduce `shotCooldown` da 340 a 300;
+  testi EN+IT corretti.
 
 ---
 
 ## GRUPPO H — Menu (grafica)
 
-- [ ] **H.1 — I menu vanno rivisti: grafica obsoleta + togliere le scritte inutili dalla schermata
-  principale.** Causa (verificata): `MenuScene.js` mostra, tutto insieme, titolo + sottotitolo +
-  riga banca + 2 mascotte + un BLOCCO di 9 righe di controlli/obiettivo (`menu_ctrl_*`/`menu_goal_*`,
-  ~38-52) + pulsanti; sfondo = gradiente + ellissi disegnati a mano (`drawBackground`, ~90-107),
-  pulsanti = testo monospace piatto su giallo. Affollato e datato. **Fix (estetico, in parte
-  soggettivo):** (a) ALLEGGERIRE la schermata principale — togliere il blocco controlli/obiettivo
-  (i comandi touch sono già a schermo in gioco e ovvi; al massimo spostarli in un pannellino "?"
-  o in un tutorial al primo avvio); tenere l'essenziale (titolo, START, NEGOZIO, lingua, audio,
-  banca); (b) svecchiare il LOOK — titolo più caratterizzato, pulsanti più curati, palette coerente
-  con l'interno "carnoso" del gioco. **DECISO con l'utente (2026-07-17): SONNET PROPONE UNA BOZZA
-  e poi si itera guardandola** (niente direzione d'arte prima). Sonnet faccia una prima versione
-  rinnovata + alleggerita, screenshot, e la si aggiusta insieme all'utente.
-  Verifica: schermata principale pulita (poche scritte), aspetto più moderno/coeso; nessuna
-  regressione ai pulsanti/lingua/audio.
+- [x] **H.1 — I menu vanno rivisti: grafica obsoleta + togliere le scritte inutili dalla schermata
+  principale.** FATTO E VERIFICATO (2026-07-17), bozza proposta e verificata con screenshot reali
+  (canvas → PNG, non lo screenshot "normale" che va in timeout su questo tab in background).
+  **NON ancora committato.**
+  **FATTO — riscritta `MenuScene.js`:**
+  - **(a) Alleggerita.** Tolto il blocco fisso di 9 righe comandi/obiettivo dalla schermata
+    principale; spostato in un **pannello "?"** a comparsa (cerchio discreto sotto i pulsanti) —
+    backdrop semi-trasparente + pannello con bordo, si chiude toccando ovunque. Restano in vista
+    solo titolo, sottotitolo, banca, mascotte, START/NEGOZIO, lingua, audio.
+  - **(b) Svecchiata.** Sfondo VERO (lo stesso fondale pixel-art usato in partita,
+    `GameGfx.drawBackground`, invece del vecchio gradiente+ellissi disegnato a mano) + velo scuro
+    per la leggibilità (stessa tecnica già usata in UpgradeScene); pannello semi-trasparente
+    dietro titolo/sottotitolo/banca per raggrupparli visivamente; pulsanti con bordo+ombra
+    (stesso linguaggio del negozio, un po' piu' rifinito) al posto del vecchio testo piatto su
+    sfondo giallo pieno; titolo con un lieve movimento (era statico).
+  Verificato con screenshot reali (non solo dati): schermata principale pulita e composta;
+  pannello "?" si apre mostrando tutti i comandi/obiettivo leggibili e si chiude correttamente
+  al tocco; zero errori nuovi (solo la singolarità dell'ambiente già nota, non del codice).
+  **Nota:** essendo estetico/in parte soggettivo, l'utente potrebbe voler aggiustare qualcosa
+  dopo averlo visto dal vivo — è una bozza da iterare, come deciso.
 
 ---
 
@@ -298,9 +315,11 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17, committato (`8c5c938`).
 4. ~~**Gruppo B**~~ ✅ FATTO 2026-07-17, committato (`1b97655`).
 5. ~~**Gruppo E**~~ ✅ FATTO 2026-07-17 (terremoto: stalattiti + scosse con shake, usa `CEIL_Y`).
-6. ~~**Gruppo F**~~ ✅ FATTO 2026-07-17 — F.1 (Corsa a tempo, Game Over se scade) + F.2a (timer Assedio, stesso widget). F.2b (arena) resta da pianificare con Opus. NON ancora committato.
-7. **Gruppo G** — **PROSSIMO** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.
-8. **Gruppo H** (menu) — **Sonnet propone una bozza e si itera con l'utente** (deciso).
+6. ~~**Gruppo F**~~ ✅ FATTO 2026-07-17, committato (`4066df8`). F.2b (arena) resta da pianificare con Opus.
+7. ~~**Gruppo G**~~ ✅ FATTO 2026-07-17 (carte melee chiarite + Getto Rapido).
+8. ~~**Gruppo H**~~ ✅ FATTO 2026-07-17 (menu: sfondo vero, alleggerito, pannello "?"). NON ancora committato.
+
+**TUTTI I GRUPPI FATTI.** Resta solo da confermare col playtest dell'utente e tarare i numeri.
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo DAL VIVO
 (god-mode, screenshot/campionamento in preview) → riferisci in italiano semplice → chiedi se

@@ -1942,7 +1942,12 @@ class GameScene extends Phaser.Scene {
     const cfg = isHammer ? this.WEAPONS.hammer : this.WEAPONS.swab;
     const w = this.heroWeapon;
     this.tweens.killTweensOf(w);
-    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
+    // Abilità BRACCIO LUNGO (round 2, G.1): prima la portata extra era invisibile (allungava
+    // solo il rettangolo di danno, non l'arma disegnata) — ora l'arma stessa si ingrandisce con
+    // `p.attackRange`, smorzato a meta' (altrimenti dopo tante pescate diventerebbe assurda:
+    // e' una carta "comune" ripescabile all'infinito).
+    const reachScale = 1 + (window.GameState.player.attackRange - 1) * 0.5;
+    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale * reachScale).setVisible(true);
     this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
     this._weaponHideAt = this.time.now + 240;
     this.positionWeapon();
