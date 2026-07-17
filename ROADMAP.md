@@ -174,54 +174,67 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 
 ## GRUPPO E — Terremoto (mutatore)
 
-- [ ] **E.1 — La scossa si deve PERCEPIRE + i blocchi che cadono devono essere già VISIBILI
-  attaccati al soffitto, e a ogni scossa ne cade qualcuno.** Oggi (round 1, E.1) il "Terremoto"
-  (`startWaxCollapseEvent`/`spawnCollapseChunk`, `GameScene.js` ~670-703) fa comparire chunk di
-  cerume dal nulla in cima con un telegrafo lampeggiante, senza scossa percepita. **Cosa vuole
-  l'utente (ridisegno):**
-  - **(a) Cerume già appeso al soffitto.** All'inizio di un livello col mutatore `quake`, PIAZZARE
-    una fila di "stalattiti" di cerume attaccate al soffitto (sprite `wax_a/b/c/d` tintati come il
-    cerume duro, ancorati a `CEIL_Y` di B.1 — origin in alto, pendono giù), in punti sparsi. Sono
-    scenografia INERTE finché non arriva la scossa.
-  - **(b) Scossa percepibile a impulsi.** Sostituire la cadenza fissa dei chunk con vere "SCOSSE"
-    periodiche (es. ogni ~2.5-3.5s): a ogni scossa → `cameras.main.shake` deciso (es. 400ms,
-    0.012-0.016) + un rombo (`Sfx`, valutare cosa c'è) + STACCARE qualcuno dei blocchi appesi (quelli
-    più vicini al giocatore o a caso), che da lì cadono col sistema già esistente (gravità, danno da
-    contatto via overlap `collapseChunks`↔player già presente, `collapseImpact` sul cerume). Quando
-    le stalattiti finiscono, o si ripopolano piano, o la scossa smette.
-  - **Nota:** riusare il più possibile l'infrastruttura `collapseChunks` esistente (overlap/danno/
-    impatto già fatti nel round 1); il lavoro nuovo è (1) le stalattiti pre-appese e (2) il ritmo a
-    scosse con lo shake. **Collegamento:** dipende da `CEIL_Y` (B.1) per l'ancoraggio al soffitto —
-    ha senso farlo DOPO il Gruppo B.
-  Verifica: forzando il mutatore quake, si vedono blocchi appesi al soffitto; a ogni scossa lo
-  schermo trema e cade qualche blocco (che ferisce il PG e apre varchi); nessun errore.
+- [x] **E.1 — La scossa si deve PERCEPIRE + i blocchi che cadono devono essere già VISIBILI
+  attaccati al soffitto, e a ogni scossa ne cade qualcuno.** FATTO E VERIFICATO (2026-07-17).
+  **NON ancora committato.**
+  **FATTO — ridisegno completo di `startWaxCollapseEvent`** (tolta `spawnCollapseChunk`, sostituita
+  da 4 metodi nuovi):
+  - **(a) Cerume già appeso al soffitto.** `placeStalactites()` piazza 5-12 sprite VERI
+    (`wax_a/b/c/d`, tinti come il cerume duro, origin in alto ancorato a `this.CEIL_Y` di B.1)
+    lungo il livello (`pickHazardX`, come le altre insidie) — scenografia inerte in
+    `this.stalactites`, niente fisica finché una scossa non le stacca.
+  - **(b) Scossa percepibile a impulsi.** `scheduleQuakePulse()` si ri-programma da sola ogni
+    2.5-3.5s (intervallo diverso ogni volta, non meccanico); `quakePulse()` fa
+    `cameras.main.shake(400, 0.014)` + `Sfx.smash()` (rombo) + stacca 1-3 stalattiti (preferendo
+    quelle più vicine al giocatore, via `detachStalactite`, che riusa `collapseChunks` — stessa
+    fisica/danno/impatto del round 1, solo velocità iniziale un po' più alta: parte "smossa"
+    dalla scossa, non da ferma). Se sono finite, 40% di possibilità a ogni scossa di ripiazzarne
+    una nuova (si ripopolano piano, non restano vuote per il resto del livello).
+  - Ripulita anche la pulizia di fine livello: le due chiamate `this.collapseTimer.remove()` in
+    `levelComplete()`/`gameOver()` ora puntano al nuovo `this.quakeTimer` (il vecchio nome era
+    rimasto due punti extra, non trovato al primo giro).
+  Verificato: 7 stalattiti piazzate correttamente (sprite giusto, tinta 0xd59a2e, ancorate a
+  `CEIL_Y`); una scossa manuale stacca la stalattite più vicina al giocatore, crea un chunk vero
+  con gravità e velocità di partenza corrette, la camera trema; su 40 scosse a stalattiti vuote,
+  11 ripopolamenti (~27%, coerente col 40% di probabilità); **percorso automatico REALE**
+  verificato con `game.step()` (mutatore applicato come farebbe `chooseMutator`, ~8s di gioco
+  reale): stalattiti piazzate da sole, almeno una scossa scattata da sola con un chunk caduto,
+  timer ancora attivo. Zero errori console in tutta la verifica.
 
 ---
 
 ## GRUPPO F — Modalità a tempo (Corsa + Assedio)
 
-- [ ] **F.1 — Corsa contro il tempo: manca un timer ben visibile che lampeggi negli ultimi
-  secondi.** Causa (verificata): la modalità `rush` OGGI NON È A TEMPO — in `create` (`GameScene.js`
-  ~336-344) è solo "attraversa fino al timpano senza dover pulire" (`cleanGoal=0`), niente
-  cronometro. **Fix:** (a) renderla davvero una corsa a tempo — dare un limite (es. `rushEndAt =
-  now + tempo_in_base_alla_lunghezza`) e se scade prima del timpano → fallimento (o penalità, da
-  decidere); (b) TIMER ben visibile in HUD, grande e centrato in alto, che negli ultimi ~5s
-  LAMPEGGIA (rosso/scala). **Collegamento con F.2:** conviene creare UN widget-timer riutilizzabile
-  (grande, centrato, con modalità "lampeggio finale") e usarlo sia per la Corsa sia per l'Assedio,
-  invece dell'attuale `siegeText` minuscolo. Verifica: in Corsa il timer scorre, lampeggia negli
-  ultimi secondi, e scadere prima del timpano ha una conseguenza chiara.
+- [x] **F.1 — Corsa contro il tempo: manca un timer ben visibile che lampeggi negli ultimi
+  secondi.** FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
+  **DECISO con l'utente:** se il tempo scade prima del timpano → **Game Over** (come morire, non
+  una penalità morbida).
+  **FATTO:** (a) `rushEndAt = now + round(worldW/130)*1000 + 8000` (ritmo medio atteso ~130px/s +
+  margine fisso 8s di reazione — numero da TARARE col playtest, come sempre); scaduto senza aver
+  raggiunto il timpano → `gameOver()`. Guardia anti-ingiustizia: se traguardo e scadenza capitano
+  nello STESSO frame, vince il traguardo (`this.player.x < this.goalX` nella condizione), non la
+  scadenza. (b) Nuovo **widget-timer condiviso** `buildBigTimer`/`updateBigTimer` (38px, centrato
+  y=92, sostituisce il vecchio `siegeText` da 20px) — lampeggia (rosso + scala 1.18x) negli ultimi
+  5s. Banner `game_rush_in` aggiornato per menzionare il tempo (EN+IT). Nuova chiave i18n
+  `hud_rush` EN+IT.
+  Verificato con `game.step()`: budget calcolato correttamente (worldW 3360 → 34s); testo/colore/
+  scala del timer corretti sia lontano dalla scadenza che negli ultimi secondi (lampeggio
+  alternato confermato su due campioni a 200ms di distanza); scadenza con PG lontano dal traguardo
+  → vero Game Over (schermata `over_title` confermata, non solo `locked=true`); scadenza con PG
+  GIÀ al traguardo → Livello Completato, non Game Over (guardia funziona).
 
-- [ ] **F.2 — Assedio: timer poco visibile + la stessa mappa non è un granché.**
-  Causa (verificata): il timer assedio è `siegeText` (`GameScene.js` ~369) — testo piccolo (20px)
-  a y=96, poco leggibile; l'aggiornamento è in update ~2625. E l'assedio riusa lo stesso condotto
-  orizzontale dei livelli normali. **Fix:** (a) timer → usare il widget grande/lampeggiante di F.1;
-  (b) **DECISO con l'utente (2026-07-17): ARENA DEDICATA** — l'assedio "difendi la posizione a
-  tempo" va in un'arena (mondo più stretto/chiuso, nemici da più lati, niente il lungo corridoio da
-  attraversare) invece del solito livello. ⚠️ **È un lavoro di DESIGN grosso** (tocca `buildLevel`/
-  `worldW`/spawn/camera): **prima di implementarlo va progettato a fondo con Opus** (forma
-  dell'arena, da dove arrivano i nemici, come si vince) — NON improvvisare. La parte (a) timer si
-  può fare subito; la (b) arena è un blocco a sé da pianificare. Verifica: timer assedio grande e
-  chiaro; (arena) l'assedio si SENTE diverso da un livello normale.
+- [x] **F.2a — Assedio: timer poco visibile.** FATTO E VERIFICATO (2026-07-17), stesso widget di
+  F.1. **NON ancora committato.** Verificato: `bigTimerText` mostra "Survive: Ns" per l'assedio,
+  vecchio `siegeText` rimosso (non più definito). **F.2b (arena dedicata) resta NON fatta**: è
+  design grosso, **da pianificare a fondo con Opus prima** — non toccato in questo turno, come da
+  decisione del 2026-07-17.
+  **Nota tecnica (non è un bug del gioco):** durante questa verifica è comparso un errore console
+  `Texture key already in use: 00000000-...` — riproducibile anche su un avvio completamente
+  pulito (server riavviato, PRIMA che qualsiasi mio codice giri), quindi non è causato da F.1/F.2:
+  sembra una singolarità dell'ambiente di preview di questa sessione (RNG interno di Phaser che
+  genera chiavi-testura automatiche, probabilmente legato alle stranezze gia' note di questo tab
+  in background), non un difetto del codice — tutta la logica testata (timer, scadenza, guardia,
+  game over, livello completato) ha funzionato correttamente nonostante l'avviso.
 
 ---
 
@@ -283,10 +296,10 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17, committato (`2db4ecf`).
 2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17, committato (`bf7c206`).
 3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17, committato (`8c5c938`).
-4. ~~**Gruppo B**~~ ✅ FATTO 2026-07-17 (soffitto tangibile+più sottile + pedane sotto il soffitto, `CEIL_Y` fissato). NON ancora committato.
-5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **PROSSIMO** — usa `CEIL_Y` appena fissato.
-6. **Gruppo F** — F.1 (timer Corsa) + F.2 parte (a) (timer Assedio grande/lampeggiante, widget condiviso). ⚠️ **F.2 parte (b) ARENA assedio = blocco a sé, va pianificato con Opus prima** (non farlo qui).
-7. **Gruppo G** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.
+4. ~~**Gruppo B**~~ ✅ FATTO 2026-07-17, committato (`1b97655`).
+5. ~~**Gruppo E**~~ ✅ FATTO 2026-07-17 (terremoto: stalattiti + scosse con shake, usa `CEIL_Y`).
+6. ~~**Gruppo F**~~ ✅ FATTO 2026-07-17 — F.1 (Corsa a tempo, Game Over se scade) + F.2a (timer Assedio, stesso widget). F.2b (arena) resta da pianificare con Opus. NON ancora committato.
+7. **Gruppo G** — **PROSSIMO** (G.1 chiarire/rendere evidenti le 3 carte melee; G.2 aggiungere il solo "Getto Rapido") — **decisioni già prese** (vedi i punti), si può fare.
 8. **Gruppo H** (menu) — **Sonnet propone una bozza e si itera con l'utente** (deciso).
 
 Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo DAL VIVO

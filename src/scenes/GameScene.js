@@ -91,7 +91,8 @@ class GameScene extends Phaser.Scene {
     // arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
     if (this.levelKind === 'rush') this.cleanGoal = 0;
     this.siegeEndAt = 0;   // istante (ms) in cui l'assedio e' superato (0 = non assedio)
-    this.siegeText = null;
+    this.rushEndAt = 0;    // istante (ms) in cui scade la corsa a tempo (0 = non corsa)
+    this.bigTimerText = null;
 
     // Mondo LARGO da attraversare (cresce un po' col livello): la telecamera segue
     // il giocatore mentre cammina verso il timpano (a destra). W/H restano la
@@ -341,7 +342,14 @@ class GameScene extends Phaser.Scene {
       // normal / rush: attraversa fino al timpano (la corsa non chiede pulizia).
       this.maxEnemies = Math.min(2 + lvl, 6);
       spawnDelay = Math.max(1500, 2800 - lvl * 150);
-      if (this.levelKind === 'rush') { this.maxEnemies = Math.min(this.maxEnemies + 2, 8); spawnDelay = Math.round(spawnDelay * 0.7); }
+      if (this.levelKind === 'rush') {
+        this.maxEnemies = Math.min(this.maxEnemies + 2, 8); spawnDelay = Math.round(spawnDelay * 0.7);
+        // CORSA A TEMPO (round 2, F.1): prima non c'era nessun cronometro, solo "arriva al
+        // timpano quando vuoi". Tempo commisurato alla lunghezza del livello: ritmo medio
+        // atteso ~130px/s (piu' lento della camminata base: si suppone rallentato dai
+        // combattimenti) + un margine fisso di reazione. Da TARARE col playtest.
+        this.rushEndAt = this.time.now + Math.round(this.worldW / 130) * 1000 + 8000;
+      }
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
       const bkey = this.levelKind === 'rush' ? 'game_rush_in' : 'game_goal';
       const bcol = this.levelKind === 'rush' ? '#ffd166' : '#ffd9a0';
@@ -369,12 +377,10 @@ class GameScene extends Phaser.Scene {
 
     this.buildHud();
 
-    // ASSEDIO: cronometro di sopravvivenza in alto (aggiornato in update).
-    if (this.levelKind === 'siege') {
-      this.siegeText = this.add.text(window.CONFIG.WIDTH / 2, 96, '', {
-        fontFamily: 'monospace', fontSize: '20px', color: '#ffd9a0', stroke: '#14161f', strokeThickness: 4,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
-    }
+    // Timer grande e centrato (round 2, F.1/F.2a): condiviso da Assedio (sopravvivi) e Corsa
+    // (tempo per arrivare) — prima l'assedio aveva un testo minuscolo (`siegeText`, 20px) e la
+    // corsa non aveva nessun timer. Vedi `buildBigTimer`/`updateBigTimer`.
+    if (this.levelKind === 'siege' || this.levelKind === 'rush') this.buildBigTimer();
 
     // Pausa: tasti ESC/P + pulsante a schermo (in alto a destra)
     this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
@@ -699,48 +705,91 @@ class GameScene extends Phaser.Scene {
     e.setFlipX(false);
   }
 
-  // MUTATORE "Terremoto" (`this.mutQuake`): per tutto il livello, blocchi di cerume vero
-  // crollano dal soffitto in punti casuali con un breve telegrafo lampeggiante. Fanno danno
-  // da contatto E aprono un piccolo varco nel cerume dove atterrano (sfruttabile come
-  // scorciatoia) — a differenza delle gocce (permanenti, solo schizzano), qui la cadenza e
-  // la durata sono quelle del mutatore (niente scadenza a tempo: dura finche' dura il
-  // livello, si ferma da solo quando la scena finisce/riparte, come ogni altro timer).
+  // MUTATORE "Terremoto" (`this.mutQuake`), RIDISEGNATO nel round 2 (E.1): il cerume PENDE
+  // GIA' dal soffitto tangibile (B.1) — scenografia inerte (`this.stalactites`) — e a ogni
+  // SCOSSA periodica (shake della camera + rombo) qualcuna si stacca e cade, riusando
+  // l'infrastruttura `collapseChunks` gia' esistente (gravita', danno da contatto, impatto sul
+  // cerume). Prima (round 1) i chunk comparivano dal nulla con un telegrafo lampeggiante e una
+  // pioggia continua — la scossa non si percepiva. Dura finche' dura il livello, si ferma da
+  // solo quando la scena finisce/riparte (il guard `this.locked` interrompe la catena).
   startWaxCollapseEvent() {
     const delay = Phaser.Math.Between(2000, 4000);
     this.time.delayedCall(delay, () => {
       if (this.locked) return;
-      this.collapseTimer = this.time.addEvent({
-        delay: this.mutQuake ? 1100 : 1500, loop: true,
-        callback: () => { if (!this.locked) this.spawnCollapseChunk(); },
-      });
+      this.placeStalactites();
+      this.scheduleQuakePulse();
     });
   }
 
-  // Sceglie un punto libero (come le altre insidie: lontano da membrane/pozze gia' piazzate),
-  // mostra il telegrafo al soffitto, poi lascia cadere il blocco.
-  spawnCollapseChunk() {
+  // Fila di stalattiti di cerume duro appese al soffitto (sprite VERI, `wax_a/b/c/d` come il
+  // muro, tinti come il cerume duro) in punti sparsi lungo il livello — quantita' scalata alla
+  // larghezza. Restano inerti finche' `quakePulse` non ne stacca qualcuna.
+  placeStalactites() {
+    this.stalactites = [];
+    const n = Phaser.Math.Clamp(Math.round(this.worldW / 480), 5, 12);
+    for (let i = 0; i < n; i++) this.addStalactite();
+  }
+
+  addStalactite() {
     const x = this.pickHazardX(36, 20);
     if (x == null) return;
     const cx = x + 18;
-    const warn = this.add.rectangle(cx, 14, 30, 16, 0xe0a83a, 0.5).setDepth(8).setStrokeStyle(2, 0xffd98a, 0.8);
-    this.tweens.add({ targets: warn, alpha: 0.15, yoyo: true, repeat: 3, duration: 130 });
-    this.time.delayedCall(560, () => {
-      warn.destroy();
+    const key = Phaser.Utils.Array.GetRandom(['wax_a', 'wax_b', 'wax_c', 'wax_d']);
+    const sprite = this.add.image(cx, this.CEIL_Y, key).setOrigin(0.5, 0).setDepth(6);
+    const src = this.textures.get(key).getSourceImage();
+    sprite.setScale((window.CONFIG.BLOCK * 1.5) / src.width);
+    sprite.setTint(this._waxTint('hard', 1));
+    if (Math.random() < 0.5) sprite.setFlipX(true);
+    this.stalactites.push({ x: cx, sprite });
+  }
+
+  // Si richiama da sola con un intervallo diverso ogni volta (2.5-3.5s): cosi' le scosse non
+  // hanno un ritmo prevedibile/meccanico.
+  scheduleQuakePulse() {
+    this.quakeTimer = this.time.delayedCall(Phaser.Math.Between(2500, 3500), () => {
       if (this.locked) return;
-      // Sprite VERO del cerume (stesso set usato dal muro in buildWaxSprites, invece del
-      // vecchio placeholder 'block_hard' — che qui era VISIBILE, non solo hitbox).
-      const key = Phaser.Utils.Array.GetRandom(['wax_a', 'wax_b', 'wax_c', 'wax_d']);
-      const chunk = this.collapseChunks.create(cx, 6, key).setDepth(8);
-      const src = this.textures.get(key).getSourceImage();
-      chunk.setScale((window.CONFIG.BLOCK * 1.3) / src.width);
-      chunk.setAngle(Phaser.Math.Between(-20, 20));
-      if (Math.random() < 0.5) chunk.setFlipX(true);
-      chunk.setTint(this._waxTint('hard', 1));
-      chunk.body.setAllowGravity(true);
-      chunk.body.setSize(24, 24, true);
-      chunk.setVelocityY(40);
-      this.time.delayedCall(5000, () => { if (chunk.active) chunk.destroy(); });   // rete di sicurezza
+      this.quakePulse();
+      this.scheduleQuakePulse();
     });
+  }
+
+  // La SCOSSA vera e propria: si deve PERCEPIRE (shake deciso + rombo) — poi stacca 1-3
+  // stalattiti, preferendo quelle piu' vicine al giocatore (piu' probabile che le veda cadere).
+  // Se sono finite, ogni tanto ne ripiazza una nuova (si ripopolano piano, non restano vuote
+  // per il resto del livello).
+  quakePulse() {
+    this.cameras.main.shake(400, 0.014);
+    window.Sfx.smash();
+    if (!this.stalactites.length) {
+      if (Math.random() < 0.4) this.addStalactite();
+      return;
+    }
+    const sorted = this.stalactites.slice().sort((a, b) =>
+      Math.abs(a.x - this.player.x) - Math.abs(b.x - this.player.x));
+    const n = Math.min(Phaser.Math.Between(1, 3), sorted.length);
+    for (let i = 0; i < n; i++) this.detachStalactite(sorted[i]);
+  }
+
+  // Stacca UNA stalattite: distrugge lo sprite appeso e fa nascere al suo posto un chunk VERO
+  // (stesso gruppo/sprite/tinta del round 1, solo velocita' iniziale leggermente maggiore —
+  // parte gia' "smossa" dalla scossa, non da ferma) che cade con la fisica/danno gia' esistenti.
+  detachStalactite(s) {
+    const idx = this.stalactites.indexOf(s);
+    if (idx === -1) return;
+    this.stalactites.splice(idx, 1);
+    const cx = s.x;
+    const key = s.sprite.texture.key;
+    s.sprite.destroy();
+    const chunk = this.collapseChunks.create(cx, this.CEIL_Y + 4, key).setDepth(8);
+    const src = this.textures.get(key).getSourceImage();
+    chunk.setScale((window.CONFIG.BLOCK * 1.3) / src.width);
+    chunk.setAngle(Phaser.Math.Between(-20, 20));
+    if (Math.random() < 0.5) chunk.setFlipX(true);
+    chunk.setTint(this._waxTint('hard', 1));
+    chunk.body.setAllowGravity(true);
+    chunk.body.setSize(24, 24, true);
+    chunk.setVelocityY(60);
+    this.time.delayedCall(5000, () => { if (chunk.active) chunk.destroy(); });   // rete di sicurezza
   }
 
   // Impatto della frana: danno ad area al cerume vicino (puo' aprire un varco), effetto
@@ -2516,7 +2565,7 @@ class GameScene extends Phaser.Scene {
     this.locked = true;
     window.Sfx.win();
     if (this.spawnTimer) this.spawnTimer.remove();
-    if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
+    if (this.quakeTimer) { this.quakeTimer.remove(false); this.quakeTimer = null; }
     this.player.setVelocity(0, 0);
     this.enemies.getChildren().forEach((e) => { if (e.active) e.setVelocity(0, 0); });
 
@@ -2539,7 +2588,7 @@ class GameScene extends Phaser.Scene {
     this.locked = true;
     window.Sfx.lose();
     if (this.spawnTimer) this.spawnTimer.remove();
-    if (this.collapseTimer) { this.collapseTimer.remove(false); this.collapseTimer = null; }
+    if (this.quakeTimer) { this.quakeTimer.remove(false); this.quakeTimer = null; }
 
     // Fine della run: incassa il cerume raccolto nella banca permanente.
     const lvl = window.GameState.level;
@@ -2621,6 +2670,29 @@ class GameScene extends Phaser.Scene {
     this.waxText.setText(T.t('hud_wax', { n: window.GameState.wax }));
   }
 
+  // Timer grande e centrato (round 2, F.1/F.2a): condiviso da Assedio e Corsa (prima l'assedio
+  // aveva solo `siegeText`, 20px poco leggibile, e la corsa non aveva nessun timer). Negli
+  // ultimi 5s LAMPEGGIA (colore acceso + pulsazione) per segnalare che sta per scadere.
+  buildBigTimer() {
+    this.bigTimerText = this.add.text(window.CONFIG.WIDTH / 2, 92, '', {
+      fontFamily: 'monospace', fontSize: '38px', color: '#ffd9a0', stroke: '#14161f', strokeThickness: 6,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+  }
+
+  // `text` = stringa gia' formattata (i18n) da mostrare; `secondsLeft` guida SOLO il lampeggio.
+  updateBigTimer(text, secondsLeft, now) {
+    if (!this.bigTimerText) return;
+    this.bigTimerText.setText(text);
+    if (secondsLeft <= 5) {
+      const blink = Math.floor(now / 200) % 2 === 0;
+      this.bigTimerText.setColor(blink ? '#ff4040' : '#ffd9a0');
+      this.bigTimerText.setScale(blink ? 1.18 : 1);
+    } else {
+      this.bigTimerText.setColor('#ffd9a0');
+      this.bigTimerText.setScale(1);
+    }
+  }
+
   // ---------- Pausa ----------
 
   buildPauseButton() {
@@ -2676,8 +2748,16 @@ class GameScene extends Phaser.Scene {
     // ASSEDIO: si vince SOPRAVVIVENDO fino allo scadere del cronometro (niente timpano).
     if (this.levelKind === 'siege') {
       const left = Math.max(0, Math.ceil((this.siegeEndAt - now) / 1000));
-      if (this.siegeText) this.siegeText.setText(window.I18n.t('hud_siege', { s: left }));
+      this.updateBigTimer(window.I18n.t('hud_siege', { s: left }), left, now);
       if (now >= this.siegeEndAt) { this.levelComplete(); return; }
+    } else if (this.levelKind === 'rush') {
+      // CORSA A TEMPO (round 2, F.1): se il tempo scade PRIMA del timpano -> game over (deciso
+      // con l'utente). Il controllo `player.x < goalX` evita che, nel caso limite in cui tempo
+      // scaduto e traguardo raggiunto capitino nello stesso frame, si perda una corsa in realta'
+      // vinta (il blocco "Traguardo" qui sotto la completerebbe comunque, se lo lasciamo passare).
+      const left = Math.max(0, Math.ceil((this.rushEndAt - now) / 1000));
+      this.updateBigTimer(window.I18n.t('hud_rush', { s: left }), left, now);
+      if (now >= this.rushEndAt && this.player.x < this.goalX) { this.gameOver(); return; }
     }
 
     // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
