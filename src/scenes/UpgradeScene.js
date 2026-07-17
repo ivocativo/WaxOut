@@ -49,7 +49,7 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'homing', rep: false, rarity: 'rare', ability: 'homing', apply: (s) => { s.homing = true; } },
       { id: 'secondlife', rep: false, rarity: 'rare', ability: 'secondlife', apply: (s) => { s.secondLife = true; } },
       { id: 'greed', rep: false, stack: true, rarity: 'rare', ability: 'greed', apply: (s) => { s.waxMult += 0.5; } },
-      { id: 'dashstrike', rep: false, rarity: 'rare', ability: 'dashstrike', apply: (s) => { s.dashStrike = true; if (!s.dash) s.dash = true; } },
+      { id: 'dashstrike', rep: false, rarity: 'rare', ability: 'dashstrike', needs: 'dash', apply: (s) => { s.dashStrike = true; } },
       { id: 'corrosive', rep: false, rarity: 'rare', ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
       // Rimbalzo: IMPILABILE — ogni pesca aggiunge un rimbalzo alle palline.
       { id: 'bounce', rep: false, stack: true, rarity: 'rare', ability: 'bounce', apply: (s) => { s.bounce += 1; } },
@@ -98,8 +98,11 @@ class UpgradeScene extends Phaser.Scene {
     // Disponibili: gli stat ripetibili sempre; le "stack" (impilabili) ri-pescabili all'infinito;
     // le abilità una-tantum solo se non gia' possedute (ownedAbilities le traccia tutte). Le
     // abilità "locked" compaiono solo se il Progetto e' sbloccato al negozio (Meta.unlockLevel>0).
+    // "needs" (round 2, A.4): PREREQUISITO — la carta non esce finche' non possiedi gia'
+    // l'abilita' base collegata (es. Scatto Offensivo richiede lo Scatto normale).
     const owned = window.GameState.ownedAbilities;
     const avail = ALL.filter((u) => {
+      if (u.needs && owned.indexOf(u.needs) === -1) return false;
       if (u.rep) return true;
       if (u.locked && window.Meta.unlockLevel(u.id) <= 0) return false;
       if (u.stack) return true;

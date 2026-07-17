@@ -22,45 +22,63 @@ Ogni punto: **cosa ha segnalato l'utente** → **causa** (file:riga, verificata)
 
 ---
 
-## GRUPPO A — Fix rapidi, causa già individuata
+## GRUPPO A — Fix rapidi, causa già individuata  ✅ TUTTI FATTI E VERIFICATI (2026-07-17)
+_Tutti e 4 corretti nella stessa sessione, verificati con test mirati in preview (dati, zero_
+_errori). **NON ancora committato** — in attesa di conferma dell'utente._
 
-- [ ] **A.1 — L'animazione del coton fioc va SEMPRE verso destra.**
+> ⚠️ **Nota tecnica per i prossimi round:** in questa sessione di preview il tab del browser resta
+> in background (rAF/orologio di gioco fermi), il che ha rotto in due punti gli approcci di test
+> "al buio" usuali: (1) `scene.start()` ripetuto in loop NON ri-esegue davvero `create()` finché
+> non parte un frame reale — una scena può restare bloccata a metà creazione (`sys.settings.status
+> === 4`) e ridare sempre lo stesso contenuto stantio; soluzione: se i risultati sembrano sospetti-
+> mente identici a ripetizione, **ricaricare la pagina** (`navigate` con `force:true`) prima di
+> dubitare della logica. (2) Per verificare la GEOMETRIA di un'animazione (non solo "esiste" ma
+> "va nel verso giusto"), **non fidarsi di `getWorldTransformMatrix()` da solo** (ignora `flipX`/
+> `flipY`, che sono solo un mirror dei pixel, non della matrice) — usare invece `sprite.getBounds()`
+> a piu' punti dell'arco/tween con `tweens.killTweensOf()` + rotazione impostata a mano, cosi' si
+> confronta la vera scatola visibile invece di un singolo punto locale.
+
+- [x] **A.1 — L'animazione del coton fioc va SEMPRE verso destra.**
   Causa (verificata): `showMeleeWeapon` (`GameScene.js` ~1875) fa ruotare l'arma con un tween
   d'angolo FISSO da `-1.1` a `0.7` (un arco orario) e applica solo `setFlipY(this._weaponFlip)` in
   base al facing. Il flip verticale non cambia il VERSO della rotazione, quindi l'arco "spazza"
-  sempre verso destra anche quando guardi a sinistra. **Fix:** specchiare anche la rotazione col
-  facing — quando `this.facing < 0`, invertire i due angoli del tween (es. da `+1.1` a `-0.7`) e/o
-  usare `setFlipX` invece di `setFlipY`, così l'arco segue la direzione del colpo. Verifica: colpo
-  a sinistra → l'arco spazza verso sinistra; a destra → verso destra.
+  sempre verso destra anche quando guardi a sinistra.
+  **FATTO (causa piu' sottile del previsto — 3 tentativi prima di quello giusto):**
+  `setFlipX` invece di `setFlipY` da SOLO non basta (il flip mescola solo i PIXEL, non la matrice
+  di rotazione/posizione: verificato con `getWorldTransformMatrix`); nemmeno la semplice
+  NEGAZIONE dell'angolo (`-θ`) basta, perche' geometricamente e' un mirror ALTO/BASSO, non
+  SINISTRA/DESTRA, e sposta l'arco anche in verticale (verificato con `getBounds()`: Y diversa tra
+  destra e sinistra). La formula corretta e' **`π - θ`** (riflessione attorno all'asse verticale) +
+  `setFlipX` per l'orientamento dei pixel (utile per armi asimmetriche come il martello). Fix in
+  `showMeleeWeapon`: `const mirror = (theta) => this._weaponFlip ? (Math.PI - theta) : theta;` poi
+  `w.rotation = mirror(-1.1)` e il tween verso `mirror(0.7)`. Verificato con `getBounds()` su 4
+  punti dell'arco (inizio/2 meta'/fine) per ENTRAMBE le armi (coton fioc + martello): X sempre
+  specchiata esattamente attorno al giocatore, Y IDENTICA tra destra e sinistra in ogni punto.
 
-- [ ] **A.2 — Dare alle Pulci balzi ancora più alti.**
-  Causa: `fleaAI` (`GameScene.js` ~2077) usa `setVelocity(dir*speed*2.2, -380)`. **Fix:** alzare
-  la componente verticale (es. `-460`/`-500`; apice ≈ v²/(2·1100) → -380=66px, -480=105px). Valuta
-  se allungare di poco anche il cooldown `hopReadyAt` (ora 950ms) se diventano troppo insistenti.
-  Verifica: la Pulce scavalca ostacoli più alti; picco velocità verticale = il nuovo valore.
+- [x] **A.2 — Dare alle Pulci balzi ancora più alti.**
+  Causa: `fleaAI` (`GameScene.js` ~2077) usava `setVelocity(dir*speed*2.2, -380)`.
+  **FATTO:** alzata la componente verticale a `-480` (apice ≈105px, da 66px). Cooldown
+  `hopReadyAt` lasciato a 950ms (l'aria in volo resta comunque sotto quella soglia, niente
+  bisogno di allungarlo). Verificato: picco velocita' verticale = -480 come atteso.
 
-- [ ] **A.3 — I proiettili dei nemici sono identici al cerume che raccogli.**
-  Causa (verificata): `spitAt` (`GameScene.js` ~1437) crea la pallina sputata con `this.projectiles.
-  create(sx, sy, 'wax_glob')` — la STESSA texture `wax_glob` usata sia dai pickup di cerume sulle
-  pedane sia dalle palline lasciate dai nemici morti (F.1b). A colpo d'occhio "sparo nemico" e
-  "bottino da raccogliere" si confondono. **Fix:** dare ai proiettili una texture PROPRIA,
-  chiaramente "ostile" e diversa dal cerume dorato — es. una pallina generata a codice in `BootScene`
-  (come le altre texture procedurali: cerca `PixelArt`/`generateTexture`), tono verde-acido/viola
-  "velenoso" con un piccolo bordo scuro, così si legge come minaccia. Usarla in `spitAt` (e
-  verificare che il boss usi la stessa via `spitAt`). Verifica: proiettili nemici visivamente
-  distinti dai pickup; nessun errore. **Collegamento:** tema condiviso col round 1 (F.1b ha reso i
-  nemici "sorgente di palline"): ora serve separare NETTAMENTE le palline-bottino da quelle-danno.
+- [x] **A.3 — I proiettili dei nemici sono identici al cerume che raccogli.**
+  Causa (verificata): `spitAt` (`GameScene.js` ~1437) creava la pallina sputata con
+  `this.projectiles.create(sx, sy, 'wax_glob')` — la STESSA texture del cerume raccoglibile.
+  **FATTO:** nuova texture procedurale dedicata (`PixelArt.poisonBall`, in `pixelart.js`) —
+  pallina verde-acido/viola con bordo scuro e riflesso chiaro, generata in `BootScene` come chiave
+  `'proj_poison'`; `spitAt` ora la usa al posto di `wax_glob` (copre sia il gorgogliante sia il
+  boss, che passano entrambi da `spitAt`). Verificato: texture del proiettile = `proj_poison` per
+  entrambi i tipi di nemico, nettamente diversa dal pickup.
 
-- [ ] **A.4 — Lo Scatto con danno va sbloccato solo DOPO lo scatto normale.**
-  Causa (verificata): la carta `dashstrike` (`UpgradeScene.js` ~52) fa `apply: (s) => { s.dashStrike
-  = true; if (!s.dash) s.dash = true; }` — cioè REGALA lo scatto base se non ce l'hai. E il filtro
-  `avail` (`UpgradeScene.js` ~102) non ha un concetto di "prerequisito" per le carte normali (solo
-  le EVOLUZIONI usano `needs`). **Fix (2 righe):** (1) aggiungere il supporto `needs` alle carte nel
-  filtro `avail` — `if (u.needs && owned.indexOf(u.needs) === -1) return false;`; (2) su `dashstrike`
-  mettere `needs: 'dash'` e TOGLIERE l'auto-regalo (`if (!s.dash)...`). Verifica: senza `dash` in
-  `ownedAbilities`, la carta Scatto Offensivo NON esce; presa la carta Scatto, comincia a comparire.
-  **Nota:** controllare che nessun'altra carta si appoggiasse a quell'auto-grant (non risulta: è
-  l'unico caso).
+- [x] **A.4 — Lo Scatto con danno va sbloccato solo DOPO lo scatto normale.**
+  Causa (verificata): la carta `dashstrike` (`UpgradeScene.js` ~52) faceva `apply: (s) => {
+  s.dashStrike = true; if (!s.dash) s.dash = true; }` — REGALAVA lo scatto base se non posseduto.
+  Il filtro `avail` non aveva concetto di prerequisito (solo le EVOLUZIONI usano `needs`).
+  **FATTO:** aggiunto supporto generico `needs` al filtro `avail` (`if (u.needs &&
+  owned.indexOf(u.needs) === -1) return false;`); su `dashstrike` aggiunto `needs: 'dash'` e
+  tolto l'auto-regalo. Verificato su 50 aperture della carta SENZA scatto posseduto (150 carte
+  totali): "Dash Strike" mai comparsa; CON scatto posseduto: ricomparsa al tentativo 43/80 (in
+  linea con la probabilita' attesa ~2.5%/slot). Nessun'altra carta si appoggiava all'auto-regalo.
 
 ---
 
@@ -244,8 +262,8 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 ---
 
 ## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
-1. **Gruppo A** (A.1 arco coton fioc, A.2 pulci, A.3 texture proiettili, A.4 gate scatto-danno) — 4 fix rapidi, cause certe.
-2. **Gruppo D** (boss: arco del salto più verticale + stretch/ombra) — rapido, causa certa, verifica dal vivo.
+1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17 (A.1 arco coton fioc, A.2 pulci, A.3 texture proiettili, A.4 gate scatto-danno). NON ancora committato.
+2. **Gruppo D** (boss: arco del salto più verticale + stretch/ombra) — **PROSSIMO** — rapido, causa certa, verifica dal vivo.
 3. **Gruppo C** (scia scatto più visibile + differenza normale/danno) — estetico, si sposa con A.4.
 4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **INSIEME**, fissa `CEIL_Y`.
 5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **dopo B** (usa `CEIL_Y`).

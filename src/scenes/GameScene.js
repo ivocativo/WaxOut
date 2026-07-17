@@ -1434,7 +1434,7 @@ class GameScene extends Phaser.Scene {
     const T = Phaser.Math.Clamp(dist / 230, 0.65, 1.25);  // tempo di volo (piu' lungo = pallina piu' lenta)
     const vx = dx / T;
     const vy = (dy - 0.5 * g * T * T) / T;               // soluzione balistica
-    const proj = this.projectiles.create(sx, sy, 'wax_glob').setDepth(9);
+    const proj = this.projectiles.create(sx, sy, 'proj_poison').setDepth(9);
     proj.body.setAllowGravity(true);                     // cade in parabola
     proj.body.setSize(10, 10, true);
     proj.setVelocity(vx, vy);
@@ -1880,9 +1880,14 @@ class GameScene extends Phaser.Scene {
     this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
     this._weaponHideAt = this.time.now + 240;
     this.positionWeapon();
-    w.setFlipY(this._weaponFlip);
-    w.rotation = -1.1;                                  // parte alto-indietro
-    this.tweens.add({ targets: w, rotation: 0.7, duration: 150, ease: 'Quad.out' });  // fino a basso-avanti
+    // FlipX (non FlipY, il bug originale) per l'orientamento dei pixel + rotazione "π - θ"
+    // (NON la semplice negazione -θ, che sposta l'arco anche in verticale — verificato con
+    // getBounds(): solo π-θ da' un mirror pulito, stessa Y, X specchiata attorno al giocatore).
+    w.setFlipX(this._weaponFlip);
+    w.setFlipY(false);
+    const mirror = (theta) => this._weaponFlip ? (Math.PI - theta) : theta;
+    w.rotation = mirror(-1.1);                                  // parte alto-indietro
+    this.tweens.add({ targets: w, rotation: mirror(0.7), duration: 150, ease: 'Quad.out' });  // fino a basso-avanti
   }
 
   // Posiziona l'arma alla mano (la segue ogni frame finche' visibile). L'angolo lo impostano
@@ -2074,8 +2079,8 @@ class GameScene extends Phaser.Scene {
     const onGround = e.body.blocked.down || e.body.touching.down;
     if (onGround && now >= (e.hopReadyAt || 0)) {
       e.hopDir = dir;
-      e.setVelocity(dir * e.speed * 2.2, -380);   // balzo piu' alto (era -260)
-      e.hopReadyAt = now + 950;                    // meno frequente (era 550ms)
+      e.setVelocity(dir * e.speed * 2.2, -480);   // balzo ancora piu' alto (era -380, prima -260)
+      e.hopReadyAt = now + 950;                    // invariato: l'aria in volo (~870ms) resta sotto al cooldown
     }
     e.setFlipX(dir < 0);
   }

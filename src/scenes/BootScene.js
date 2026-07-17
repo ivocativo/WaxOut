@@ -158,7 +158,9 @@ class BootScene extends Phaser.Scene {
     ];
     PA.fromGrid(this, 'enemy_boss', tappo, bPal, sE * 2);
 
-    // wax_glob (proiettile) ora arriva da PNG (vedi preload).
+    // Proiettile OSTILE dei nemici (sputo): texture propria, ben diversa dal cerume
+    // raccoglibile 'wax_glob' (round 2, A.3 — prima erano la stessa immagine e si confondevano).
+    PA.poisonBall(this, 'proj_poison');
 
     // --- Blocchi del muro (3 durezze) ---
     PA.block(this, 'block_soft', C.waxSoft, C.waxSoftLight, C.waxSoftDark,

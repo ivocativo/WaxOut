@@ -97,5 +97,18 @@ window.PixelArt = (function () {
     g.destroy();
   }
 
-  return { fromGrid, solid, block, swab, hammer, sprayer };
+  // Pallina VELENOSA sputata dai nemici (proiettile ostile): verde-acido/viola con bordo
+  // scuro, ben diversa dal cerume dorato (wax_glob) che si raccoglie — cosi' "minaccia" e
+  // "bottino" non si confondono a colpo d'occhio (round 2, A.3).
+  function poisonBall(scene, key) {
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x2a0f3a, 1); g.fillCircle(8, 8, 7);       // bordo scuro viola-nero
+    g.fillStyle(0x7a2fb8, 1); g.fillCircle(8, 8, 6);       // viola velenoso
+    g.fillStyle(0x9fe83a, 1); g.fillCircle(8, 8, 4);       // nucleo verde-acido
+    g.fillStyle(0xd4ff8a, 0.85); g.fillCircle(6, 6, 1.6);  // riflesso chiaro
+    g.generateTexture(key, 16, 16);
+    g.destroy();
+  }
+
+  return { fromGrid, solid, block, swab, hammer, sprayer, poisonBall };
 })();
