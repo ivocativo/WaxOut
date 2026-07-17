@@ -1277,6 +1277,8 @@ class GameScene extends Phaser.Scene {
     if (cfg.boss) {
       e.bossAtk = null;                                         // stato attacco balzo+schiacciata (vedi bossAI)
       e.slamReadyAt = this.time.now + Phaser.Math.Between(2500, 4000);   // niente slam nei primissimi istanti
+      e.slamShadow = null;                                      // ombra a terra durante il balzo (round 2, D.1)
+      e.once('destroy', () => { if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; } });
     }
 
     // ELITE: aura colorata dietro il nemico (segnale visivo, niente tint per non confliggere
@@ -2168,18 +2170,46 @@ class GameScene extends Phaser.Scene {
         e.slamStartAt = now;
         e.slamDir = dir;
         e.setFlipX(dir < 0);
-        e.setVelocity(dir * (e.speed * 2 + 120), -430);
+        // Arco VERTICALE (round 2, D.1): salto alto (-600, apice ~164px, quasi il doppio del
+        // vecchio -430 di appena 84px) che ATTERRA SUL giocatore invece di superarlo — la
+        // velocita' orizzontale si calcola dalla distanza reale al bersaglio (non un
+        // moltiplicatore fisso di e.speed) assumendo un volo simmetrico (stessa quota di
+        // partenza/arrivo): T = 2*|vy|/g, vx = distanza/T. Clamp di sicurezza (non dovrebbe
+        // mai servire, il raggio d'innesco e' comunque limitato).
+        const SLAM_VY = 600;
+        const flightT = (2 * SLAM_VY) / this.physics.world.gravity.y;
+        const vx = Phaser.Math.Clamp((this.player.x - e.x) / flightT, -420, 420);
+        e.setVelocity(vx, -SLAM_VY);
+        e.slamApex = (SLAM_VY * SLAM_VY) / (2 * this.physics.world.gravity.y);   // per l'ombra sotto
+        // VENDERE il salto: stiramento al decollo (l'opposto dell'accovacciamento del windup,
+        // si riassesta da solo con un tween) + ombra a terra che segue e si rimpicciolisce.
+        const bs = e._baseScale || (e._baseScale = e.scaleX);
+        e.setScale(bs * 0.8, bs * 1.25);
+        this.tweens.add({ targets: e, scaleX: bs, scaleY: bs, duration: 200, ease: 'Quad.out' });
+        if (!e.slamShadow) {
+          e.slamShadow = this.add.ellipse(e.x, this.groundTop, 70, 18, 0x000000, 0.35).setDepth(6);
+        }
+        e.slamShadow.setPosition(e.x, this.groundTop).setScale(1).setAlpha(0.35).setVisible(true);
       }
       return;
     }
     if (e.bossAtk === 'slamjump') {
       e.setFlipX(e.slamDir < 0);
+      // Ombra a terra: segue orizzontalmente, si rimpicciolisce/schiarisce mentre sale (stessa
+      // logica dell'altezza apice usata per calcolare la traiettoria, cosi' resta coerente).
+      if (e.slamShadow) {
+        const heightRatio = Phaser.Math.Clamp((this.groundTop - e.body.bottom) / (e.slamApex || 1), 0, 1);
+        e.slamShadow.setPosition(e.x, this.groundTop);
+        e.slamShadow.setScale(1 - heightRatio * 0.65);
+        e.slamShadow.setAlpha(0.35 * (1 - heightRatio * 0.55));
+      }
       // Atterrato per davvero (non nel primo istante del balzo, dove il corpo tocca ancora
       // terra per un frame): stesso accorgimento gia' usato per il Saltatore.
       const landed = (e.body.blocked.down || e.body.touching.down) && now - e.slamStartAt > 250;
       if (landed) {
         e.bossAtk = null;
         e.setVelocityX(0);
+        if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; }
         this.bossSlamFx(e, e.x, e.y);
         e.slamReadyAt = now + (e._enraged ? 3000 : 4500);
       }
@@ -2199,7 +2229,9 @@ class GameScene extends Phaser.Scene {
     }
 
     // Pronto + giocatore abbastanza vicino + boss a terra: parte il telegrafo dello slam.
-    if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 360 &&
+    // Raggio allargato da 360 a 440 (round 2, D.1): con l'arco piu' verticale il boss deve
+    // poter agganciare lo slam anche quando il giocatore lo tiene a distanza col getto.
+    if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
         (e.body.blocked.down || e.body.touching.down)) {
       e.bossAtk = 'slamwind';
       e.slamWindupUntil = now + 600;   // telegrafo lungo: e' pesante, si vede arrivare

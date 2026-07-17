@@ -134,23 +134,40 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 
 ## GRUPPO D — Boss
 
-- [ ] **D.1 — Il boss non si stacca da terra quando salta (balzo+schiacciata di C.1).**
-  Causa (VERIFICATA DAL VIVO, non solo letta): fisicamente il balzo c'è — misurato in preview, il
-  boss si alza di **71px**, cioè ~il 100% della sua altezza (il boss è alto solo 72px). Il problema è
-  che l'ARCO è troppo ORIZZONTALE: `bossAI` (`GameScene.js` ~2166) fa `setVelocity(dir*(speed*2+120),
-  -430)` = ~188px/s orizzontali → **~147px in avanti** contro 71px in su, un arco piatto che si legge
-  come "scivolata/carica in avanti" più che come un salto; e senza uno "stiramento" al decollo/ombra
-  che si stacca, l'occhio non percepisce lo stacco. **Fix:** (a) arco più VERTICALE e drammatico —
-  alzare la componente su (es. `-560`/`-620`) e ridurre/limitare quella orizzontale così ATTERRA
-  SUL giocatore invece di superarlo (calcolare l'orizzontale in base alla distanza dal PG, non fissa);
-  (b) VENDERE il salto: al decollo un piccolo "stretch" (scaleY su, scaleX giù, l'opposto
-  dell'accovacciamento del windup) e un'OMBRA a terra che si rimpicciolisce mentre sale (cerchio
-  scuro sotto il boss). Ricontrollare che `landed` (~2174) scatti ancora bene col nuovo arco.
-  Verifica DAL VIVO in god-mode (campionare `boss.body.bottom` sui frame reali, come ho fatto io):
-  apice ben visibile, il boss ATTERRA vicino al giocatore, l'onda d'urto (`bossSlamFx`) parte a
-  terra. **Nota:** valutare anche se il raggio di innesco (ora 360px, `~2197`) è troppo corto — in
-  un combattimento a distanza il boss potrebbe non arrivare mai a distanza-slam e non saltare mai:
-  se serve, allargarlo o farlo avvicinare prima di caricare.
+- [x] **D.1 — Il boss non si stacca da terra quando salta (balzo+schiacciata di C.1).**
+  FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
+  Causa originale: l'arco era troppo ORIZZONTALE (`bossAI`) — `setVelocity(dir*(speed*2+120),
+  -430)` dava ~147px avanti contro solo ~84px in su (teorico), letto come "scivolata" non salto;
+  niente stiramento/ombra per vendere lo stacco.
+  **FATTO:**
+  - **(a) Arco verticale + atterra SUL giocatore.** Salto molto piu' alto (`vy=-600`, apice
+    teorico 163.6px, quasi il DOPPIO di prima) e orizzontale calcolato dalla distanza REALE al
+    giocatore (non piu' un moltiplicatore fisso): `flightT = 2*600/gravity`, `vx =
+    (player.x-e.x)/flightT` (volo simmetrico, stessa quota di partenza/arrivo), con clamp di
+    sicurezza ±420. Raggio d'innesco allargato da 360 a 440px (nota della roadmap: con l'arco
+    piu' verticale il boss deve poter agganciare lo slam anche da piu' lontano).
+  - **(b) Venduto il salto:** stiramento al decollo (`setScale(bs*0.8, bs*1.25)`, l'opposto
+    dell'accovacciamento del windup, si riassesta da solo con un tween in 200ms) + OMBRA a terra
+    (`e.slamShadow`, nuova ellisse) che segue orizzontalmente e si rimpicciolisce/schiarisce con
+    l'altezza (`e.slamApex` salvato al decollo), si distrugge all'atterraggio (e anche su morte
+    del boss a meta' volo, hook `destroy`).
+  - **⚠️ Scoperta tecnica IMPORTANTE per i test futuri (vedi nota in cima al Gruppo A):**
+    `physics.world.step()` chiamato DA SOLO e ripetutamente (senza il resto del ciclo di gioco)
+    "blocca" il flag `body.blocked.down` a `true` per sempre dopo un lungo periodo di riposo a
+    terra, ANCHE se il corpo si stacca davvero — **riproducibile pure con un salto banale, senza
+    nessuna riga del mio codice**. Mi ha fatto sembrare (erroneamente) che l'atterraggio scattasse
+    troppo presto (~250ms, il minimo di sicurezza) invece che alla fine del volo vero. Il fix del
+    test: usare `window.game.step(time, delta)` (il PASSO COMPLETO del motore, la stessa via della
+    partita vera — gia' usato per il test dell'arco del coton fioc) invece del solo
+    `physics.world.step()`. **Retroattivamente, questo significa che anche il numero "71px" del
+    round 1 (C.1) era quasi certamente falsato dallo stesso artefatto** (71px combacia quasi
+    esattamente con lo spostamento atteso nei primi 250ms del vecchio salto, non con l'apice vero).
+  Verificato con `game.step()` (ciclo motore reale): apice 162px (teorico 163.6, quasi esatto);
+  65 frame in aria (teorico 65.4); **atterra a 248px da un bersaglio posto a 250px** (praticamente
+  esatto); stiramento visibile (`scaleY` >1 durante il volo); ombra visibile che si restringe
+  salendo e si allarga scendendo, poi si distrugge; danno da impatto applicato all'atterraggio
+  (`bossSlamFx`); innesco confermato a 400px (dentro il nuovo raggio, fuori dal vecchio). Zero
+  errori console.
 
 ---
 
@@ -262,9 +279,9 @@ _che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nel
 ---
 
 ## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
-1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17 (A.1 arco coton fioc, A.2 pulci, A.3 texture proiettili, A.4 gate scatto-danno). NON ancora committato.
-2. **Gruppo D** (boss: arco del salto più verticale + stretch/ombra) — **PROSSIMO** — rapido, causa certa, verifica dal vivo.
-3. **Gruppo C** (scia scatto più visibile + differenza normale/danno) — estetico, si sposa con A.4.
+1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17, committato (`2db4ecf`).
+2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17 (boss: arco del salto più verticale + stretch/ombra). NON ancora committato.
+3. **Gruppo C** (scia scatto più visibile + differenza normale/danno) — **PROSSIMO** — estetico, si sposa con A.4.
 4. **Gruppo B** (soffitto tangibile+più sottile **+** pedane alte sotto il soffitto) — **INSIEME**, fissa `CEIL_Y`.
 5. **Gruppo E** (terremoto: stalattiti + scosse con shake) — **dopo B** (usa `CEIL_Y`).
 6. **Gruppo F** — F.1 (timer Corsa) + F.2 parte (a) (timer Assedio grande/lampeggiante, widget condiviso). ⚠️ **F.2 parte (b) ARENA assedio = blocco a sé, va pianificato con Opus prima** (non farlo qui).
