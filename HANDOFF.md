@@ -197,14 +197,15 @@ Emersi giocando SENZA god-mode (che nei test li nascondeva — vedi `earwaxwar-s
   (via `delayedCall`), quando e' gia' in aria. Verificato dal vivo: il boss ora salta ad apice 151px
   (era 7px), confermato anche a schermo. **Perche' sfuggito in round 2:** il test con `game.step`
   forzava condizioni che non riproducevano il conflitto setScale-a-terra → falso positivo.
-- **FREEZE totale allo "Start Run" su PC (schermo congelato, non morte):** causato dal NUOVO motore
-  musicale. Lo scheduler a lookahead aveva un `while` di "recupero passi persi" che, se il thread
-  aveva un intoppo caricando il livello (PC piu' lenti), poteva rincorrere all'infinito
-  (`currentTime` avanza piu' in fretta della schedulazione) → pagina bloccata. Sul PC veloce/telefono
-  non capitava. Fix in `sfx.js` `schedTick`: se resta troppo indietro RISINCRONIZZA (salta i passi
-  persi) invece di rincorrerli + TETTO rigido di 32 passi per giro (il ciclo ora e' provabilmente
-  limitato). ⚠️ NON riproducibile sul mio ambiente (troppo veloce) → fix ragionato e reso a prova di
-  loop, ma da CONFERMARE dall'utente sul suo PC.
+- **⚠️ APERTO — FREEZE totale allo "Start Run" SUL PC (schermo congelato, non morte):** persiste
+  ANCHE dopo aver reso lo scheduler musicale provabilmente limitato (risync + tetto 32 passi/giro in
+  `sfx.js` `schedTick`) → quindi **NON era (solo) l'audio**. Non riproducibile sul mio ambiente
+  (preview gira a 60fps senza bloccarsi). **DEPRIORITIZZATO dall'utente (2026-07-18): gioca dal
+  TELEFONO, dove funziona** (menu, boss, musica ok). Piste da indagare quando si riprende: (a) e'
+  specifico del browser/hardware del PC dell'utente? (b) postFX WebGL del cerume (`WaxMetaballFX`) su
+  quella GPU? (c) driver audio del PC? **Da chiarire PRIMA del build Android** (verificare che il
+  webview mobile/Capacitor non erediti lo stesso blocco — finora il browser del telefono e' ok). Il
+  fix dello scheduler resta comunque una robustezza sensata (tenerlo).
 - **Telefono "non funziona":** era solo l'IP del PC cambiato (DHCP). Nessuna modifica al codice.
 Tutti da riprovare a fondo dall'utente (senza god-mode).
 
