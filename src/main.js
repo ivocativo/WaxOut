@@ -1,5 +1,17 @@
 // Configurazione Phaser e avvio del gioco.
 window.addEventListener('load', function () {
+  // LARGHEZZA ADATTIVA allo schermo: il gioco resta alto 540 (fisso), ma la larghezza si
+  // adegua alla proporzione del dispositivo, cosi' riempie tutto lo schermo — niente piu'
+  // bande nere ai lati sui telefoni piu' larghi del 16:9 (mostra solo un po' piu' di
+  // corridoio in orizzontale, ideale per uno sparatutto a scorrimento). Tutto il layout del
+  // gioco usa CONFIG.WIDTH, quindi si riposiziona da solo. Va calcolata PRIMA di creare il
+  // gioco. La proporzione e' sempre quella "orizzontale" (lato lungo/lato corto), cosi' non
+  // dipende da come e' ruotato il telefono; con un limite per evitare estremi (da 3:2 a ~21.6:9).
+  const longSide = Math.max(window.innerWidth, window.innerHeight);
+  const shortSide = Math.min(window.innerWidth, window.innerHeight) || 1;
+  const aspect = Math.min(Math.max(longSide / shortSide, 1.5), 2.4);
+  window.CONFIG.WIDTH = Math.round(window.CONFIG.HEIGHT * aspect);
+
   const config = {
     type: Phaser.AUTO,
     width: window.CONFIG.WIDTH,
