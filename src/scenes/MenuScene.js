@@ -116,6 +116,9 @@ class MenuScene extends Phaser.Scene {
     window.Sfx.addAudioButton(this, 28, 26);
     window.Sfx.addMusicButton(this, 68, 26);
 
+    // Atmosfera musicale del menu (parte davvero al primo tocco, via unlock).
+    window.Sfx.setMusic('menu');
+
     this.input.keyboard.once('keydown-ENTER', begin);
     this.input.keyboard.once('keydown-SPACE', begin);
     this.input.keyboard.once('keydown-N', openShop);

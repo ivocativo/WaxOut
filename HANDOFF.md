@@ -6,12 +6,15 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-13 · Ultimo commit: `afd6b5c` (idle+salto integrati, cartella spritesheets).
-Pushato. Non ancora committato: prototipo arma-in-mano era gia' `b2e167c` (quello si')._
-_**Personaggio NUOVO di qualita' (immagine AI) con animazioni VERE: idle/camminata/corsa/salto, +_
-_prototipo arma-in-mano durante l'attacco.** L'utente ha FATTO IL PRIMO PLAYTEST completo su telefono:_
-_21 segnalazioni annotate e raggruppate nel **nuovo blocco `ROADMAP.md` "Correzioni playtest — round 1"**_
-_(bug con causa gia' trovata + feature/redesign piu' grandi). Da lì si riparte, un gruppo alla volta._
+_Ultimo aggiornamento: 2026-07-17 · Ultimo commit pushato: `75df562` su `origin/main`._
+_**DUE giri di correzioni da playtest telefono CHIUSI e PUSHATI:**_
+_· **Round 1** (dopo il 1° playtest, 21 segnalazioni) — tutti i gruppi fatti, fino a `9b43c73`._
+_· **Round 2** (dopo il 2° playtest, 15 segnalazioni) — tutti gli 8 gruppi A–H fatti, fino a `75df562`:_
+_arco coton fioc, balzo pulci, texture proiettili ostili, gate scatto-danno, soffitto tangibile,_
+_scia scatto, salto boss verticale, terremoto a stalattiti, Corsa a tempo + timer condiviso, carte_
+_melee chiarite + "Getto Rapido", menu principale rifatto. (Dettaglio: `ROADMAP.md`, ora chiuso.)_
+_**SI RIPARTE dal playtest dell'utente (round 3):** provare i due giri di fix sul telefono, tarare i_
+_numeri "sensati" e decidere il prossimo grande asse (vedi §DA FARE)._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -87,9 +90,12 @@ GOTCHA loop-pumping:
 - Il riferimento alla scena (`getScene('GameScene')`) resta valido tra i restart, ma i gruppi
   (`enemies`, ecc.) vengono ricreati: ri-prendi i figli dopo ogni `scene.start`.
 
-**Telefono (per l'utente):** doppio-click su `GIOCA-SU-TELEFONO.cmd` sul PC → sul telefono
-(stesso Wi-Fi) aprire `http://<IP-PC>:8123` (di recente `192.168.1.193:8123`; l'indirizzo
-esatto è stampato nella finestra nera). Consentire il firewall su rete PRIVATA.
+**Telefono (per l'utente):** doppio-click su `GIOCA-SU-TELEFONO.cmd` sul PC (deve restare
+aperta la finestra nera) → sul telefono (stesso Wi-Fi) aprire l'indirizzo `http://<IP>:8123`
+**stampato in quella finestra nera**. ⚠️ L'IP del PC CAMBIA (DHCP): non fidarsi di un indirizzo
+memorizzato — il 2026-07-13 era `192.168.1.193`, il 2026-07-18 era `192.168.1.10`. Leggere sempre
+quello mostrato dalla finestra. Consentire il firewall su rete PRIVATA. Se "non funziona" da
+telefono, la causa n.1 è l'indirizzo vecchio o la finestra nera non avviata.
 
 **God-mode nei test (OBBLIGATORIO, tranne quando si testa la morte):**
 ```js
@@ -119,7 +125,9 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - `src/gfx.js` (`GameGfx`) — SOLO rendering (sfondo, cerume, splat, `showBanner`, ecc.). Tenere
   grafica separata dal gameplay: sessione "grafica" tocca gfx.js, "gameplay" GameScene.js.
 - `src/i18n.js` — dizionario EN (default) + IT. Ogni stringa passa da `I18n.t('chiave')`.
-- `src/touch.js` — comandi touch (stick analogico + tasti). `src/sfx.js` — audio procedurale.
+- `src/touch.js` — comandi touch (stick analogico + tasti). `src/sfx.js` — audio procedurale
+  (WebAudio): synth con ADSR/filtri/detune + mandata delay-riverbero, effetti stratificati, e un
+  motore musicale a lookahead con 3 atmosfere (`Sfx.setMusic('menu'|'level'|'boss')`).
 - `assets/` — sprite/immagini (incorporati come data-URI in `sprites_data.js`/`assets_data.js`
   per girare da `file://`). **`assets/spritesheets/<entita'>/`** = home DEDICATA per TUTTI gli sprite
   sheet animati del gioco (separata da `assets/sprites/` che resta per immagini singole) — oggi
@@ -168,27 +176,72 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 
 ## DA FARE
 
-### Correzioni playtest — BLOCCO IN CORSO (piano dettagliato in `ROADMAP.md`)
-Dopo il primo playtest completo su telefono (2026-07-13), l'utente ha dato **21 segnalazioni**
-(bug + migliorie), tutte **annotate e raggruppate** in `ROADMAP.md` con causa probabile (file:riga)
-dove trovata con una verifica veloce. Riassunto dei gruppi (dettagli in ROADMAP):
-- **Gruppo A** (bug rapidi, causa già individuata): coton fioc doppio nel corpo a corpo; moscerini
-  attraversano il cerume; Seconda Vita si ricarica troppo; potenziamenti one-shot (es. doppio salto)
-  riproposti anche se già garantiti da uno sblocco permanente; nemici Esplosivi non danneggiano
-  altri nemici/cerume; scatto (dash) fa sparire le torri di cerume istantaneamente; proiettili rotti
-  nei livelli a poca gravità.
-- **Gruppo B**: Fuggitivo Dorato bloccato nel cerume (proposta: farlo volante — MA decisione legata
-  al Gruppo A, vedi nota lì) + valutare nemici che saltano.
-- **Gruppo C**: boss noioso/troppo sicuro con pedana comoda, dovrebbe droppare cure alla morte.
-- **Gruppo D**: scatto-con-danno deve essere visivamente distinto dallo scatto normale.
-- **Gruppo E** (grande): variante "cerume che cade" da rifare con lo sprite vero; livelli monotoni →
-  più sfondi, soffitto visibile, condotto ondulato, protuberanze/burroni; pedane non sempre
-  raggiungibili.
-- **Gruppo F** (grande): shop troppo facile → ridurre cerume per livello, drop-da-raccogliere invece
-  di auto-pickup, più progetti sbloccabili.
-- **Gruppo G**: audio da rifare completamente (standalone, sessione a parte).
-- **Gruppo H**: note per il futuro (PG che si sporca di cerume; aure élite spariranno con sprite
-  nemici veri) — non azioni immediate.
+### Correzioni playtest — DUE GIRI CHIUSI E PUSHATI ✅
+Round 1 (21 segnalazioni) e Round 2 (15 segnalazioni) entrambi completati e pushati (fino a
+`75df562`). Il dettaglio di entrambi è nella **cronologia git** (il file `ROADMAP.md` è "usa e
+getta" ed è già stato ripreso dal blocco successivo, vedi sotto). **Prossimo passo su questo
+fronte:** aspettare il round 3 di playtest dell'utente per tarare i numeri e giudicare le parti
+soggettive (look nuovo menu, durata Corsa, altezza salto boss, cadenza terremoto).
+
+### 🩹 HOTFIX dal playtest utente (2026-07-18) — NON ancora committati
+Emersi giocando SENZA god-mode (che nei test li nascondeva — vedi `earwaxwar-sim-godmode`):
+- **Morte istantanea allo spawn ("freeze" allo Start Run):** a caso un nemico nasceva incollato al
+  punto di partenza e uccideva il PG prima che potesse muoversi. Fix in `GameScene.js`: (1)
+  `pickGroundX` non piazza mai un nemico < 130px dal PG (nei ripieghi sceglie il bordo piu' lontano);
+  (2) protezione allo spawn `invulnUntil = now + 1400`. Verificato: su 12 gen. del lvl 1 distanza
+  minima nemico-spawn 212px (era 36), PG sopravvive i primi ~3,4s fermo.
+- **Boss ancorato a terra (il fix D.1 del round 2 non funzionava DAVVERO in gioco):** al lancio del
+  salto il boss veniva "stirato" con `setScale(…, 1.25)` — che in questa build ingrandisce anche il
+  CORPO fisico — mentre era ancora appoggiato a terra: il motore lo ri-separava dal suolo e ANNULLAVA
+  la velocita' di salto (da -600 a ~0 in un frame). Fix: applicare lo stiramento ~50ms DOPO il decollo
+  (via `delayedCall`), quando e' gia' in aria. Verificato dal vivo: il boss ora salta ad apice 151px
+  (era 7px), confermato anche a schermo. **Perche' sfuggito in round 2:** il test con `game.step`
+  forzava condizioni che non riproducevano il conflitto setScale-a-terra → falso positivo.
+- **FREEZE totale allo "Start Run" su PC (schermo congelato, non morte):** causato dal NUOVO motore
+  musicale. Lo scheduler a lookahead aveva un `while` di "recupero passi persi" che, se il thread
+  aveva un intoppo caricando il livello (PC piu' lenti), poteva rincorrere all'infinito
+  (`currentTime` avanza piu' in fretta della schedulazione) → pagina bloccata. Sul PC veloce/telefono
+  non capitava. Fix in `sfx.js` `schedTick`: se resta troppo indietro RISINCRONIZZA (salta i passi
+  persi) invece di rincorrerli + TETTO rigido di 32 passi per giro (il ciclo ora e' provabilmente
+  limitato). ⚠️ NON riproducibile sul mio ambiente (troppo veloce) → fix ragionato e reso a prova di
+  loop, ma da CONFERMARE dall'utente sul suo PC.
+- **Telefono "non funziona":** era solo l'IP del PC cambiato (DHCP). Nessuna modifica al codice.
+Tutti da riprovare a fondo dall'utente (senza god-mode).
+
+### 🎵 Audio (rifacimento synth) — FATTO E VERIFICATO (logica), NON ancora committato
+Rifatto `src/sfx.js` (2026-07-17): sintesi più ricca (busta ADSR, filtri, detune, mandata
+delay+riverbero), **13 effetti stratificati con variazione** a ogni colpo, e un **vero motore
+musicale** (scheduler a lookahead, voci basso/accordi/lead + batteria sintetica) con **3 atmosfere
+che cambiano da sole**: menu (rilassato), livello (ritmato), boss/assedio (teso), con dissolvenza.
+Agganci: `MenuScene`→'menu', `GameScene`→'level'/'boss' per tipo. Resta PROCEDURALE (peso zero).
+Verifica LOGICA in preview ok (zero errori, note davvero generate, cambi atmosfera ok). **Il GUSTO
+lo giudica l'utente sul telefono** — le 3 atmosfere sono bozze da tarare. Piano in `ROADMAP.md`.
+RIMANDATI: effetti extra (AU-B.2) e boss-infuriato = musica più intensa (AU-D.3).
+**Iterazione 2026-07-18 (feedback utente):** (1) meno ripetitiva — melodie a 4 battute (64 passi)
+con frasi diverse, backing a 2 battute (32), batteria con fill, umanizzazione volume lead/hat;
+(2) piu' ACUSTICA/calda — accordi STRUMMATI (note sfasate ~18ms), timbri triangle su menu+livello,
+lieve detune sul lead; (3) BOSS PUNK — power chord + basso a crome + batteria tirata + DISTORSIONE
+(waveshaper, opzione `dist` in synth, attiva solo per i brani `punk:true`). Ancora bozze da
+rigiudicare dall'utente.
+
+**Unico strascico di design ancora aperto dal round 2:**
+- **F.2b — arena dedicata per l'Assedio** (`siege`): oggi l'Assedio riusa un livello normale col
+  timer. Renderlo un vero spazio chiuso/ad arena e' un pezzo di design grosso → **da pianificare a
+  fondo con Opus prima di implementare**, non toccato di proposito.
+
+### Grandi assi ancora da fare (scelta del prossimo blocco, dopo il playtest)
+In ordine NON vincolante — da decidere con l'utente qual e' la priorita':
+- **AUDIO da rifare completamente** (era il "Gruppo G" del round 1, sempre rimandato): musica +
+  effetti, sessione dedicata a parte.
+- **Sprite + animazioni dei NEMICI** (stesso trattamento del PG: immagine AI → AutoSprite →
+  pixelate): uniforma l'estetica e fara' sparire le aureole élite (che oggi sono un ripiego).
+  Include le animazioni chieste: cerumino/gorgogliante che strisciano, crosta "asciutta" diversa.
+- **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa che seguono la mira): serve
+  generarla su AutoSprite → **richiede l'abbonamento** (i crediti gratis sono finiti). Oggi c'e' il
+  ripiego "arma-in-mano" su layer separato.
+- **STRADA VERSO GOOGLE PLAY** (l'obiettivo finale): ottimizzare/alleggerire `assets_data.js` +
+  incorporare gli sprite sheet → **Capacitor** → build Android. Serve installare **Node** (oggi
+  assente). Vedi §Grandi assi in fondo.
 
 ### Personaggio & animazioni — quasi chiuso, resta:
 - **Attacco coordinato corpo+arma:** serve una POSA DEDICATA (braccio/testa che seguono la mira),

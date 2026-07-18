@@ -1,326 +1,133 @@
-# Earwax War — Piano esecutivo (blocco "Correzioni playtest — round 2")
+# Earwax War — Piano esecutivo (blocco "Round 3 — Audio, rifacimento synth")
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" del blocco in corso (con le caselle da
 > spuntare), usa e getta. Per lo **stato generale** del progetto, come collaudare e le regole vedi
 > **`HANDOFF.md`**; per la descrizione del gioco vedi **`README.md`**.
 
-_Preparato 2026-07-17 da Opus dopo il 2° playtest telefono dell'utente (15 segnalazioni). Le cause_
-_qui sotto sono **già verificate nel codice** (file:riga) o **dal vivo in preview** dove non bastava_
-_leggere — si affrontano una alla volta o a gruppetti, nell'ordine in fondo salvo diverso avviso._
+_Preparato 2026-07-17 da Opus. **Blocchi precedenti "Correzioni playtest round 1 e round 2" CHIUSI e_
+_pushati** (fino a `75df562` su `origin/main`); il loro dettaglio è nella cronologia git, non più qui._
 _Regole invariate: god-mode nei test SEMPRE, i18n EN+IT per stringhe nuove, commit solo su richiesta._
 
-> ✅ **Blocco precedente ("Correzioni playtest — round 1") CHIUSO e pushato.** Fatti e in
-> `origin/main`: Gruppo A (7 bug) `cbd4fe2`, B.1+D.1+B.2, **C.1** boss `4913ba3`, **E.1+E.3**
-> `672c20e`, **F.1a+b** `3a296a9`, **F.1c** (4 progetti) `7571519`, **soffitto** `9b43c73`. Il
-> dettaglio di quel blocco è nella cronologia git (non più qui: questo file è usa e getta).
+---
+
+## Decisioni dell'utente (2026-07-17) che guidano tutto il blocco
+- **Ambito:** rifare SIA la musica SIA gli effetti sonori.
+- **Approccio:** **restare PROCEDURALI** (WebAudio, nessun file audio) ma alzare MOLTO la qualità.
+  Motivo scelto dall'utente: peso zero (cruciale per il build Android/Google Play) e nessun
+  abbonamento a servizi di musica. → NON si introducono file `.mp3/.ogg`, tutto resta sintetizzato.
+- **Varietà:** la musica deve **cambiare in base alla situazione** — almeno 3 atmosfere:
+  **menu**, **livello normale**, **boss/assedio**.
+
+## Da dove partiamo (stato attuale di `src/sfx.js`)
+Tutto già procedurale, ma "povero, tipo vecchia console":
+- **Effetti** (~13: hit/crack/smash/jump/dash/hurt/enemyDie/spit/spray/pick/win/lose/emerge): quasi
+  tutti un SOLO oscillatore + una `slide`/`noise`, **nessuna stratificazione**, **nessuna variazione**
+  (identici a ogni colpo → stancano), buste (envelope) grezze, niente spazio/riverbero.
+- **Musica:** UN solo loop di 16 passi (`LEAD`+`BASS`+tick) via `setInterval(165ms)`, **sempre lo
+  stesso ovunque** (menu = gioco = boss), niente percussioni, niente accordi, niente sezioni.
+- **Buono da tenere:** l'architettura bus (`master`→`sfxBus`/`musicBus`), i controlli volume/musica
+  salvati in localStorage, i pulsanti a schermo, lo `unlock()` al primo gesto. **NON rifare questi.**
+
+## ⚠️ Nota sul collaudo (importante, l'audio è un caso speciale)
+Il preview mi fa verificare la **LOGICA** (nessun errore, scheduler che gira, tracce che partono/
+cambiano, guadagni che rampano, note schedulate nei tempi giusti) — **NON il GUSTO del suono**: la
+qualità musicale vera la giudica l'utente ASCOLTANDO sul telefono. Quindi per ogni gruppo: verificare
+a fondo la logica in preview (god-mode, `game.step()`/interrogazione stato via `javascript_tool`,
+ispezione dei nodi WebAudio), poi **dire chiaramente che il giudizio finale di gusto è dell'utente**.
+Non spacciare "gira senza errori" per "suona bene".
 
 ---
 
-## Come leggere questa lista
-Ogni punto: **cosa ha segnalato l'utente** → **causa** (file:riga, verificata) → **cosa fare** →
-**note di collegamento**. Numeri "sensati" (velocità/altezze/tempi/colori) da TARARE col playtest.
+## GRUPPO AU-A — Fondamenta del synth (toolkit + spazio)  ⚙️
+_Base tecnica su cui poggiano B e C. Solo `src/sfx.js`. Nessun cambiamento udibile "da solo": è_
+_infrastruttura, si collauda col Gruppo B._
+- [x] **AU-A.1 — Mattoni sonori migliori.** FATTO (busta ADSR, `synth`/`noiseBurst`, detune, filtri, `noteToFreq`, jitter). Ampliare il toolkit interno (accanto a `tone/slide/
+  noise`, che restano): busta ADSR vera (attacco/decay/sustain/release parametrici) invece delle due
+  rampe esponenziali fisse; `osc` con **detune**/voci sovrapposte (suono più "grasso"); rumore con
+  filtro passa-alto oltre al passa-basso (per hi-hat/aria); un `pluck` corto (osc+filtro che si
+  chiude) per note percussive. Piccoli helper `noteToFreq(nome)` e un jitter deterministico-ma-vario
+  (NB: `Math.random()` è OK qui, è audio a runtime, non un test da rendere riproducibile).
+- [x] **AU-A.2 — Un po' di "spazio".** FATTO (bus `fxBus`→delay smorzato + riverbero a convoluzione con impulso sintetico → `fxReturn`; mandata per-suono). Aggiungere un bus effetti economico (un **feedback-delay**
+  corto + eventualmente un riverbero a convoluzione con impulso sintetico di rumore ~0.3s) come
+  **mandata** condivisa, con dosatura per-suono. Serve a togliere il "secco da beep". Tenerlo leggero
+  (CPU su telefono). Restare sotto `sfxBus`/`musicBus` esistenti, non toccare il mix generale.
+- **Verifica:** nessun errore; i nuovi nodi esistono e sono collegati al grafo; il delay/riverbero si
+  sente come coda su un suono di prova. (Il grosso si collauda in AU-B.)
+
+## GRUPPO AU-B — Effetti sonori rifatti  🔊
+_Solo `src/sfx.js`. **NON cambiare i NOMI** dei metodi (hit/jump/smash/…) né le firme: le scene li_
+_chiamano già, così non si tocca `GameScene.js`._
+- [x] **AU-B.1 — Stratificare + variare i 13 effetti esistenti.** FATTO (tutti a 2-3 strati con jitter; nomi/firme invariati → scene non toccate). Ognuno diventa 2-3 strati (es.
+  `smash` = sbuffo di rumore + "thud" che scende di tono + piccolo "squish" gommoso) con la busta/
+  filtri di AU-A, e **jitter casuale a ogni colpo** (±piccola % su tono e tempo) così ripetuti non
+  stancano. Mantenere il **tono comico/gommoso** del gioco (non realismo). Dosare la mandata spazio
+  di AU-A.2 con parsimonia (gli effetti restano "in faccia", la coda è un velo).
+- [~] **AU-B.2 — (opzionale) 2-3 effetti in più.** RIMANDATO: avrebbe richiesto nuovi punti di
+  chiamata in GameScene, fuori dall'obiettivo di questo blocco. Gli effetti esistenti bastano. Solo se
+  aggancio già presente e a costo quasi nullo: es. differenziare `spray` del getto perforante, o un
+  suono per la parata scudo se c'è già un punto di chiamata comodo. **Se richiede toccare GameScene
+  in più punti → RIMANDARE**, non è l'obiettivo di questo blocco.
+- **Verifica:** in preview innescare ogni effetto (chiamata diretta) → nessun errore, si sente la
+  differenza (più corposo, con variazione tra due colpi ravvicinati). **Giudizio di gusto: utente.**
+
+## GRUPPO AU-C — Motore musicale (scheduler + voci)  🎛️
+_Solo `src/sfx.js`. È il "motore" (parte più delicata del blocco)._
+- [x] **AU-C.1 — Scheduler a "lookahead".** FATTO (`schedTick` ogni 25ms schedula ~100ms in anticipo sull'orologio audio; `startMusic`/`stopMusic` ok). Sostituire il `setInterval(165ms)` che suona un passo
+  alla volta con lo schema standard WebAudio (loop di controllo ~25ms che **schedula in anticipo**
+  ~100ms di note sull'orologio audio): timing molto più stabile, niente sfarfallii, regge il cambio
+  scheda/tab. Mantenere `startMusic/stopMusic/toggleMusic` funzionanti.
+- [x] **AU-C.2 — Voci multiple + percussioni.** FATTO (basso/accordi-pad/lead + batteria sintetica kick/snare/hat; swing sui passi dispari; note per nome). Un "brano" diventa un dato: `{ bpm, swing, voci }`
+  dove le voci sono pattern di passi. Voci previste: **basso** (saw/tri filtrato), **accordi/pad**
+  (triangoli detunati, attacco lento), **lead/arpeggio** (pluck di AU-A), **batteria** sintetica
+  (kick = sinusoide che cala di tono; snare = rumore + tono corto; hat = rumore passa-alto breve).
+  Helper note→frequenza + swing sui tempi pari. Tutto su `musicBus`.
+- [x] **AU-C.3 — `setMusic(nome)` con dissolvenza.** FATTO (fade-out 0.35s → cambio brano → fade-in 0.35s via nodo `musicFade`; ricorda il brano se l'audio non è ancora sbloccato). Nuova API pubblica: cambia brano
+  rampando a zero il guadagno del brano corrente (~0.6s) e avviando il nuovo, senza fermare lo
+  scheduler; se l'audio non è ancora sbloccato, ricorda il brano voluto e parte allo `unlock()`.
+  Compatibile con l'attuale `musicOn`/volume.
+- **Verifica:** lo scheduler avanza sull'orologio audio (note schedulate con `when` corretti);
+  `setMusic('a')`→`setMusic('b')` rampa un guadagno giù e l'altro su; nessun errore; con musica OFF
+  resta muto. **Giudizio di gusto: utente.**
+
+## GRUPPO AU-D — Le 3 atmosfere + agganci nelle scene  🎵
+_`src/sfx.js` (i 3 brani come dati) + agganci minimi in `MenuScene.js` e `GameScene.js`._
+- [x] **AU-D.1 — Scrivere i 3 brani.** FATTO (menu 92bpm maggiore rilassato / livello 130bpm spinto / boss 150bpm minore teso). BOZZE da tarare col gusto dell'utente. (a) **menu**: rilassato/giocoso, tempo medio, pentatonica
+  allegra, batteria leggera. (b) **livello** (normale + corsa): più spinto/ritmato, batteria piena,
+  senso di "missione di pulizia". (c) **boss/assedio**: teso, tonalità minore, basso/batteria più
+  pesanti, più veloce. Sono BOZZE da iterare col gusto dell'utente.
+- [x] **AU-D.2 — Agganciare le atmosfere.** FATTO (`MenuScene`→'menu'; `GameScene.create`: boss/siege→'boss', resto→'level'). Toccate 2 righe in tutto nelle scene. `MenuScene` → `Sfx.setMusic('menu')`. `GameScene.create`
+  → in base a `levelKind`: boss→`'boss'`, siege→`'boss'` (o `'siege'` se distinto), resto→`'level'`.
+  Alla vittoria/game over la musica può abbassarsi un attimo sotto la fanfara/trombetta (facoltativo).
+  **Toccare le scene il minimo indispensabile** (1-2 righe per aggancio).
+- [~] **AU-D.3 — (facoltativo) Boss infuriato = musica più intensa.** RIMANDATO a dopo il playtest:
+  prima l'utente giudica se le 3 atmosfere base convincono, poi eventualmente si aggiunge la variante. Se a costo basso: in
+  `bossAI` quando `_enraged`, alzare un layer o passare a una variante più carica. Se complica →
+  RIMANDARE.
+- **Verifica:** entrando nel menu parte 'menu'; avviando un livello normale parte 'level'; un livello
+  boss parte 'boss'; il cambio è una dissolvenza pulita, nessun errore, controlli volume/musica
+  ancora ok. **Giudizio di gusto: utente sul telefono.**
+
+## GRUPPO AU-E — Mix, rifiniture e chiusura  🎚️
+- [x] **AU-E.1 — Bilanciare il mix.** FATTO (volumi relativi per voce impostati; musica sotto gli
+  effetti via `musicBus` 0.5; i 3 livelli volume + muto ricontrollati). Fine taratura al playtest. Volumi relativi tra le voci e tra musica ed effetti (la musica
+  deve stare "sotto" senza sparire); controllare che nulla clippi; ricontrollare i 3 livelli volume
+  e il muto. Eventuali manopole `window.__` per far tarare all'utente in fretta.
+- [x] **AU-E.2 — Giro finale.** FATTO (nessuna stringa i18n nuova necessaria; rimosso il vecchio
+  loop musicale `LEAD/BASS/playMusicStep` e la funzione morta `tone`; `HANDOFF.md` aggiornato). Nessuna stringa i18n nuova prevista (i pulsanti esistono già); se ne
+  servisse una, EN+IT. Rilettura per togliere codice morto (il vecchio `LEAD/BASS`/`playMusicStep` se
+  rimpiazzati). Aggiornare `HANDOFF.md` (§Cosa c'è già → audio) e chiudere questo file.
 
 ---
 
-## GRUPPO A — Fix rapidi, causa già individuata  ✅ TUTTI FATTI E VERIFICATI (2026-07-17)
-_Tutti e 4 corretti nella stessa sessione, verificati con test mirati in preview (dati, zero_
-_errori). **NON ancora committato** — in attesa di conferma dell'utente._
+## Stato: TUTTO FATTO E VERIFICATO (logica) 2026-07-17 — NON ancora committato
+Implementati AU-A→AU-E in un'unica passata (quasi tutto in `src/sfx.js` + 2 righe negli agganci
+scena). **Verifica LOGICA in preview** (god-mode): zero errori console; tutti i 13 effetti partono;
+il motore musicale genera davvero note (~28 oscillatori/s + batteria durante 'level') e prosegue tra
+i cambi scena; le dissolvenze menu→livello→boss e muto/riattiva funzionano; agganci scena
+(menu→'menu', assedio→'boss') ok. RIMANDATI (non necessari ora): AU-B.2 (effetti extra) e AU-D.3
+(boss infuriato). **Il GUSTO del suono lo deve giudicare l'utente ascoltando sul telefono** — le 3
+atmosfere sono bozze da tarare.
 
-> ⚠️ **Nota tecnica per i prossimi round:** in questa sessione di preview il tab del browser resta
-> in background (rAF/orologio di gioco fermi), il che ha rotto in due punti gli approcci di test
-> "al buio" usuali: (1) `scene.start()` ripetuto in loop NON ri-esegue davvero `create()` finché
-> non parte un frame reale — una scena può restare bloccata a metà creazione (`sys.settings.status
-> === 4`) e ridare sempre lo stesso contenuto stantio; soluzione: se i risultati sembrano sospetti-
-> mente identici a ripetizione, **ricaricare la pagina** (`navigate` con `force:true`) prima di
-> dubitare della logica. (2) Per verificare la GEOMETRIA di un'animazione (non solo "esiste" ma
-> "va nel verso giusto"), **non fidarsi di `getWorldTransformMatrix()` da solo** (ignora `flipX`/
-> `flipY`, che sono solo un mirror dei pixel, non della matrice) — usare invece `sprite.getBounds()`
-> a piu' punti dell'arco/tween con `tweens.killTweensOf()` + rotazione impostata a mano, cosi' si
-> confronta la vera scatola visibile invece di un singolo punto locale.
-
-- [x] **A.1 — L'animazione del coton fioc va SEMPRE verso destra.**
-  Causa (verificata): `showMeleeWeapon` (`GameScene.js` ~1875) fa ruotare l'arma con un tween
-  d'angolo FISSO da `-1.1` a `0.7` (un arco orario) e applica solo `setFlipY(this._weaponFlip)` in
-  base al facing. Il flip verticale non cambia il VERSO della rotazione, quindi l'arco "spazza"
-  sempre verso destra anche quando guardi a sinistra.
-  **FATTO (causa piu' sottile del previsto — 3 tentativi prima di quello giusto):**
-  `setFlipX` invece di `setFlipY` da SOLO non basta (il flip mescola solo i PIXEL, non la matrice
-  di rotazione/posizione: verificato con `getWorldTransformMatrix`); nemmeno la semplice
-  NEGAZIONE dell'angolo (`-θ`) basta, perche' geometricamente e' un mirror ALTO/BASSO, non
-  SINISTRA/DESTRA, e sposta l'arco anche in verticale (verificato con `getBounds()`: Y diversa tra
-  destra e sinistra). La formula corretta e' **`π - θ`** (riflessione attorno all'asse verticale) +
-  `setFlipX` per l'orientamento dei pixel (utile per armi asimmetriche come il martello). Fix in
-  `showMeleeWeapon`: `const mirror = (theta) => this._weaponFlip ? (Math.PI - theta) : theta;` poi
-  `w.rotation = mirror(-1.1)` e il tween verso `mirror(0.7)`. Verificato con `getBounds()` su 4
-  punti dell'arco (inizio/2 meta'/fine) per ENTRAMBE le armi (coton fioc + martello): X sempre
-  specchiata esattamente attorno al giocatore, Y IDENTICA tra destra e sinistra in ogni punto.
-
-- [x] **A.2 — Dare alle Pulci balzi ancora più alti.**
-  Causa: `fleaAI` (`GameScene.js` ~2077) usava `setVelocity(dir*speed*2.2, -380)`.
-  **FATTO:** alzata la componente verticale a `-480` (apice ≈105px, da 66px). Cooldown
-  `hopReadyAt` lasciato a 950ms (l'aria in volo resta comunque sotto quella soglia, niente
-  bisogno di allungarlo). Verificato: picco velocita' verticale = -480 come atteso.
-
-- [x] **A.3 — I proiettili dei nemici sono identici al cerume che raccogli.**
-  Causa (verificata): `spitAt` (`GameScene.js` ~1437) creava la pallina sputata con
-  `this.projectiles.create(sx, sy, 'wax_glob')` — la STESSA texture del cerume raccoglibile.
-  **FATTO:** nuova texture procedurale dedicata (`PixelArt.poisonBall`, in `pixelart.js`) —
-  pallina verde-acido/viola con bordo scuro e riflesso chiaro, generata in `BootScene` come chiave
-  `'proj_poison'`; `spitAt` ora la usa al posto di `wax_glob` (copre sia il gorgogliante sia il
-  boss, che passano entrambi da `spitAt`). Verificato: texture del proiettile = `proj_poison` per
-  entrambi i tipi di nemico, nettamente diversa dal pickup.
-
-- [x] **A.4 — Lo Scatto con danno va sbloccato solo DOPO lo scatto normale.**
-  Causa (verificata): la carta `dashstrike` (`UpgradeScene.js` ~52) faceva `apply: (s) => {
-  s.dashStrike = true; if (!s.dash) s.dash = true; }` — REGALAVA lo scatto base se non posseduto.
-  Il filtro `avail` non aveva concetto di prerequisito (solo le EVOLUZIONI usano `needs`).
-  **FATTO:** aggiunto supporto generico `needs` al filtro `avail` (`if (u.needs &&
-  owned.indexOf(u.needs) === -1) return false;`); su `dashstrike` aggiunto `needs: 'dash'` e
-  tolto l'auto-regalo. Verificato su 50 aperture della carta SENZA scatto posseduto (150 carte
-  totali): "Dash Strike" mai comparsa; CON scatto posseduto: ricomparsa al tentativo 43/80 (in
-  linea con la probabilita' attesa ~2.5%/slot). Nessun'altra carta si appoggiava all'auto-regalo.
-
----
-
-## GRUPPO B — Soffitto + pedane alte  ⚠️ DA FARE INSIEME (sono in tensione)
-
-_Questi due punti si CONDIZIONANO: rendere il soffitto "tangibile" (B.1) toglie spazio in alto, il_
-_che peggiora B.2 (pedane alte irraggiungibili). Vanno decisi e implementati nello stesso turno._
-
-- [x] **B.1 — Il soffitto è troppo basso e intangibile.** FATTO E VERIFICATO (2026-07-17).
-  **NON ancora committato.**
-  **FATTO:** fascia visibile piu' sottile (`CEIL_Y = round(gh*0.28)` ≈ 50px, era 81px = `gh*0.45`)
-  **e** tangibile — `this.CEIL_Y` salvato sulla scena (lo riusa anche B.2) e riordinato `create()`
-  per calcolarlo PRIMA di `physics.world.setBounds`, che ora parte da `(0, CEIL_Y, worldW, H-gh-
-  CEIL_Y)` invece che da `(0,0,...)`: il bordo fisico alto del mondo coincide col fondo del
-  soffitto, non piu' con lo schermo. La camera resta `setBounds(0,0,worldW,H)` (invariata:
-  continua a mostrare la fascia visivamente, cambia solo dove si FERMANO i corpi fisici). I
-  volanti (`dropFromCeiling`, `restY` 90-170) restano comodamente sotto `CEIL_Y=50`, nessuna
-  modifica necessaria. Le gocce (`movers`) non hanno `collideWorldBounds`, non toccate.
-  Verificato: PG lanciato verso l'alto (velocita' enorme) si ferma esattamente a `body.top=50` =
-  `CEIL_Y`, `blocked.up` scatta correttamente.
-
-- [x] **B.2 — La pedana più in alto a volte è irraggiungibile per il limite dello schermo in alto.**
-  FATTO E VERIFICATO (2026-07-17), insieme a B.1. **NON ancora committato.**
-  **FATTO:** aggiunto un TETTO a `clampAbove` in `buildPlatforms` — `minY = this.CEIL_Y + 56`
-  (corpo del PG ~40px + margine 16px) — `clampAbove = (refY, rawY) => Math.max(rawY, refY-MAXUP,
-  minY)`, cosi' nessuna pedana (ne' lo scrigno segreto) puo' finire sopra quella quota, qualunque
-  sia la catena di riferimenti (suolo→bassa→alta→scrigno). Verificato con la stessa chiusura di
-  raggiungibilita' del round 1 (E.3) SENZA doppio salto, su **45 generazioni di livello (397
-  pedane totali): zero irraggiungibili, zero sopra il nuovo limite del soffitto.** Volante testato
-  di rimbalzo: si assesta a y≈89-90 (dentro il range atteso 90-170), ben sotto `CEIL_Y=50`. Zero
-  errori console in tutta la verifica.
-
----
-
-## GRUPPO C — Scatto (dash): feedback visivo
-
-- [x] **C.1 — Durante lo scatto la scia è poco visibile + serve più differenza tra scatto normale
-  e scatto con danno.** FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
-  **FATTO:** in `spawnDashGhost` — (a) throttle dimezzato (40ms→20ms: quasi doppi fantasmi nella
-  scia); (b) DIFFERENZIATI per intensita', non solo colore: alpha iniziale 0.65 (normale, era
-  0.5) contro 0.85 (con danno) — non solo arancio invece di azzurro, anche visibilmente PIÙ
-  luminoso; (c) scintille (`burst('bit_hard', ...)`) lungo il tragitto SOLO nello scatto
-  offensivo, throttle 60ms indipendente da quello dei fantasmi. L'anello una-tantum
-  (`dashStrikeFx`, gia' esclusivo del danno, invariato) resta l'unica cosa che lo scatto normale
-  non ha, come richiesto. Verificato con test a tempo reale (`game.step()`): in una finestra di
-  ~167ms (durata di uno scatto), 5 fantasmi per entrambi (prima ne sarebbero usciti meno, throttle
-  piu' alto); alpha range normale 0.34→0.65, con danno 0.72→0.85 (nettamente piu' alto in ogni
-  istante); tinte esatte (0x8fe0ff azzurro / 0xff6b3d arancio); 3 scintille generate nello scatto
-  con danno, 0 in quello normale; l'anello si crea correttamente. Zero errori console.
-  **Collegamento:** stessa area di A.4 (lo scatto con danno ora è un vero sblocco a valle): il
-  feedback ora rende giustizia al fatto che è "avanzato".
-
----
-
-## GRUPPO D — Boss
-
-- [x] **D.1 — Il boss non si stacca da terra quando salta (balzo+schiacciata di C.1).**
-  FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
-  Causa originale: l'arco era troppo ORIZZONTALE (`bossAI`) — `setVelocity(dir*(speed*2+120),
-  -430)` dava ~147px avanti contro solo ~84px in su (teorico), letto come "scivolata" non salto;
-  niente stiramento/ombra per vendere lo stacco.
-  **FATTO:**
-  - **(a) Arco verticale + atterra SUL giocatore.** Salto molto piu' alto (`vy=-600`, apice
-    teorico 163.6px, quasi il DOPPIO di prima) e orizzontale calcolato dalla distanza REALE al
-    giocatore (non piu' un moltiplicatore fisso): `flightT = 2*600/gravity`, `vx =
-    (player.x-e.x)/flightT` (volo simmetrico, stessa quota di partenza/arrivo), con clamp di
-    sicurezza ±420. Raggio d'innesco allargato da 360 a 440px (nota della roadmap: con l'arco
-    piu' verticale il boss deve poter agganciare lo slam anche da piu' lontano).
-  - **(b) Venduto il salto:** stiramento al decollo (`setScale(bs*0.8, bs*1.25)`, l'opposto
-    dell'accovacciamento del windup, si riassesta da solo con un tween in 200ms) + OMBRA a terra
-    (`e.slamShadow`, nuova ellisse) che segue orizzontalmente e si rimpicciolisce/schiarisce con
-    l'altezza (`e.slamApex` salvato al decollo), si distrugge all'atterraggio (e anche su morte
-    del boss a meta' volo, hook `destroy`).
-  - **⚠️ Scoperta tecnica IMPORTANTE per i test futuri (vedi nota in cima al Gruppo A):**
-    `physics.world.step()` chiamato DA SOLO e ripetutamente (senza il resto del ciclo di gioco)
-    "blocca" il flag `body.blocked.down` a `true` per sempre dopo un lungo periodo di riposo a
-    terra, ANCHE se il corpo si stacca davvero — **riproducibile pure con un salto banale, senza
-    nessuna riga del mio codice**. Mi ha fatto sembrare (erroneamente) che l'atterraggio scattasse
-    troppo presto (~250ms, il minimo di sicurezza) invece che alla fine del volo vero. Il fix del
-    test: usare `window.game.step(time, delta)` (il PASSO COMPLETO del motore, la stessa via della
-    partita vera — gia' usato per il test dell'arco del coton fioc) invece del solo
-    `physics.world.step()`. **Retroattivamente, questo significa che anche il numero "71px" del
-    round 1 (C.1) era quasi certamente falsato dallo stesso artefatto** (71px combacia quasi
-    esattamente con lo spostamento atteso nei primi 250ms del vecchio salto, non con l'apice vero).
-  Verificato con `game.step()` (ciclo motore reale): apice 162px (teorico 163.6, quasi esatto);
-  65 frame in aria (teorico 65.4); **atterra a 248px da un bersaglio posto a 250px** (praticamente
-  esatto); stiramento visibile (`scaleY` >1 durante il volo); ombra visibile che si restringe
-  salendo e si allarga scendendo, poi si distrugge; danno da impatto applicato all'atterraggio
-  (`bossSlamFx`); innesco confermato a 400px (dentro il nuovo raggio, fuori dal vecchio). Zero
-  errori console.
-
----
-
-## GRUPPO E — Terremoto (mutatore)
-
-- [x] **E.1 — La scossa si deve PERCEPIRE + i blocchi che cadono devono essere già VISIBILI
-  attaccati al soffitto, e a ogni scossa ne cade qualcuno.** FATTO E VERIFICATO (2026-07-17).
-  **NON ancora committato.**
-  **FATTO — ridisegno completo di `startWaxCollapseEvent`** (tolta `spawnCollapseChunk`, sostituita
-  da 4 metodi nuovi):
-  - **(a) Cerume già appeso al soffitto.** `placeStalactites()` piazza 5-12 sprite VERI
-    (`wax_a/b/c/d`, tinti come il cerume duro, origin in alto ancorato a `this.CEIL_Y` di B.1)
-    lungo il livello (`pickHazardX`, come le altre insidie) — scenografia inerte in
-    `this.stalactites`, niente fisica finché una scossa non le stacca.
-  - **(b) Scossa percepibile a impulsi.** `scheduleQuakePulse()` si ri-programma da sola ogni
-    2.5-3.5s (intervallo diverso ogni volta, non meccanico); `quakePulse()` fa
-    `cameras.main.shake(400, 0.014)` + `Sfx.smash()` (rombo) + stacca 1-3 stalattiti (preferendo
-    quelle più vicine al giocatore, via `detachStalactite`, che riusa `collapseChunks` — stessa
-    fisica/danno/impatto del round 1, solo velocità iniziale un po' più alta: parte "smossa"
-    dalla scossa, non da ferma). Se sono finite, 40% di possibilità a ogni scossa di ripiazzarne
-    una nuova (si ripopolano piano, non restano vuote per il resto del livello).
-  - Ripulita anche la pulizia di fine livello: le due chiamate `this.collapseTimer.remove()` in
-    `levelComplete()`/`gameOver()` ora puntano al nuovo `this.quakeTimer` (il vecchio nome era
-    rimasto due punti extra, non trovato al primo giro).
-  Verificato: 7 stalattiti piazzate correttamente (sprite giusto, tinta 0xd59a2e, ancorate a
-  `CEIL_Y`); una scossa manuale stacca la stalattite più vicina al giocatore, crea un chunk vero
-  con gravità e velocità di partenza corrette, la camera trema; su 40 scosse a stalattiti vuote,
-  11 ripopolamenti (~27%, coerente col 40% di probabilità); **percorso automatico REALE**
-  verificato con `game.step()` (mutatore applicato come farebbe `chooseMutator`, ~8s di gioco
-  reale): stalattiti piazzate da sole, almeno una scossa scattata da sola con un chunk caduto,
-  timer ancora attivo. Zero errori console in tutta la verifica.
-
----
-
-## GRUPPO F — Modalità a tempo (Corsa + Assedio)
-
-- [x] **F.1 — Corsa contro il tempo: manca un timer ben visibile che lampeggi negli ultimi
-  secondi.** FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
-  **DECISO con l'utente:** se il tempo scade prima del timpano → **Game Over** (come morire, non
-  una penalità morbida).
-  **FATTO:** (a) `rushEndAt = now + round(worldW/130)*1000 + 8000` (ritmo medio atteso ~130px/s +
-  margine fisso 8s di reazione — numero da TARARE col playtest, come sempre); scaduto senza aver
-  raggiunto il timpano → `gameOver()`. Guardia anti-ingiustizia: se traguardo e scadenza capitano
-  nello STESSO frame, vince il traguardo (`this.player.x < this.goalX` nella condizione), non la
-  scadenza. (b) Nuovo **widget-timer condiviso** `buildBigTimer`/`updateBigTimer` (38px, centrato
-  y=92, sostituisce il vecchio `siegeText` da 20px) — lampeggia (rosso + scala 1.18x) negli ultimi
-  5s. Banner `game_rush_in` aggiornato per menzionare il tempo (EN+IT). Nuova chiave i18n
-  `hud_rush` EN+IT.
-  Verificato con `game.step()`: budget calcolato correttamente (worldW 3360 → 34s); testo/colore/
-  scala del timer corretti sia lontano dalla scadenza che negli ultimi secondi (lampeggio
-  alternato confermato su due campioni a 200ms di distanza); scadenza con PG lontano dal traguardo
-  → vero Game Over (schermata `over_title` confermata, non solo `locked=true`); scadenza con PG
-  GIÀ al traguardo → Livello Completato, non Game Over (guardia funziona).
-
-- [x] **F.2a — Assedio: timer poco visibile.** FATTO E VERIFICATO (2026-07-17), stesso widget di
-  F.1. **NON ancora committato.** Verificato: `bigTimerText` mostra "Survive: Ns" per l'assedio,
-  vecchio `siegeText` rimosso (non più definito). **F.2b (arena dedicata) resta NON fatta**: è
-  design grosso, **da pianificare a fondo con Opus prima** — non toccato in questo turno, come da
-  decisione del 2026-07-17.
-  **Nota tecnica (non è un bug del gioco):** durante questa verifica è comparso un errore console
-  `Texture key already in use: 00000000-...` — riproducibile anche su un avvio completamente
-  pulito (server riavviato, PRIMA che qualsiasi mio codice giri), quindi non è causato da F.1/F.2:
-  sembra una singolarità dell'ambiente di preview di questa sessione (RNG interno di Phaser che
-  genera chiavi-testura automatiche, probabilmente legato alle stranezze gia' note di questo tab
-  in background), non un difetto del codice — tutta la logica testata (timer, scadenza, guardia,
-  game over, livello completato) ha funzionato correttamente nonostante l'avviso.
-
----
-
-## GRUPPO G — Contenuti / progressione
-
-- [x] **G.1 — Carte base "corpo a corpo" poco chiare (Braccio Lungo, Riflessi, Affilatura).**
-  FATTO E VERIFICATO (2026-07-17). **NON ancora committato.**
-  **RADICE del problema (emersa parlando con l'utente 2026-07-17):** TRE carte comuni toccano solo il
-  CORPO A CORPO (coton fioc) ma hanno nomi "generali", quindi il giocatore non capisce cosa facciano
-  e le crede inutili o doppie:
-  - `range` "Braccio Lungo" (`UpgradeScene.js` ~38): `s.attackRange += 0.25`, usato SOLO in
-    `meleeSwing` (`range = baseRange * p.attackRange`, ~1810). Su un coton fioc corto è impercettibile.
-  - `attspd` "Riflessi" (~36): `s.attackCooldown -= 45`, SOLO il colpo corpo a corpo (il getto usa
-    `shotCooldown`, altra cosa). Il nome/descrizione non dicono QUALE attacco.
-  - `damage` "Affilatura" (~34): `s.damage += 8`, usato in melee/dash/onde d'urto — NON tocca il
-    getto (che usa `p.jetDamage`, separato). Da qui la confusione dell'utente ("+danno esiste già,
-    che differenza con un getto più potente?" → risposta: sono cose diverse, +danno è corpo a corpo).
-  **DECISIONI dell'utente:**
-  - **Braccio Lungo → RENDERLO EVIDENTE:** allungare di più la portata melee (es. +40%/pesca) E
-    mostrarlo (arco/flash del colpo visibilmente più lungo). Resta una carta corpo a corpo.
-  - **Riflessi → CHIARIRE:** nome/descrizione i18n che dicano esplicitamente che velocizza il COLPO
-    CORPO A CORPO (coton fioc), non il getto (es. IT "Coton fioc più rapido").
-  - **Affilatura → CHIARIRE lo scope** nella descrizione (è danno corpo a corpo/mischia, non getto),
-    così non sembra coprire tutto. (Meccanica invariata.)
-  i18n EN+IT per i testi ritoccati. Verifica: le tre carte comunicano chiaramente cosa potenziano;
-  Braccio Lungo si vede all'uso. **Collegamento:** stessa famiglia "melee-only poco leggibile".
-  **FATTO:**
-  - **Braccio Lungo → RESO EVIDENTE.** `range` ora da' `+0.4` invece di `+0.25` per pesca. E,
-    novita': l'arma DISEGNATA (`showMeleeWeapon`) ora si ingrandisce con `p.attackRange`
-    (smorzato a meta': `1 + (attackRange-1)*0.5`, altrimenti dopo tante pescate — e' una carta
-    "comune" ripescabile all'infinito — diventerebbe assurda) — prima la portata extra era
-    invisibile: allungava solo il rettangolo di danno, l'arma disegnata restava sempre uguale.
-  - **Riflessi → RINOMINATA "Coton Fioc Rapido"/"Quick Swab"** (era troppo generico), descrizione
-    esplicita "Attacco corpo a corpo più rapido". Meccanica invariata.
-  - **Affilatura → descrizione chiarita** ("+8 danno CORPO A CORPO", non solo "+8 danno").
-    Meccanica invariata.
-  Verificato: scala dell'arma disegnata cresce correttamente con `attackRange` (1.0 → 1.2 dopo 1
-  pescata → 1.6 dopo 3, formula confermata); tutte le stringhe EN+IT risolvono correttamente.
-
-- [x] **G.2 — Aggiungere UN nuovo potenziamento base: "Getto più rapido".** FATTO E VERIFICATO
-  (2026-07-17). **NON ancora committato.**
-  **FATTO:** nuova carta comune `jetspd` "Getto Rapido"/"Fast Jet" (`rep:true, rarity:'common'`)
-  che riduce `shotCooldown` di 40 (minimo 120), parallelo di Riflessi ma per il getto a distanza.
-  i18n `up_jetspd_name/_desc` EN+IT. Verificato: la carta compare regolarmente nel mazzo (vista
-  su 20/20 aperture testate a campione), applicarla 1 volta riduce `shotCooldown` da 340 a 300;
-  testi EN+IT corretti.
-
----
-
-## GRUPPO H — Menu (grafica)
-
-- [x] **H.1 — I menu vanno rivisti: grafica obsoleta + togliere le scritte inutili dalla schermata
-  principale.** FATTO E VERIFICATO (2026-07-17), bozza proposta e verificata con screenshot reali
-  (canvas → PNG, non lo screenshot "normale" che va in timeout su questo tab in background).
-  **NON ancora committato.**
-  **FATTO — riscritta `MenuScene.js`:**
-  - **(a) Alleggerita.** Tolto il blocco fisso di 9 righe comandi/obiettivo dalla schermata
-    principale; spostato in un **pannello "?"** a comparsa (cerchio discreto sotto i pulsanti) —
-    backdrop semi-trasparente + pannello con bordo, si chiude toccando ovunque. Restano in vista
-    solo titolo, sottotitolo, banca, mascotte, START/NEGOZIO, lingua, audio.
-  - **(b) Svecchiata.** Sfondo VERO (lo stesso fondale pixel-art usato in partita,
-    `GameGfx.drawBackground`, invece del vecchio gradiente+ellissi disegnato a mano) + velo scuro
-    per la leggibilità (stessa tecnica già usata in UpgradeScene); pannello semi-trasparente
-    dietro titolo/sottotitolo/banca per raggrupparli visivamente; pulsanti con bordo+ombra
-    (stesso linguaggio del negozio, un po' piu' rifinito) al posto del vecchio testo piatto su
-    sfondo giallo pieno; titolo con un lieve movimento (era statico).
-  Verificato con screenshot reali (non solo dati): schermata principale pulita e composta;
-  pannello "?" si apre mostrando tutti i comandi/obiettivo leggibili e si chiude correttamente
-  al tocco; zero errori nuovi (solo la singolarità dell'ambiente già nota, non del codice).
-  **Nota:** essendo estetico/in parte soggettivo, l'utente potrebbe voler aggiustare qualcosa
-  dopo averlo visto dal vivo — è una bozza da iterare, come deciso.
-
----
-
-## Ordine proposto per Sonnet (dal più netto/rapido al più aperto/di design)
-1. ~~**Gruppo A**~~ ✅ FATTO 2026-07-17, committato (`2db4ecf`).
-2. ~~**Gruppo D**~~ ✅ FATTO 2026-07-17, committato (`bf7c206`).
-3. ~~**Gruppo C**~~ ✅ FATTO 2026-07-17, committato (`8c5c938`).
-4. ~~**Gruppo B**~~ ✅ FATTO 2026-07-17, committato (`1b97655`).
-5. ~~**Gruppo E**~~ ✅ FATTO 2026-07-17 (terremoto: stalattiti + scosse con shake, usa `CEIL_Y`).
-6. ~~**Gruppo F**~~ ✅ FATTO 2026-07-17, committato (`4066df8`). F.2b (arena) resta da pianificare con Opus.
-7. ~~**Gruppo G**~~ ✅ FATTO 2026-07-17 (carte melee chiarite + Getto Rapido).
-8. ~~**Gruppo H**~~ ✅ FATTO 2026-07-17 (menu: sfondo vero, alleggerito, pannello "?"). NON ancora committato.
-
-**TUTTI I GRUPPI FATTI.** Resta solo da confermare col playtest dell'utente e tarare i numeri.
-
-Ciclo fisso per ogni punto: implementa → `/code-review` e/o skill *verify* → collaudo DAL VIVO
-(god-mode, screenshot/campionamento in preview) → riferisci in italiano semplice → chiedi se
-committare. Numeri "sensati" (altezze/tempi/colori/portate) da TARARE col playtest dell'utente.
+> **Nota flusso:** questo è il piano di Opus. L'esecuzione può passare a **Sonnet** (`/model
+> claude-sonnet-5`) per risparmiare token, come da prassi — oppure procede Opus se l'utente preferisce
+> (il motore audio, AU-C, è la parte "da motore", più adatta a Opus).

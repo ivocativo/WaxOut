@@ -356,6 +356,13 @@ class GameScene extends Phaser.Scene {
       this.showBanner(window.I18n.t(bkey), bcol);
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
+
+    // PROTEZIONE ALLO SPAWN: breve invulnerabilita' a inizio livello, cosi' se un nemico
+    // nasce vicino al punto di partenza (sezioni strette) non uccide il giocatore prima che
+    // possa reagire. Il god-mode dei test nascondeva proprio questo caso — scoperto 2026-07-18
+    // (l'utente moriva all'istante cliccando "Start Run"). Vedi anche pickGroundX (spawn piu' lontani).
+    this.invulnUntil = Math.max(this.invulnUntil, this.time.now + 1400);
+
     this.spawnTimer = this.time.addEvent({
       delay: spawnDelay, loop: true,
       callback: () => { if (!this.locked && this.enemies.countActive(true) < this.maxEnemies) this.spawnEnemy(); },
@@ -381,6 +388,11 @@ class GameScene extends Phaser.Scene {
     // (tempo per arrivare) — prima l'assedio aveva un testo minuscolo (`siegeText`, 20px) e la
     // corsa non aveva nessun timer. Vedi `buildBigTimer`/`updateBigTimer`.
     if (this.levelKind === 'siege' || this.levelKind === 'rush') this.buildBigTimer();
+
+    // Atmosfera musicale in base al tipo di livello (round 3 audio): boss/assedio = teso,
+    // gli altri = ritmo "missione di pulizia". Cambia con una dissolvenza rispetto al menu.
+    const musicKind = (this.levelKind === 'boss' || this.levelKind === 'siege') ? 'boss' : 'level';
+    window.Sfx.setMusic(musicKind);
 
     // Pausa: tasti ESC/P + pulsante a schermo (in alto a destra)
     this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
@@ -1427,7 +1439,10 @@ class GameScene extends Phaser.Scene {
       if (mx <= px) { if (mx + 80 > left) left = mx + 80; }     // appena dopo la membrana dietro
       else { if (mx - 80 < right) right = mx - 80; }            // appena prima della membrana davanti
     });
-    if (right <= left) return Math.round(Phaser.Math.Clamp(px, 40, this.worldW - 40));
+    // Bordo raggiungibile PIU' LONTANO dal giocatore: il ripiego sicuro quando non c'e'
+    // spazio per la distanza piena (mai piazzare un nemico ADDOSSO allo spawn).
+    const farthestEdge = () => (Math.abs(left - px) >= Math.abs(right - px)) ? left : right;
+    if (right <= left) return Math.round(Phaser.Math.Clamp(farthestEdge(), 40, this.worldW - 40));
 
     const gap = 200;                                            // distanza minima dal giocatore
     const aLo = Math.min(px + gap, right), aHi = right;         // davanti
@@ -1437,8 +1452,11 @@ class GameScene extends Phaser.Scene {
     let x;
     if (aOk && (wantAhead || !bOk)) x = Phaser.Math.Between(aLo, aHi);
     else if (bOk) x = Phaser.Math.Between(bLo, bHi);
-    else x = Phaser.Math.Clamp(px + gap, left, right);          // sezione stretta: il meglio possibile
-    return Math.round(x);
+    else x = farthestEdge();                                    // sezione stretta: il punto piu' lontano, mai addosso
+    // Rete di sicurezza: mai piu' vicino di 130px al giocatore, se la sezione lo consente
+    // (prima il ripiego poteva far nascere un nemico sopra lo spawn → morte istantanea).
+    if (Math.abs(x - px) < 130) x = farthestEdge();
+    return Math.round(Phaser.Math.Clamp(x, left, right));
   }
 
   // Il nemico sbuca dal pavimento: parte schiacciato a terra e "cresce" in altezza.
@@ -2250,11 +2268,19 @@ class GameScene extends Phaser.Scene {
         const vx = Phaser.Math.Clamp((this.player.x - e.x) / flightT, -420, 420);
         e.setVelocity(vx, -SLAM_VY);
         e.slamApex = (SLAM_VY * SLAM_VY) / (2 * this.physics.world.gravity.y);   // per l'ombra sotto
-        // VENDERE il salto: stiramento al decollo (l'opposto dell'accovacciamento del windup,
-        // si riassesta da solo con un tween) + ombra a terra che segue e si rimpicciolisce.
+        // VENDERE il salto: stiramento verticale, ma APPLICATO UN ATTIMO DOPO il decollo (~50ms),
+        // NON sullo stesso frame del lancio. In questa build `setScale` ridimensiona anche il CORPO
+        // fisico (vedi gotcha nota): ingrandirlo mentre il boss e' ancora appoggiato a terra fa
+        // ri-separare il corpo dal suolo e ANNULLA la velocita' di salto — era la vera causa del
+        // "boss ancorato a terra" (il fix D.1 del round 2 non funzionava davvero in gioco, il salto
+        // veniva azzerato all'istante). Scoperto 2026-07-18. A terra il boss resta a scala normale
+        // (ripristinata sopra, riga ~clearTint); lo stiramento parte quando e' gia' in aria.
         const bs = e._baseScale || (e._baseScale = e.scaleX);
-        e.setScale(bs * 0.8, bs * 1.25);
-        this.tweens.add({ targets: e, scaleX: bs, scaleY: bs, duration: 200, ease: 'Quad.out' });
+        this.time.delayedCall(50, () => {
+          if (!e.active || e.bossAtk !== 'slamjump') return;   // gia' atterrato / morto: niente stiramento
+          e.setScale(bs * 0.9, bs * 1.2);
+          this.tweens.add({ targets: e, scaleX: bs, scaleY: bs, duration: 200, ease: 'Quad.out' });
+        });
         if (!e.slamShadow) {
           e.slamShadow = this.add.ellipse(e.x, this.groundTop, 70, 18, 0x000000, 0.35).setDepth(6);
         }
