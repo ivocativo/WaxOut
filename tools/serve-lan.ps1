@@ -17,6 +17,7 @@ $mime = @{
   '.css' = 'text/css'; '.png' = 'image/png'; '.jpg' = 'image/jpeg'; '.jpeg' = 'image/jpeg';
   '.gif' = 'image/gif'; '.svg' = 'image/svg+xml'; '.json' = 'application/json';
   '.ico' = 'image/x-icon'; '.wav' = 'audio/wav'; '.mp3' = 'audio/mpeg'; '.ogg' = 'audio/ogg';
+  '.apk' = 'application/vnd.android.package-archive';   # cosi' il telefono offre di INSTALLARE l'app
 }
 
 $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $Port)

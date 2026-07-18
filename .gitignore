@@ -20,3 +20,6 @@ dist/
 www/
 android/
 package-lock.json
+
+# APK scaricato in locale per l'installazione via WiFi (non versionare)
+*.apk
