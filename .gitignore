@@ -15,3 +15,8 @@ Desktop.ini
 node_modules/
 dist/
 .tmp/
+
+# Build app Android (Capacitor) — generati in automatico, non vanno versionati
+www/
+android/
+package-lock.json

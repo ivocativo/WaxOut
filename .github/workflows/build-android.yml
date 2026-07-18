@@ -1,0 +1,68 @@
+name: Costruisci app Android (APK)
+
+# Si avvia da solo a ogni push su main che tocca il gioco, e si puo' lanciare a mano
+# dal tab "Actions" del repository (pulsante "Run workflow").
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'assets/**'
+      - 'src/**'
+      - 'vendor/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica il codice
+        uses: actions/checkout@v4
+
+      - name: Prepara Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepara Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Prepara Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Installa Capacitor
+        run: npm install
+
+      # Raccoglie SOLO i file web del gioco nella cartella "www" (quella che Capacitor
+      # impacchetta), senza trascinarsi dietro node_modules, i .md, gli strumenti, ecc.
+      - name: Assembla la cartella web (www)
+        run: |
+          rm -rf www
+          mkdir -p www
+          cp index.html www/
+          cp -r vendor src assets www/
+
+      - name: Crea il progetto Android
+        run: npx cap add android
+
+      - name: Sincronizza Capacitor
+        run: npx cap sync android
+
+      - name: Compila l'APK (debug)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Carica l'APK come risultato scaricabile
+        uses: actions/upload-artifact@v4
+        with:
+          name: earwax-war-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
