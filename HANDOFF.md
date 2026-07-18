@@ -6,15 +6,13 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-17 · Ultimo commit pushato: `75df562` su `origin/main`._
-_**DUE giri di correzioni da playtest telefono CHIUSI e PUSHATI:**_
-_· **Round 1** (dopo il 1° playtest, 21 segnalazioni) — tutti i gruppi fatti, fino a `9b43c73`._
-_· **Round 2** (dopo il 2° playtest, 15 segnalazioni) — tutti gli 8 gruppi A–H fatti, fino a `75df562`:_
-_arco coton fioc, balzo pulci, texture proiettili ostili, gate scatto-danno, soffitto tangibile,_
-_scia scatto, salto boss verticale, terremoto a stalattiti, Corsa a tempo + timer condiviso, carte_
-_melee chiarite + "Getto Rapido", menu principale rifatto. (Dettaglio: `ROADMAP.md`, ora chiuso.)_
-_**SI RIPARTE dal playtest dell'utente (round 3):** provare i due giri di fix sul telefono, tarare i_
-_numeri "sensati" e decidere il prossimo grande asse (vedi §DA FARE)._
+_Ultimo aggiornamento: 2026-07-18 · Ultimo commit pushato: `05d0c46` su `origin/main`._
+_**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
+_3 atmosfere, boss punk); hotfix freeze-spawn e salto boss; **APP ANDROID via GitHub Actions** (APK_
+_installabile dal telefono, larghezza adattiva = niente bande). Dettaglio nella cronologia git._
+_**STATO ORA:** l'utente RIMANDA la pubblicazione sullo store; vuole prima rifinire **gameplay,_
+_estetica e audio**. Punti aperti raccolti e raggruppati nel **BACKLOG CONSOLIDATO** qui sotto —_
+_da lì si sceglie il prossimo blocco (poi lo si dettaglia in `ROADMAP.md`)._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -225,64 +223,75 @@ lieve detune sul lead; (3) BOSS PUNK — power chord + basso a crome + batteria 
 (waveshaper, opzione `dist` in synth, attiva solo per i brani `punk:true`). Ancora bozze da
 rigiudicare dall'utente.
 
-**Unico strascico di design ancora aperto dal round 2:**
-- **F.2b — arena dedicata per l'Assedio** (`siege`): oggi l'Assedio riusa un livello normale col
-  timer. Renderlo un vero spazio chiuso/ad arena e' un pezzo di design grosso → **da pianificare a
-  fondo con Opus prima di implementare**, non toccato di proposito.
+### ✅ APP ANDROID (Capacitor via GitHub Actions) — FATTA (2026-07-18)
+Il gioco si impacchetta in APK **nel cloud** (nessuno strumento locale): `package.json` +
+`capacitor.config.json` (webDir=www) + workflow `.github/workflows/build-android.yml`. Ciclo: push su
+main → GitHub compila → `gh run download` scarica l'APK → messo in `EarwaxWar.apk` (root, gitignored) →
+l'utente lo prende dal telefono via `GIOCA-SU-TELEFONO.cmd` (`http://<IP>:8123/EarwaxWar.apk`) e lo
+installa. **Larghezza ADATTIVA** (main.js) → niente bande nere ai lati. L'app parte e gira sul telefono.
+Resta: **icona app personalizzata** (ora generica), e la pubblicazione vera sullo store (rimandata).
 
-### Grandi assi ancora da fare (scelta del prossimo blocco, dopo il playtest)
-In ordine NON vincolante — da decidere con l'utente qual e' la priorita':
-- **AUDIO da rifare completamente** (era il "Gruppo G" del round 1, sempre rimandato): musica +
-  effetti, sessione dedicata a parte.
-- **Sprite + animazioni dei NEMICI** (stesso trattamento del PG: immagine AI → AutoSprite →
-  pixelate): uniforma l'estetica e fara' sparire le aureole élite (che oggi sono un ripiego).
-  Include le animazioni chieste: cerumino/gorgogliante che strisciano, crosta "asciutta" diversa.
-- **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa che seguono la mira): serve
-  generarla su AutoSprite → **richiede l'abbonamento** (i crediti gratis sono finiti). Oggi c'e' il
-  ripiego "arma-in-mano" su layer separato.
-- **STRADA VERSO GOOGLE PLAY** (l'obiettivo finale): ottimizzare/alleggerire `assets_data.js` +
-  incorporare gli sprite sheet → **Capacitor** → build Android. Serve installare **Node** (oggi
-  assente). Vedi §Grandi assi in fondo.
+---
 
-### Personaggio & animazioni — quasi chiuso, resta:
-- **Attacco coordinato corpo+arma:** serve una POSA DEDICATA (braccio/testa che seguono la mira),
-  generabile su AutoSprite quando l'utente fa l'abbonamento (walk/run/idle/jump erano gratis, i
-  crediti sono finiti). Nel frattempo resta il prototipo **arma-in-mano** (layer separato, vedi
-  sopra) — **ma con il bug del coton-fioc-doppio da correggere prima** (Gruppo A.1).
-- **Embed + peso:** gli sprite sheet NON sono in `assets_data.js` → si vedono via server/LAN (preview
-  + telefono ok) ma NON da doppio-click `file://`. Da incorporare e/o ottimizzare il peso prima del
-  build Android.
-- **Stesso trattamento sui nemici** (AI + AutoSprite + pixelate) per uniformare l'estetica — quando
-  si arriva a quel lavoro, farà sparire le aureole élite (Gruppo H.2).
+## BACKLOG CONSOLIDATO (raggruppato) — l'utente rimanda lo STORE, prima rifinisce gameplay/estetica/audio
+_Aggiornato 2026-07-18 raccogliendo i punti aperti di tutte le sessioni. Da qui si sceglie il prossimo
+blocco; il blocco scelto va poi dettagliato in `ROADMAP.md`. Molti "numeri" restano da tarare col
+playtest dell'utente sul telefono._
 
-### Pipeline arte (collaudata 2026-07-12/13) — sostituisce il procedurale
-Look di qualita' = **immagini AI (Leonardo)**, NON procedurale a codice (bocciato dall'utente: "qualita'
-bassa"). Flusso: **l'utente genera** su Leonardo (prompt scritti dall'assistente) → **l'assistente**
-ritaglia/scala/pixela/integra. Tool: `cutout_bg.ps1`, `scale_sprite.ps1`, `bake_sheet_pixel.ps1`.
-Animazioni = **AutoSprite** (1 immagine → sprite sheet per stato, preserva il design). Sheet salvati in
-`assets/spritesheets/<entita'>/`. Stesso metodo riusabile per **nemici/ambiente**.
+**1. GAMEPLAY — tarature (serve il PLAYTEST dell'utente, poco codice)**
+- Tarare i numeri "sensati" mai collaudati dal vivo: durata Corsa, `vy` salto boss, cadenza terremoto,
+  bilanciamento spawn, durata Assedio, cadenza gocce, prezzi shop, danni/durate élite e dei 3 eventi.
+- Verificare dal vivo il tipo **Assedio** (mai giocato davvero). Volanti vs pedane: se si "incastrano",
+  limitare la collisione alla sola picchiata.
 
-### Grandi assi (dopo il blocco correzioni)
-- **Strada verso Google Play:** ottimizzare `assets_data.js` (cresce con gli sheet) → **Capacitor** →
-  build Android. (Node servira' lì; ora NON installato — non piu' bloccante per l'arte.)
+**2. GAMEPLAY — contenuti/feature**
+- **F.2b — arena dedicata per l'Assedio** (oggi riusa un livello normale col timer): design grosso, da
+  pianificare a fondo prima.
+- Più **varietà di nemici / varianti boss**; più **eventi/potenziamenti**.
+- ~~**Condotto a larghezza variabile**~~ ✅ FATTO (round 4, 2026-07-18): soffitto+pavimento irregolari
+  coerenti, **stanze ampie** ogni tanto, **rilievi** da scavalcare e **buche** da saltare. Dettaglio
+  in `ROADMAP.md`. Resta il look ORGANICO vero (con l'arte) e la taratura numeri col playtest.
+- Altri **segreti/easter egg** (ce n'è uno: lo scrigno in alto).
+- (da VERIFICARE nel codice) il boss dovrebbe droppare cure alla morte — controllare se già fatto.
 
-### Backlog estetico/futuro (dettagli in memoria `earwaxwar-backlog`)
-- Alternative ostacoli (peli oscillanti, geyser) — probabilmente assorbite dal Gruppo E (livelli).
-  Monetizzazione (non decisa).
+**3. ESTETICA — uniformare al look di qualità (il fronte più grosso)**
+- **Uniformare TUTTO** allo stile AI/pixel-art: oggi solo **sfondo** e **personaggio** sono di qualità;
+  **nemici, armi, cumuli di cerume, timpano, pavimento, particelle, UI** stonano ancora.
+- **Sprite + animazioni dei NEMICI** (immagine AI → AutoSprite → pixelate): farà **sparire le aureole
+  élite** (oggi un ripiego); include strisciamento cerumino/gorgogliante, crosta "asciutta" diversa.
+- **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa seguono la mira): serve AutoSprite →
+  **richiede abbonamento**. Oggi solo il layer "arma-in-mano".
+- **Cerume più gooey**; **protuberanze** provvisorie da migliorare; **varianti sfondo** per livello;
+  cerume "candela".
+- Restyle coerente di **Shop / Upgrade / Pause / game-over** (il menu principale è già rifatto, bozza).
+- **Icona app** personalizzata. Dettaglio: il PG che si sporca di cerume.
+- _Pipeline arte (collaudata): l'utente genera su **Leonardo** (prompt scritti da me) → io ritaglio/
+  scalo/pixelo/integro (`cutout_bg.ps1`, `scale_sprite.ps1`, `bake_sheet_pixel.ps1`); animazioni via
+  **AutoSprite**, sheet in `assets/spritesheets/<entità>/`. Il procedurale-a-codice è stato bocciato._
+
+**4. AUDIO**
+- Musica: migliorata (acustica + boss punk) ma l'utente la trova ancora **un filo ripetitiva/asettica**
+  → continuare a variare/arricchire dopo il suo riascolto.
+- Effetti extra (AU-B.2); **boss infuriato = musica più intensa** (AU-D.3).
+
+**5. TECNICO / PIATTAFORMA (per lo più rimandato dall'utente)**
+- **Freeze PC allo Start Run** (aperto, deprioritizzato; NON è l'audio; indagare prima dello store).
+- **Embed** degli sprite sheet in `assets_data.js` (per il doppio-click `file://`; l'APK li include già).
+- Ottimizzare il **peso** degli asset (APK ~14MB, ok per ora).
+- **Pubblicazione Play Store** + **ads** (AdMob): rimandati dall'utente a quando il gioco è rifinito.
 
 ---
 
 ## RISCHI / punti aperti da tenere d'occhio
-- **Tipo di livello ASSEDIO (`siege`):** mai provato dal vivo. Verificare che il countdown parta e
-  che il livello si completi allo scadere (win a tempo, timpano disattivato).
-- **Volanti vs pedane (`00ec955`):** le pedane sono solide anche ai moscerini; se in playtest si
-  "incastrano", limitare la collisione alla sola picchiata. **Collegato:** i volanti invece NON
-  collidono col cerume (`notFlyer` sul collider blocks) — segnalato come bug playtest (ROADMAP §A.2),
-  da decidere insieme alla proposta "Fuggitivo Dorato = volante" (§B.1): stessa regola fisica, non va
-  decisa due volte in modo incoerente.
-- **Tante manopole numeriche da tarare col playtest** (valori "sensati" non collaudati): danni/durate
-  élite e dei 3 eventi (bottino/tempo del fuggitivo, cadenza/danno della frana, numero dello sciame),
-  cadenza gocce, prezzi shop, durata assedio.
+- **FREEZE PC allo Start Run:** aperto e deprioritizzato (vedi §HOTFIX e Backlog gruppo 5). Non è
+  l'audio; specifico del PC dell'utente. Da chiarire prima di puntare allo store.
+- **Volanti vs pedane (`00ec955`):** pedane solide anche ai moscerini; se in playtest si "incastrano",
+  limitare la collisione alla sola picchiata. I volanti NON collidono col cerume (`notFlyer` sul
+  collider blocks) — decidere insieme (regola fisica coerente).
+- **God-mode nasconde i bug di DANNO:** i due hotfix del 2026-07-18 sono sfuggiti in round 2 proprio
+  per questo → per ogni blocco che tocca spawn/nemici/danni, fare anche ≥1 prova SENZA god-mode
+  (vedi memoria `earwaxwar-sim-godmode`).
+- **Manopole numeriche da tarare** e verifica dal vivo dell'Assedio: vedi Backlog gruppo 1.
 
 ---
 
