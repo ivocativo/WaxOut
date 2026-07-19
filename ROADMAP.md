@@ -89,9 +89,21 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
   heightmap; (2) `body.updateFromGameObject()` ogni frame CONGELA l'orizzontale → uso `body.y -= …`.
 - Rilievi-rettangolo e pozze-buca del round 4 DISABILITATI (bumpCount/pitCount = 0); il codice
   `addBump`/`addPit` resta finche' il terreno non e' confermato, poi si rimuove.
-- Verificato: PG cammina su/giu' colline fino a 108px, mai incastrato. **DA FARE se approvato:**
-  nemici sul terreno, cunette SOTTO il pavimento (serve togliere il pavimento piatto), rifinitura
-  visiva (ora colline color-carne + bordo scuro), taratura ampiezza/frequenza.
+- Verificato: PG cammina su/giu' colline fino a 108px, mai incastrato.
+
+**VERSIONE COMPLETA — l'utente ha approvato ("procedi"). Fatta in tappe:**
+- ✅ **Tappa A — nemici sul terreno (2026-07-19):** heightmap-snap anche per i nemici a terra
+  (nel loop update, prima dell'IA): aggancio `body.y` a `terrainTopAt`, `e._grounded` sostituisce
+  `blocked.down` in TUTTI i controlli "a terra" dell'IA (blob/flea/hopper/boss/spit). Soglia snap
+  `vy>=-30 && |feet-surf|<=34` (i balzi grandi -190/-480/-600 hanno i piedi ben piu' in alto →
+  passano; il jitter da fermo -2 e' incluso). Verificato: blob cammina su/giu' colline (54px),
+  grounded, piedi incollati, zero incastri. NB: `blocked.down` rimasto solo nello snap stesso.
+- ⏳ **Tappa B — cunette (avvallamenti SOTTO il pavimento) + rifinitura visiva:** DA FARE. Richiede:
+  profilo terreno che scende sotto 360, ABBASSARE il collider `this.ground` a backstop (~410),
+  RIDISEGNARE il pavimento seguendo `terrainTopAt` (sostituendo il vecchio disegno floorEdgeYAt),
+  estendere lo snap in discesa (cap -44). Parte piu' delicata → passaggio dedicato.
+- Ancora: nemici che EMERGONO in aree collinose (emergeFromGround usa 360 fisso → poi lo snap li
+  aggancia, piccolo pop), taratura ampiezza/frequenza colline.
 
 ---
 

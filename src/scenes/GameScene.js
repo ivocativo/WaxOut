@@ -2363,7 +2363,7 @@ class GameScene extends Phaser.Scene {
 
     // idle: se il giocatore e' vicino ed e' pronto, inizia la carica; altrimenti cammina.
     const near = Math.abs(dx) < 155 && Math.abs(this.player.y - e.y) < 72;
-    if (near && now >= (e.atkReadyAt || 0) && (e.body.blocked.down || e.body.touching.down)) {
+    if (near && now >= (e.atkReadyAt || 0) && e._grounded) {
       e.atkState = 'windup';
       e.windupUntil = now + 420;
       e.lungeDir = dir;
@@ -2384,7 +2384,7 @@ class GameScene extends Phaser.Scene {
   // e' in aria. Riparte da terra appena atterra e il cooldown e' scaduto.
   fleaAI(e, now) {
     const dir = Math.sign(this.player.x - e.x) || (e.hopDir || 1);
-    const onGround = e.body.blocked.down || e.body.touching.down;
+    const onGround = e._grounded;
     if (onGround && now >= (e.hopReadyAt || 0)) {
       e.hopDir = dir;
       e.setVelocity(dir * e.speed * 2.2, -480);   // balzo ancora piu' alto (era -380, prima -260)
@@ -2417,7 +2417,7 @@ class GameScene extends Phaser.Scene {
       e.setFlipX(e.lungeDir < 0);
       // Atterrato per davvero (non nel primo istante del balzo, dove il corpo tocca ancora
       // terra per un frame): stesso accorgimento gia' usato altrove per l'accovacciamento.
-      const landed = (e.body.blocked.down || e.body.touching.down) && now - e.lungeStartAt > 200;
+      const landed = e._grounded && now - e.lungeStartAt > 200;
       if (now >= e.lungeUntil || landed) {
         e.atkState = 'idle';
         e.atkReadyAt = now + 900;
@@ -2428,7 +2428,7 @@ class GameScene extends Phaser.Scene {
     }
 
     const near = Math.abs(dx) < 260 && Math.abs(this.player.y - e.y) < 90;
-    if (near && now >= (e.atkReadyAt || 0) && (e.body.blocked.down || e.body.touching.down)) {
+    if (near && now >= (e.atkReadyAt || 0) && e._grounded) {
       e.atkState = 'windup';
       e.windupUntil = now + 550;   // carica piu' lunga del cerumino: il balzo e' molto piu' grosso
       e.lungeDir = dir;
@@ -2519,7 +2519,7 @@ class GameScene extends Phaser.Scene {
       }
       // Atterrato per davvero (non nel primo istante del balzo, dove il corpo tocca ancora
       // terra per un frame): stesso accorgimento gia' usato per il Saltatore.
-      const landed = (e.body.blocked.down || e.body.touching.down) && now - e.slamStartAt > 250;
+      const landed = e._grounded && now - e.slamStartAt > 250;
       if (landed) {
         e.bossAtk = null;
         e.setVelocityX(0);
@@ -2546,7 +2546,7 @@ class GameScene extends Phaser.Scene {
     // Raggio allargato da 360 a 440 (round 2, D.1): con l'arco piu' verticale il boss deve
     // poter agganciare lo slam anche quando il giocatore lo tiene a distanza col getto.
     if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
-        (e.body.blocked.down || e.body.touching.down)) {
+        e._grounded) {
       e.bossAtk = 'slamwind';
       e.slamWindupUntil = now + 600;   // telegrafo lungo: e' pesante, si vede arrivare
       e.setVelocityX(0);
@@ -3224,6 +3224,24 @@ class GameScene extends Phaser.Scene {
       if (!e.active) return;
       if (e.eliteAura) { e.eliteAura.x = e.x; e.eliteAura.y = e.y; }   // l'aura élite segue il nemico
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
+
+      // TERRENO (round 4): i nemici A TERRA camminano sul profilo `terrainTopAt` come il PG
+      // (heightmap-snap: aggancio i piedi alla superficie). I VOLANTI no. `e._grounded` sostituisce
+      // `blocked.down` nei controlli "a terra" dell'IA (che qui sopra le colline sarebbe falso).
+      if (e.kind === 'fly') {
+        e._grounded = e.body.blocked.down || e.body.touching.down;
+      } else {
+        const surf = this.terrainTopAt(e.x);
+        // aggancio se NON sta salendo in un salto (vy >= -30: esclude affondi/balzi -190/-480/…) e i
+        // piedi sono entro ±34 dalla superficie (i balzi grandi hanno i piedi ben piu' in alto → passano).
+        if (e.body.velocity.y >= -30 && (e.body.bottom - surf) >= -34) {
+          e.body.y -= Phaser.Math.Clamp(e.body.bottom - surf, -34, 22);
+          if (e.body.velocity.y > 0) e.body.velocity.y = 0;
+          e._grounded = true;
+        } else {
+          e._grounded = e.body.blocked.down || e.body.touching.down;
+        }
+      }
 
       // Sapone corrosivo: danno-nel-tempo ad intervalli finché la corrosione è attiva.
       if (e.corrodeUntil && now < e.corrodeUntil && now >= (e.corrodeNext || 0)) {
