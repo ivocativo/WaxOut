@@ -76,6 +76,23 @@ Ciclo per gruppo: implementa → collaudo DAL VIVO (god-mode + una prova senza) 
 riferisci in italiano semplice → chiedi se committare. Numeri (n. pinch, profondità, larghezze) da
 TARARE col playtest dell'utente. **Priorità assoluta: il condotto resta sempre attraversabile.**
 
+### PROTOTIPO TERRENO stile Terraria (2026-07-18) — l'utente ha bocciato i rilievi-rettangolo
+Feedback utente: i rilievi a rettangolo erano brutti, le buche non si notavano. Nuova direzione
+approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). Fatto un PROTOTIPO
+(solo personaggio):
+- `buildTerrain()` genera un profilo di ALTEZZA a pendenze dolci (colline sopra il pavimento),
+  quantizzato a gradini di `TERR_STEP=18`; disegno VISIVO a mattoni (`terrainHeightAt`/`terrainTopAt`).
+- Camminata via **MAPPA DI ALTEZZE** (heightmap-snap) nel player update: aggancio i piedi a
+  `terrainTopAt` frame per frame (sposto `body.y`, NON lo sprite — l'orizzontale resta al motore).
+  Niente blocchi-collisione → niente "cuciture" che incastravano. Cap salita 26/frame, discesa 34.
+- **Trappole tecniche risolte:** (1) blocchi separati catturavano il PG sugli spigoli → passato a
+  heightmap; (2) `body.updateFromGameObject()` ogni frame CONGELA l'orizzontale → uso `body.y -= …`.
+- Rilievi-rettangolo e pozze-buca del round 4 DISABILITATI (bumpCount/pitCount = 0); il codice
+  `addBump`/`addPit` resta finche' il terreno non e' confermato, poi si rimuove.
+- Verificato: PG cammina su/giu' colline fino a 108px, mai incastrato. **DA FARE se approvato:**
+  nemici sul terreno, cunette SOTTO il pavimento (serve togliere il pavimento piatto), rifinitura
+  visiva (ora colline color-carne + bordo scuro), taratura ampiezza/frequenza.
+
 ---
 
 ## STATO: FATTO E VERIFICATO (2026-07-18) — poi rifiniture su richiesta utente

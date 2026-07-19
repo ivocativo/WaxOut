@@ -496,6 +496,7 @@ class GameScene extends Phaser.Scene {
       this.membranes.push(info);
       this.membraneXs.push(mx);
     }
+    this.buildTerrain();         // PROTOTIPO round 4: colline a gradini camminabili sul pavimento
     this.buildMounds();          // cumuli di cerume su pavimento e soffitto
     this.buildPlatforms();
     this.ensureHealPickups();    // garantisce un minimo di cure (la vita non si ricarica piu' a fine livello)
@@ -700,6 +701,48 @@ class GameScene extends Phaser.Scene {
       this.ceilBlocks.add(r);
     }
   }
+
+  // PROTOTIPO TERRENO (round 4): COLLINE a GRADINI camminabili sul pavimento (montagnole,
+  // saliscendi). Fatte di blocchi statici solidi → "a terra"/salto restano quelli di sempre; un
+  // piccolo "auto-gradino" in update() le fa SALIRE camminando (senza saltare a ogni gradino).
+  // NB: per ora le colline salgono SOPRA il pavimento; le cunette SOTTO il pavimento sono la
+  // versione completa (richiede togliere il pavimento piatto).
+  buildTerrain() {
+    const base = this.groundTop;
+    this.TERR_STEP = 18;                       // altezza di un gradino
+    const MAXH = 132;                          // collina piu' alta
+    const C = window.CONFIG.COLORS;
+    // Profilo di ALTEZZA (sopra il pavimento) a punti di controllo con dislivello limitato tra
+    // punti vicini (±70) → colline ben visibili ma con pendenze ancora DOLCI (niente muri verticali,
+    // che il PG "scalerebbe"; il salto/frame resta sotto il cap dell'aggancio). Quantizzato a gradini
+    // per il look a mattoni. Piatto vicino a spawn/goal. Parte da un'altezza media per non stare basso.
+    const pts = [];
+    let x = 0, h = 54;
+    while (x <= this.worldW) {
+      if (x > 560 && x < this.worldW - 480) h = Phaser.Math.Clamp(h + Phaser.Math.Between(-70, 70), 0, MAXH);
+      else h = 0;
+      pts.push({ x, y: h });
+      x += Phaser.Math.Between(150, 240);
+    }
+    pts.push({ x: this.worldW, y: 0 });
+    this._terrainPts = pts;
+    // Disegno VISIVO delle colline (a mattoni): la COLLISIONE la fa la "mappa di altezze" nel
+    // player update (heightmap-snap), non blocchi fisici — cosi' niente cuciture che incastrano.
+    const STEPW = 22;
+    for (let cx = 0; cx < this.worldW; cx += STEPW) {
+      const h = this.terrainHeightAt(cx + STEPW / 2);
+      if (h < this.TERR_STEP) continue;
+      this.add.rectangle(cx + STEPW / 2, base - h / 2, STEPW + 1, h, C.ground).setDepth(4.3);
+      this.add.rectangle(cx + STEPW / 2, base - h, STEPW + 1, 4, C.groundDark).setDepth(4.35);   // bordo superiore
+    }
+  }
+  // Altezza del terreno (sopra il pavimento) in x, quantizzata a gradini di TERR_STEP.
+  terrainHeightAt(x) {
+    const raw = this._sampleProfile(this._terrainPts, x, 0);
+    return Math.max(0, Math.round(raw / this.TERR_STEP) * this.TERR_STEP);
+  }
+  // y della SUPERFICIE del terreno in x (piu' in alto dove c'e' collina).
+  terrainTopAt(x) { return this.groundTop - this.terrainHeightAt(x); }
 
   // Interpolazione lineare del profilo (spezzata) al punto x.
   _sampleProfile(pts, x, fallback) {
@@ -1020,13 +1063,11 @@ class GameScene extends Phaser.Scene {
     const slimeCount = lvl >= 2 ? Phaser.Math.Clamp(1 + Math.floor(lvl / 3), 1, 4) : 0;
     for (let i = 0; i < slimeCount; i++) this.addSlimeZone();
 
-    // RILIEVI del pavimento (round 4): gobbe solide da SCAVALCARE saltando (collidono col PG,
-    // non coi nemici che le "sorpassano"). Dal lvl 2, crescono col livello.
-    const bumpCount = lvl >= 2 ? Phaser.Math.Clamp(1 + Math.floor(lvl / 2), 1, 5) : 0;
+    // RILIEVI/BUCHE a rettangolo (round 4) DISABILITATI: sostituiti dal TERRENO a gradini
+    // camminabile (`buildTerrain`, prototipo). Il codice resta finche' il nuovo look e' approvato.
+    const bumpCount = 0;
     for (let i = 0; i < bumpCount; i++) this.addBump();
-
-    // BUCHE (round 4): pozze scure che feriscono se ci stai DENTRO a terra → si superano SALTANDO.
-    const pitCount = lvl >= 3 ? Phaser.Math.Clamp(Math.floor(lvl / 3), 1, 4) : 0;
+    const pitCount = 0;
     for (let i = 0; i < pitCount; i++) this.addPit();
 
     // Gocce dal soffitto (dal lvl 2): "movers" contiene le GOCCE che cadono (riusa l'overlap
@@ -2989,7 +3030,21 @@ class GameScene extends Phaser.Scene {
       }
     }
 
-    const onGround = this.player.body.blocked.down || this.player.body.touching.down;
+    // TERRENO A "MAPPA DI ALTEZZE" (prototipo round 4): il PG cammina sul profilo `terrainTopAt`
+    // (colline dolci) agganciando i piedi alla superficie frame per frame → camminata liscia su/giu'
+    // senza blocchi fisici (niente cuciture che incastrano). NON aggancia mentre SALE in un salto
+    // (vy<0), ne' se la superficie e' molto piu' in basso (dirupo/salto) → li' cade. I dislivelli
+    // sono limitati a pendenze dolci (vedi buildTerrain), quindi il cap di salita non si vede.
+    let onGround = this.player.body.blocked.down || this.player.body.touching.down;   // pavimento piatto/pedane
+    const surfaceY = this.terrainTopAt(this.player.x);
+    const feetY = this.player.body.bottom;
+    if (this.player.body.velocity.y >= -1 && (feetY - surfaceY) >= -34) {
+      // sposto SOLO il corpo in verticale (non lo sprite → l'orizzontale resta al motore);
+      // sali max 26/frame, scendi max 34/frame.
+      this.player.body.y -= Phaser.Math.Clamp(feetY - surfaceY, -34, 26);
+      this.player.body.velocity.y = 0;
+      onGround = true;
+    }
 
     // JUICE — atterraggio: si rileva il passaggio aria->terra, ma solo se si era DAVVERO in aria
     // da un po' (confronto con `this.lastGroundAt`, letto PRIMA che il rifornimento salti qui
