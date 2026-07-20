@@ -445,6 +445,11 @@ class GameScene extends Phaser.Scene {
     const lvl = window.GameState.level;
     this.groundTop = H - gh;
 
+    // Il PROFILO del terreno (colline + cunette) va generato PRIMA di tutto cio' che "sta sul
+    // pavimento" (membrane, cumuli, pozze, comparse nemici), cosi' possono agganciarsi alla
+    // superficie LOCALE `terrainTopAt(x)` invece che alla vecchia quota piatta 360.
+    this.buildTerrain();         // round 4: colline a gradini camminabili sul pavimento
+
     // Riempimento continuo (base scura) DIETRO agli sprite di cerume: chiude i vuoti tra un
     // pezzo e l'altro così la massa sembra unica. Gli sprite-chunk (depth 6) ci vanno sopra.
     this.waxGfx = this.add.graphics().setDepth(5);   // base scura DIETRO (fuori dal livello metaball)
@@ -477,8 +482,7 @@ class GameScene extends Phaser.Scene {
       this.membranes.push(info);
       this.membraneXs.push(mx);
     }
-    this.buildTerrain();         // PROTOTIPO round 4: colline a gradini camminabili sul pavimento
-    this.buildMounds();          // cumuli di cerume su pavimento e soffitto
+    this.buildMounds();          // cumuli di cerume su pavimento e soffitto (agganciati al terreno)
     this.buildPlatforms();
     this.ensureHealPickups();    // garantisce un minimo di cure (la vita non si ricarica piu' a fine livello)
     this.buildHazards();         // pozze scivolose + gocce dal soffitto
@@ -502,9 +506,10 @@ class GameScene extends Phaser.Scene {
     const groundTop = this.groundTop;
     const baseCol = Math.round(mx / B);
 
-    // Crea un blocco di cerume a (col, row) con tipo/HP giusti.
+    // Crea un blocco di cerume a (col, row) con tipo/HP giusti. La riga 0 poggia sulla superficie
+    // LOCALE del terreno (terrainTopAt) cosi' la membrana segue colline/cunette invece di fluttuare.
     const mk = (col, row) => {
-      const x = col * B + B / 2, y = groundTop - row * B - B / 2;
+      const x = col * B + B / 2, y = this.terrainTopAt(x) - row * B - B / 2;
       let bt = 'soft';
       if (row === 0) bt = 'dirt';
       else if (type === 'full' && lvl >= 2 && (row + col) % 4 === 0) bt = 'hard';
@@ -546,10 +551,13 @@ class GameScene extends Phaser.Scene {
   }
 
   // Crea un singolo blocco di cerume alla colonna/riga date (riga 0 = pavimento, su = verso il soffitto).
-  addWaxBlock(col, row, lvl, type) {
+  // baseY = quota della "riga 0": di default il pavimento fisso, ma i cumuli a terra passano la
+  // superficie LOCALE del terreno (terrainTopAt) cosi' il cerume segue colline e cunette.
+  addWaxBlock(col, row, lvl, type, baseY) {
     const B = window.CONFIG.BLOCK;
     const x = col * B + B / 2;
-    const y = this.groundTop - row * B - B / 2;
+    const base = (baseY != null) ? baseY : this.groundTop;
+    const y = base - row * B - B / 2;
     let key, hp, bitKey, wax;
     if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
     else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
@@ -584,8 +592,10 @@ class GameScene extends Phaser.Scene {
     for (let r = 0; r < h; r++) {
       const span = Math.max(1, w - r);
       for (let c = 0; c < span; c++) {
+        const col = baseCol + c;
+        const surf = this.terrainTopAt(col * B + B / 2);   // superficie LOCALE del terreno
         const type = (r === 0) ? 'dirt' : (lvl >= 4 && Math.random() < 0.2 ? 'hard' : 'soft');
-        this.addWaxBlock(baseCol + c, r, lvl, type);
+        this.addWaxBlock(col, r, lvl, type, surf);
       }
     }
   }
@@ -990,9 +1000,10 @@ class GameScene extends Phaser.Scene {
   // I blocchi che non incontrano cerume/pedane nella caduta atterrano a terra (come le gocce).
   updateCollapseChunks() {
     this.collapseChunks.getChildren().forEach((c) => {
-      if (c.active && c.y >= this.groundTop - 6) {
-        this.splat(c.x, this.groundTop - 8, 'hard');
-        this.burst('bit_hard', c.x, this.groundTop - 8, 6);
+      const surf = this.terrainTopAt(c.x);   // superficie LOCALE del terreno
+      if (c.active && c.y >= surf - 6) {
+        this.splat(c.x, surf - 8, 'hard');
+        this.burst('bit_hard', c.x, surf - 8, 6);
         c.destroy();
       }
     });
@@ -1119,7 +1130,7 @@ class GameScene extends Phaser.Scene {
     const x = this.pickHazardX(w);
     if (x == null) return;
     const C = window.CONFIG.COLORS;
-    const cx = x + w / 2, y = this.groundTop;
+    const cx = x + w / 2, y = this.terrainTopAt(cx);   // superficie LOCALE del terreno
     const g = this.add.rectangle(cx, y - 4, w, 9, C.slime, 0.88).setDepth(4.5);
     g.setStrokeStyle(1, C.slimeGloss, 0.5);
     this.tweens.add({ targets: g, scaleY: 1.3, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.inOut' });
@@ -1185,7 +1196,8 @@ class GameScene extends Phaser.Scene {
     }
     if (this.movers) {
       this.movers.getChildren().forEach((m) => {
-        if (m.active && m.y >= this.groundTop - 4) { this.splat(m.x, this.groundTop - 6, 'soft'); m.destroy(); }
+        const surf = this.terrainTopAt(m.x);   // superficie LOCALE del terreno
+        if (m.active && m.y >= surf - 4) { this.splat(m.x, surf - 6, 'soft'); m.destroy(); }
       });
     }
   }
@@ -1506,11 +1518,7 @@ class GameScene extends Phaser.Scene {
     // terreno in punti lontani dal giocatore (il boss esce verso destra).
     const groundTop = H - gh;
     const targetScale = cfg.scale || 1;
-    // L'hitbox scala con lo sprite: la quota di riposo va calcolata con l'altezza
-    // GIA' scalata, così il corpo appoggia esattamente sul pavimento (niente
-    // sprofondamento sotto la linea del terreno).
-    const restY = groundTop - (cfg.body[1] * targetScale) / 2;
-    let x, y;
+    let x, y, surfY = groundTop;                 // surfY = superficie LOCALE del terreno sotto lo spawn
     if (cfg.fly) {
       // Cala dal soffitto a distanza onesta dal giocatore (mai addosso alla partenza),
       // di solito davanti a lui verso il timpano.
@@ -1518,13 +1526,16 @@ class GameScene extends Phaser.Scene {
       const ahead = Math.random() < 0.7 ? 1 : -1;
       x = Phaser.Math.Clamp(this.player.x + ahead * Phaser.Math.Between(camW * 0.30, camW * 0.5), 60, this.worldW - 60);
       y = -24;                                   // parte sopra lo schermo
-    } else if (cfg.boss) {
-      x = Phaser.Math.Clamp(this.goalX - 260, 700, this.worldW - 200);  // fa la guardia al timpano in fondo
-      y = restY;                                 // a livello del pavimento
     } else {
-      // Posizione fissa (guardiano di una membrana) oppure scelta automatica.
-      x = (opts.x !== undefined) ? Phaser.Math.Clamp(opts.x, 60, this.worldW - 60) : this.pickGroundX();
-      y = restY;
+      // A terra: il boss fa la guardia al timpano in fondo; gli altri in posizione fissa
+      // (guardiano di una membrana) o scelta automatica lontano dal giocatore.
+      if (cfg.boss) x = Phaser.Math.Clamp(this.goalX - 260, 700, this.worldW - 200);
+      else x = (opts.x !== undefined) ? Phaser.Math.Clamp(opts.x, 60, this.worldW - 60) : this.pickGroundX();
+      // L'hitbox scala con lo sprite: la quota di riposo usa l'altezza GIA' scalata sulla
+      // superficie LOCALE del terreno (terrainTopAt), cosi' il corpo e lo sbuffo di comparsa
+      // appoggiano sul terreno sotto x, non sulla vecchia linea piatta 360.
+      surfY = this.terrainTopAt(x);
+      y = surfY - (cfg.body[1] * targetScale) / 2;
     }
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
@@ -1573,7 +1584,7 @@ class GameScene extends Phaser.Scene {
     // morto li': emergere da lontano non avrebbe senso).
     if (opts.splitChild) this.splitPop(e, targetScale);
     else if (cfg.fly) this.dropFromCeiling(e, targetScale);
-    else this.emergeFromGround(e, targetScale, y, x, groundTop, !!cfg.boss);
+    else this.emergeFromGround(e, targetScale, y, x, surfY, !!cfg.boss);
     return e;
   }
 
@@ -2490,9 +2501,9 @@ class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: e, scaleX: bs, scaleY: bs, duration: 200, ease: 'Quad.out' });
         });
         if (!e.slamShadow) {
-          e.slamShadow = this.add.ellipse(e.x, this.groundTop, 70, 18, 0x000000, 0.35).setDepth(6);
+          e.slamShadow = this.add.ellipse(e.x, this.terrainTopAt(e.x), 70, 18, 0x000000, 0.35).setDepth(6);
         }
-        e.slamShadow.setPosition(e.x, this.groundTop).setScale(1).setAlpha(0.35).setVisible(true);
+        e.slamShadow.setPosition(e.x, this.terrainTopAt(e.x)).setScale(1).setAlpha(0.35).setVisible(true);
       }
       return;
     }
@@ -2501,8 +2512,9 @@ class GameScene extends Phaser.Scene {
       // Ombra a terra: segue orizzontalmente, si rimpicciolisce/schiarisce mentre sale (stessa
       // logica dell'altezza apice usata per calcolare la traiettoria, cosi' resta coerente).
       if (e.slamShadow) {
-        const heightRatio = Phaser.Math.Clamp((this.groundTop - e.body.bottom) / (e.slamApex || 1), 0, 1);
-        e.slamShadow.setPosition(e.x, this.groundTop);
+        const surf = this.terrainTopAt(e.x);   // superficie LOCALE sotto il boss
+        const heightRatio = Phaser.Math.Clamp((surf - e.body.bottom) / (e.slamApex || 1), 0, 1);
+        e.slamShadow.setPosition(e.x, surf);
         e.slamShadow.setScale(1 - heightRatio * 0.65);
         e.slamShadow.setAlpha(0.35 * (1 - heightRatio * 0.55));
       }
