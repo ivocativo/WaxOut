@@ -98,12 +98,20 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
   `vy>=-30 && |feet-surf|<=34` (i balzi grandi -190/-480/-600 hanno i piedi ben piu' in alto →
   passano; il jitter da fermo -2 e' incluso). Verificato: blob cammina su/giu' colline (54px),
   grounded, piedi incollati, zero incastri. NB: `blocked.down` rimasto solo nello snap stesso.
-- ⏳ **Tappa B — cunette (avvallamenti SOTTO il pavimento) + rifinitura visiva:** DA FARE. Richiede:
-  profilo terreno che scende sotto 360, ABBASSARE il collider `this.ground` a backstop (~410),
-  RIDISEGNARE il pavimento seguendo `terrainTopAt` (sostituendo il vecchio disegno floorEdgeYAt),
-  estendere lo snap in discesa (cap -44). Parte piu' delicata → passaggio dedicato.
-- Ancora: nemici che EMERGONO in aree collinose (emergeFromGround usa 360 fisso → poi lo snap li
-  aggancia, piccolo pop), taratura ampiezza/frequenza colline.
+- ✅ **Tappa B — cunette (2026-07-19):** il profilo terreno ora scende SOTTO il pavimento
+  (`terrainHeightAt` ammette valori negativi, fino a `TERR_DIP=36`); colline fino a `TERR_MAXH=132`.
+  Il pavimento piatto (disegno + collider a 360) e' stato TOLTO: `buildTerrain` disegna tutto il
+  terreno seguendo `terrainTopAt` (colline + cunette, riempimento a gradini + linea di superficie),
+  e il collider `this.ground` e' sceso a un BACKSTOP di sicurezza (~408, sotto la cunetta piu'
+  profonda). Snap in discesa esteso a -44 (player + nemici) per entrare/uscire dalle cunette.
+  Verificato: traversata completa di un livello con colline (+126) e cunette (-36), sale/scende,
+  mai incastrato, non cade oltre il backstop, terreno disegnato (grafica depth 4.3), zero errori.
+- **Resta (rifinitura/taratura, dopo il playtest utente):** aspetto ORGANICO vero (con l'arte;
+  ora e' color-carne + linea scura); taratura ampiezza/frequenza di colline e cunette (a volte un
+  livello esce tutto colline o tutte cunette); nemici che EMERGONO in aree non piane (emergeFromGround
+  usa 360 fisso → poi lo snap li aggancia, piccolo "pop"); `floorEdgeYAt`/`buildFloorProfile` ora
+  inutilizzati (codice morto da rimuovere). + integrare crouch (36 frame) e sfondo parallax a 5
+  strati (l'utente esporta gli strati separati con trasparenza).
 
 ---
 

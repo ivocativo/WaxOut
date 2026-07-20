@@ -117,34 +117,15 @@ class GameScene extends Phaser.Scene {
     // tratti → passaggi stretti/ampi. Il profilo va calcolato PRIMA di disegnare il soffitto e di
     // costruire il livello (pedane/stalattiti/gocce si agganciano al soffitto locale via ceilingYAt).
     this.buildCeilingProfile();
-    this.buildFloorProfile();
 
     this.drawBackground();
 
-    // Pavimento del condotto (lungo tutto il mondo). Disegnato con GRAPHICS (come lo
-    // sfondo) e non con un grande Shape rettangolare: su alcune GPU i rettangoli Shape
-    // molto larghi non venivano disegnati e il pavimento "spariva". Si estende sotto il
-    // bordo del mondo cosi' il tremolio della camera non scopre mai un buco.
+    // Il PAVIMENTO (terreno) vero lo disegna `buildTerrain()` seguendo il profilo `terrainTopAt`
+    // (colline + cunette). Qui creiamo solo il collider di SICUREZZA (backstop) ben SOTTO il
+    // terreno: la superficie d'appoggio vera la fa la "mappa di altezze" nel player/enemy update.
+    // (`groundGfx` serve sotto per disegnare il SOFFITTO.)
     const groundGfx = this.add.graphics().setDepth(4);
-    // Pavimento con BORDO IRREGOLARE (solo visivo): riempimento sotto il profilo `floorEdgeYAt`
-    // + linea di bordo. La superficie d'appoggio FISICA resta PIATTA a H-gh (vedi sotto).
-    const FSTEP = 16;
-    const floorPts = [{ x: 0, y: H + 200 }];
-    for (let x = 0; x <= this.worldW; x += FSTEP) floorPts.push({ x, y: this.floorEdgeYAt(x) });
-    floorPts.push({ x: this.worldW, y: this.floorEdgeYAt(this.worldW) });
-    floorPts.push({ x: this.worldW, y: H + 200 });
-    groundGfx.fillStyle(C.ground, 1);
-    groundGfx.fillPoints(floorPts, true);
-    groundGfx.lineStyle(5, C.groundDark, 1);
-    groundGfx.beginPath();
-    for (let x = 0; x <= this.worldW; x += FSTEP) {
-      const y = this.floorEdgeYAt(x);
-      if (x === 0) groundGfx.moveTo(x, y); else groundGfx.lineTo(x, y);
-    }
-    groundGfx.strokePath();
-    // Corpo fisico del pavimento (invisibile): la superficie d'appoggio resta PIATTA a H-gh
-    // (camminata liscia = zero rischio incastri). Il bordo irregolare sopra e' solo estetico.
-    this.ground = this.add.rectangle(this.worldW / 2, H - gh / 2, this.worldW, gh).setVisible(false);
+    this.ground = this.add.rectangle(this.worldW / 2, (H - gh + 48) + gh / 2, this.worldW, gh).setVisible(false);
     this.physics.add.existing(this.ground, true);
 
     // Soffitto VISIBILE ondulato (round 4): forma piena che segue il profilo `ceilingYAt(x)`,
@@ -708,40 +689,48 @@ class GameScene extends Phaser.Scene {
   // NB: per ora le colline salgono SOPRA il pavimento; le cunette SOTTO il pavimento sono la
   // versione completa (richiede togliere il pavimento piatto).
   buildTerrain() {
-    const base = this.groundTop;
-    this.TERR_STEP = 18;                       // altezza di un gradino
-    const MAXH = 132;                          // collina piu' alta
+    this.TERR_STEP = 18;                        // altezza di un gradino
+    this.TERR_MAXH = 132;                       // collina piu' alta (SOPRA il pavimento)
+    this.TERR_DIP = 36;                         // cunetta piu' profonda (SOTTO il pavimento)
     const C = window.CONFIG.COLORS;
-    // Profilo di ALTEZZA (sopra il pavimento) a punti di controllo con dislivello limitato tra
-    // punti vicini (±70) → colline ben visibili ma con pendenze ancora DOLCI (niente muri verticali,
-    // che il PG "scalerebbe"; il salto/frame resta sotto il cap dell'aggancio). Quantizzato a gradini
-    // per il look a mattoni. Piatto vicino a spawn/goal. Parte da un'altezza media per non stare basso.
+    const H = window.CONFIG.HEIGHT;
+    // Profilo di ALTEZZA a punti di controllo, dislivello limitato (±70) = pendenze DOLCI (niente
+    // muri verticali che il PG "scalerebbe"). POSITIVO = collina (sopra il pavimento), NEGATIVO =
+    // cunetta (sotto). Quantizzato a gradini. Piatto vicino a spawn/goal.
     const pts = [];
-    let x = 0, h = 54;
+    let x = 0, h = 40;
     while (x <= this.worldW) {
-      if (x > 560 && x < this.worldW - 480) h = Phaser.Math.Clamp(h + Phaser.Math.Between(-70, 70), 0, MAXH);
+      if (x > 560 && x < this.worldW - 480) h = Phaser.Math.Clamp(h + Phaser.Math.Between(-70, 70), -this.TERR_DIP, this.TERR_MAXH);
       else h = 0;
       pts.push({ x, y: h });
       x += Phaser.Math.Between(150, 240);
     }
     pts.push({ x: this.worldW, y: 0 });
     this._terrainPts = pts;
-    // Disegno VISIVO delle colline (a mattoni): la COLLISIONE la fa la "mappa di altezze" nel
-    // player update (heightmap-snap), non blocchi fisici — cosi' niente cuciture che incastrano.
-    const STEPW = 22;
-    for (let cx = 0; cx < this.worldW; cx += STEPW) {
-      const h = this.terrainHeightAt(cx + STEPW / 2);
-      if (h < this.TERR_STEP) continue;
-      this.add.rectangle(cx + STEPW / 2, base - h / 2, STEPW + 1, h, C.ground).setDepth(4.3);
-      this.add.rectangle(cx + STEPW / 2, base - h, STEPW + 1, 4, C.groundDark).setDepth(4.35);   // bordo superiore
-    }
+    // DISEGNO del terreno seguendo `terrainTopAt` (colline + cunette), riempimento a gradini +
+    // linea di superficie. La COLLISIONE la fa la "mappa di altezze" (heightmap-snap) nel update,
+    // non blocchi fisici → niente cuciture che incastrano. Nelle cunette il riempimento parte piu'
+    // in basso, cosi' sopra si vede lo sfondo (avvallamento).
+    const g = this.add.graphics().setDepth(4.3);
+    const SS = 16;
+    const poly = [{ x: 0, y: H + 200 }];
+    for (let cx = 0; cx <= this.worldW; cx += SS) poly.push({ x: cx, y: this.terrainTopAt(cx) });
+    poly.push({ x: this.worldW, y: this.terrainTopAt(this.worldW) });
+    poly.push({ x: this.worldW, y: H + 200 });
+    g.fillStyle(C.ground, 1);
+    g.fillPoints(poly, true);
+    g.lineStyle(5, C.groundDark, 1);
+    g.beginPath();
+    for (let cx = 0; cx <= this.worldW; cx += SS) { const y = this.terrainTopAt(cx); if (cx === 0) g.moveTo(cx, y); else g.lineTo(cx, y); }
+    g.strokePath();
   }
-  // Altezza del terreno (sopra il pavimento) in x, quantizzata a gradini di TERR_STEP.
+  // Altezza del terreno in x (POSITIVO = collina sopra il pavimento, NEGATIVO = cunetta sotto),
+  // quantizzata a gradini di TERR_STEP.
   terrainHeightAt(x) {
     const raw = this._sampleProfile(this._terrainPts, x, 0);
-    return Math.max(0, Math.round(raw / this.TERR_STEP) * this.TERR_STEP);
+    return Phaser.Math.Clamp(Math.round(raw / this.TERR_STEP) * this.TERR_STEP, -this.TERR_DIP, this.TERR_MAXH);
   }
-  // y della SUPERFICIE del terreno in x (piu' in alto dove c'e' collina).
+  // y della SUPERFICIE del terreno in x (piu' in alto sulle colline, piu' in basso nelle cunette).
   terrainTopAt(x) { return this.groundTop - this.terrainHeightAt(x); }
 
   // Interpolazione lineare del profilo (spezzata) al punto x.
@@ -3035,13 +3024,13 @@ class GameScene extends Phaser.Scene {
     // senza blocchi fisici (niente cuciture che incastrano). NON aggancia mentre SALE in un salto
     // (vy<0), ne' se la superficie e' molto piu' in basso (dirupo/salto) → li' cade. I dislivelli
     // sono limitati a pendenze dolci (vedi buildTerrain), quindi il cap di salita non si vede.
-    let onGround = this.player.body.blocked.down || this.player.body.touching.down;   // pavimento piatto/pedane
+    let onGround = this.player.body.blocked.down || this.player.body.touching.down;   // backstop/pedane
     const surfaceY = this.terrainTopAt(this.player.x);
     const feetY = this.player.body.bottom;
-    if (this.player.body.velocity.y >= -1 && (feetY - surfaceY) >= -34) {
+    if (this.player.body.velocity.y >= -1 && (feetY - surfaceY) >= -44) {
       // sposto SOLO il corpo in verticale (non lo sprite → l'orizzontale resta al motore);
-      // sali max 26/frame, scendi max 34/frame.
-      this.player.body.y -= Phaser.Math.Clamp(feetY - surfaceY, -34, 26);
+      // sali max 26/frame, scendi max 44/frame (per entrare/uscire dalle cunette).
+      this.player.body.y -= Phaser.Math.Clamp(feetY - surfaceY, -44, 26);
       this.player.body.velocity.y = 0;
       onGround = true;
     }
@@ -3233,9 +3222,9 @@ class GameScene extends Phaser.Scene {
       } else {
         const surf = this.terrainTopAt(e.x);
         // aggancio se NON sta salendo in un salto (vy >= -30: esclude affondi/balzi -190/-480/…) e i
-        // piedi sono entro ±34 dalla superficie (i balzi grandi hanno i piedi ben piu' in alto → passano).
-        if (e.body.velocity.y >= -30 && (e.body.bottom - surf) >= -34) {
-          e.body.y -= Phaser.Math.Clamp(e.body.bottom - surf, -34, 22);
+        // piedi sono entro il range dalla superficie (i balzi grandi hanno i piedi ben piu' in alto → passano).
+        if (e.body.velocity.y >= -30 && (e.body.bottom - surf) >= -44) {
+          e.body.y -= Phaser.Math.Clamp(e.body.bottom - surf, -44, 22);
           if (e.body.velocity.y > 0) e.body.velocity.y = 0;
           e._grounded = true;
         } else {
