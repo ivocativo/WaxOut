@@ -6,13 +6,16 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-18 · Ultimo commit pushato: `05d0c46` su `origin/main`._
+_Ultimo aggiornamento: 2026-07-20 · Ultimo commit pushato: `159663d` su `origin/main`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); hotfix freeze-spawn e salto boss; **APP ANDROID via GitHub Actions** (APK_
-_installabile dal telefono, larghezza adattiva = niente bande). Dettaglio nella cronologia git._
-_**STATO ORA:** l'utente RIMANDA la pubblicazione sullo store; vuole prima rifinire **gameplay,_
-_estetica e audio**. Punti aperti raccolti e raggruppati nel **BACKLOG CONSOLIDATO** qui sotto —_
-_da lì si sceglie il prossimo blocco (poi lo si dettaglia in `ROADMAP.md`)._
+_installabile dal telefono, larghezza adattiva); **Round 4 — CONDOTTO/TERRENO:** soffitto ondulato_
+_con stanze ampie + collisione, e **TERRENO stile Terraria** (colline + cunette) su cui camminano_
+_PG e nemici via "mappa di altezze" (heightmap-snap). Dettaglio in `ROADMAP.md` (blocco round 4)._
+_**STATO ORA:** in mezzo al round 4 (terreno). Prossimi passi: correggere il **BUG del cerume**_
+_(vedi §DA FARE), integrare **crouch** e **sfondo parallax** (§Asset nuovi), poi rifinitura/taratura._
+_L'utente RIMANDA lo store; rifinisce gameplay/estetica. Questa sessione va chiusa (contesto pieno):_
+_una nuova sessione riparte da QUI + dal blocco round 4 in `ROADMAP.md`._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -234,9 +237,24 @@ Resta: **icona app personalizzata** (ora generica), e la pubblicazione vera sull
 ---
 
 ## BACKLOG CONSOLIDATO (raggruppato) — l'utente rimanda lo STORE, prima rifinisce gameplay/estetica/audio
-_Aggiornato 2026-07-18 raccogliendo i punti aperti di tutte le sessioni. Da qui si sceglie il prossimo
+_Aggiornato 2026-07-20 raccogliendo i punti aperti di tutte le sessioni. Da qui si sceglie il prossimo
 blocco; il blocco scelto va poi dettagliato in `ROADMAP.md`. Molti "numeri" restano da tarare col
 playtest dell'utente sul telefono._
+
+**🚧 IN CORSO — ROUND 4 (condotto + terreno) — riparti da QUI.** Piano dettagliato + stato in
+`ROADMAP.md`. Fatto e pushato (fino a `159663d`): soffitto ondulato con stanze ampie + collisione;
+**TERRENO stile Terraria** (colline + cunette) disegnato da `buildTerrain` seguendo `terrainTopAt`;
+PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y` a `terrainTopAt`;
+`e._grounded` sostituisce `blocked.down` nell'IA nemici). Da fare subito:
+- **🐞 BUG CERUME (segnalato utente 2026-07-20):** i cumuli di cerume a PAVIMENTO sono ancorati alla
+  quota fissa 360 (`buildFloorMound`/`addWaxBlock` usano `groundTop`), quindi col terreno risultano
+  **sospesi sopra le cunette** o **dentro le colline**. FIX: ancorarli a `terrainTopAt(mx)` (come
+  `buildCeilingMound` fa gia' con `ceilingYAt`). Rivedere anche gli altri elementi a terra fissi a 360
+  (pickup, pozze scivolose, spawn/emersione nemici): tutto cio' che "sta sul pavimento" deve usare
+  `terrainTopAt(x)`. **Dettaglio nel blocco round 4 di `ROADMAP.md`.**
+- **Rifinitura terreno:** look organico (con l'arte); taratura ampiezza/frequenza colline+cunette;
+  togliere codice morto (`floorEdgeYAt`/`buildFloorProfile`, `addBump`/`addPit` disabilitati).
+- **Asset nuovi da integrare** (vedi sezione dedicata sotto): crouch + sfondo parallax.
 
 **1. GAMEPLAY — tarature (serve il PLAYTEST dell'utente, poco codice)**
 - Tarare i numeri "sensati" mai collaudati dal vivo: durata Corsa, `vy` salto boss, cadenza terremoto,
@@ -248,9 +266,9 @@ playtest dell'utente sul telefono._
 - **F.2b — arena dedicata per l'Assedio** (oggi riusa un livello normale col timer): design grosso, da
   pianificare a fondo prima.
 - Più **varietà di nemici / varianti boss**; più **eventi/potenziamenti**.
-- ~~**Condotto a larghezza variabile**~~ ✅ FATTO (round 4, 2026-07-18): soffitto+pavimento irregolari
-  coerenti, **stanze ampie** ogni tanto, **rilievi** da scavalcare e **buche** da saltare. Dettaglio
-  in `ROADMAP.md`. Resta il look ORGANICO vero (con l'arte) e la taratura numeri col playtest.
+- **Condotto a larghezza variabile → diventato ROUND 4 (terreno):** IN CORSO, vedi il blocco 🚧 in
+  cima a questo backlog + `ROADMAP.md`. (I "rilievi/buche" a rettangolo del primo tentativo sono stati
+  BOCCIATI dall'utente e sostituiti dal terreno a colline/cunette.)
 - Altri **segreti/easter egg** (ce n'è uno: lo scrigno in alto).
 - (da VERIFICARE nel codice) il boss dovrebbe droppare cure alla morte — controllare se già fatto.
 
@@ -268,6 +286,23 @@ playtest dell'utente sul telefono._
 - _Pipeline arte (collaudata): l'utente genera su **Leonardo** (prompt scritti da me) → io ritaglio/
   scalo/pixelo/integro (`cutout_bg.ps1`, `scale_sprite.ps1`, `bake_sheet_pixel.ps1`); animazioni via
   **AutoSprite**, sheet in `assets/spritesheets/<entità>/`. Il procedurale-a-codice è stato bocciato._
+
+### 🆕 Asset nuovi da integrare (l'utente li ha aggiunti, 2026-07-20)
+- **CROUCH (animazione accovacciamento):** 36 frame PNG in
+  `assets/spritesheets/hero/Nuova cartella/` (`Image1.png`..`Image36.png`), 708×1298, personaggio
+  accovacciato su **sfondo NERO**. Da fare: (1) togliere il nero → trasparente (tipo `cutout_bg.ps1`,
+  qui la chiave e' il nero puro), (2) montare i frame in UN spritesheet + pixelare/ridimensionare
+  come le altre anim (`hero_*_px`), (3) caricarlo in `BootScene`, (4) agganciare l'anim quando
+  `this.crouching` in `GameScene.update` (oggi c'e' solo uno "schiacciamento" segnaposto via scale).
+  **Dubbi da chiedere all'utente:** 36 frame sono tanti per un accovacciamento — e' un CICLO (giu'→su)
+  o una posa tenuta? Sostituire del tutto lo schiacciamento attuale?
+- **SFONDO PARALLAX a 5 strati:** in `assets/backgrounds/` c'e' `background set 1.png` (1536×1024, UNA
+  immagine con 5 fasce etichettate: primo piano / piano terra-grotta / corpo grotta / lontano / sfondo)
+  e `background.png` (1913×822). **Deciso con l'utente:** lui **esporta i 5 strati come PNG SEPARATI
+  con TRASPARENZA** (per un parallax vero con profondita'). Quando li fornisce: ritagliare/embeddare
+  (`embed_assets.ps1`) e **riscrivere `gfx.js drawBackground`** per usarli come strati parallax
+  (scrollFactor diversi, i vicini davanti coi buchi trasparenti) al posto dello sfondo attuale
+  (`bg_flesh_01_px` + strati procedurali). Coerente con l'obiettivo "uniformare l'estetica".
 
 **4. AUDIO**
 - Musica: migliorata (acustica + boss punk) ma l'utente la trova ancora **un filo ripetitiva/asettica**
