@@ -106,18 +106,16 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
   profonda). Snap in discesa esteso a -44 (player + nemici) per entrare/uscire dalle cunette.
   Verificato: traversata completa di un livello con colline (+126) e cunette (-36), sale/scende,
   mai incastrato, non cade oltre il backstop, terreno disegnato (grafica depth 4.3), zero errori.
-- **🐞 BUG DA CORREGGERE (segnalato dall'utente 2026-07-20) — CERUME non segue il terreno:** i
-  cumuli di cerume sul PAVIMENTO (`buildFloorMound` → `addWaxBlock`, che usa `y = groundTop - row*B
-  - B/2`, cioe' il pavimento FISSO a 360) sono ancora ancorati alla vecchia quota piatta. Col nuovo
-  terreno risultano **sospesi in aria sopra le cunette** o **infilati dentro le colline**. FIX:
-  ancorare i cumuli di pavimento alla superficie LOCALE `terrainTopAt(mx)` (come gia' fatto per i
-  cumuli di soffitto in `buildCeilingMound`, che usa `ceilingYAt(mx)`) — es. calcolare la riga base
-  da `terrainTopAt(mx)` invece che da `groundTop`. **Rivedere anche gli ALTRI elementi ancorati al
-  pavimento fisso 360** che col terreno variabile possono galleggiare/infossarsi: pickup a terra,
-  pozze scivolose (`addSlimeZone`, disegnate a `groundTop-4`), spawn/riposo nemici (`restY`,
-  `emergeFromGround` usano 360 → poi lo snap li aggancia, ma l'emersione parte dalla quota sbagliata),
-  eventuali insidie a terra. Regola generale: **tutto cio' che "sta sul pavimento" deve usare
-  `terrainTopAt(x)`, non `groundTop`.**
+- ✅ **BUG CERUME su terreno — RISOLTO 2026-07-20 (commit `d6e50cd`).** Tutto cio' che "sta sul
+  pavimento" era ancorato alla vecchia quota piatta `groundTop` (360) → col terreno round 4
+  risultava sospeso sopra le cunette o infilato nelle colline. Ora usa la superficie LOCALE
+  `terrainTopAt(x)`: cumuli a pavimento (`buildFloorMound`/`addWaxBlock`, nuovo param `baseY`),
+  membrane (`buildMembrane.mk`), pozze scivolose (`addSlimeZone`), comparsa/sbuffo nemici
+  (spawn `restY` + `emergeFromGround`), ombra del boss nel balzo, splat di frane/gocce che cadono.
+  Trappola risolta: `buildTerrain()` girava DOPO le membrane → spostato PRIMA (altrimenti il loro
+  aggancio al terreno era un no-op). Verifica dal vivo (lvl 4, god-mode): 30 blocchi con errore 0px
+  (22 su colline/cunette), nemici agganciati 0px, zero errori, nessun crash su 150 frame. I pickup a
+  terra NON servivano fix (nascono su pedane elevate o alla morte dei nemici, gia' agganciati).
 - **Resta (rifinitura/taratura, dopo il playtest utente):** aspetto ORGANICO vero del terreno (con
   l'arte; ora e' color-carne + linea scura); taratura ampiezza/frequenza di colline e cunette (a
   volte un livello esce tutto colline o tutte cunette — vedi `buildTerrain`, random walk ±70 da h=40);

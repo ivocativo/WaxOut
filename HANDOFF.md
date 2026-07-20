@@ -6,16 +6,17 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-20 · Ultimo commit pushato: `159663d` su `origin/main`._
+_Ultimo aggiornamento: 2026-07-20 · Ultimo commit di lavoro pushato: `d6e50cd` (fix cerume su terreno)._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); hotfix freeze-spawn e salto boss; **APP ANDROID via GitHub Actions** (APK_
 _installabile dal telefono, larghezza adattiva); **Round 4 — CONDOTTO/TERRENO:** soffitto ondulato_
 _con stanze ampie + collisione, e **TERRENO stile Terraria** (colline + cunette) su cui camminano_
-_PG e nemici via "mappa di altezze" (heightmap-snap). Dettaglio in `ROADMAP.md` (blocco round 4)._
-_**STATO ORA:** in mezzo al round 4 (terreno). Prossimi passi: correggere il **BUG del cerume**_
-_(vedi §DA FARE), integrare **crouch** e **sfondo parallax** (§Asset nuovi), poi rifinitura/taratura._
-_L'utente RIMANDA lo store; rifinisce gameplay/estetica. Questa sessione va chiusa (contesto pieno):_
-_una nuova sessione riparte da QUI + dal blocco round 4 in `ROADMAP.md`._
+_PG e nemici via "mappa di altezze" (heightmap-snap); **✅ BUG CERUME su terreno RISOLTO** (`d6e50cd`:_
+_cumuli/membrane/pozze/nemici/ombra boss agganciati a `terrainTopAt`). Dettaglio in `ROADMAP.md`._
+_**STATO ORA:** round 4 quasi chiuso (manca solo rifinitura terreno). Prossimi passi: integrare_
+_**crouch** e **sfondo parallax** (§Asset nuovi), togliere il codice morto del terreno, tarare i_
+_numeri (col playtest). L'utente RIMANDA lo store; rifinisce gameplay/estetica. Nuova sessione:_
+_riparte da QUI + dal blocco round 4 in `ROADMAP.md`._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -241,17 +242,16 @@ _Aggiornato 2026-07-20 raccogliendo i punti aperti di tutte le sessioni. Da qui 
 blocco; il blocco scelto va poi dettagliato in `ROADMAP.md`. Molti "numeri" restano da tarare col
 playtest dell'utente sul telefono._
 
-**🚧 IN CORSO — ROUND 4 (condotto + terreno) — riparti da QUI.** Piano dettagliato + stato in
-`ROADMAP.md`. Fatto e pushato (fino a `159663d`): soffitto ondulato con stanze ampie + collisione;
+**🚧 QUASI CHIUSO — ROUND 4 (condotto + terreno) — riparti da QUI.** Piano dettagliato + stato in
+`ROADMAP.md`. Fatto e pushato (fino a `d6e50cd`): soffitto ondulato con stanze ampie + collisione;
 **TERRENO stile Terraria** (colline + cunette) disegnato da `buildTerrain` seguendo `terrainTopAt`;
 PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y` a `terrainTopAt`;
-`e._grounded` sostituisce `blocked.down` nell'IA nemici). Da fare subito:
-- **🐞 BUG CERUME (segnalato utente 2026-07-20):** i cumuli di cerume a PAVIMENTO sono ancorati alla
-  quota fissa 360 (`buildFloorMound`/`addWaxBlock` usano `groundTop`), quindi col terreno risultano
-  **sospesi sopra le cunette** o **dentro le colline**. FIX: ancorarli a `terrainTopAt(mx)` (come
-  `buildCeilingMound` fa gia' con `ceilingYAt`). Rivedere anche gli altri elementi a terra fissi a 360
-  (pickup, pozze scivolose, spawn/emersione nemici): tutto cio' che "sta sul pavimento" deve usare
-  `terrainTopAt(x)`. **Dettaglio nel blocco round 4 di `ROADMAP.md`.**
+`e._grounded` sostituisce `blocked.down` nell'IA nemici); **✅ BUG CERUME su terreno RISOLTO**. Da fare:
+- ✅ **BUG CERUME su terreno — RISOLTO 2026-07-20 (`d6e50cd`).** Tutto cio' che "sta sul pavimento"
+  ora usa `terrainTopAt(x)` invece della quota fissa 360: cumuli (`buildFloorMound`/`addWaxBlock`),
+  membrane (`buildMembrane`), pozze scivolose (`addSlimeZone`), comparsa/sbuffo nemici, ombra boss,
+  splat di frane/gocce. Anche `buildTerrain()` spostato PRIMA delle membrane. Verificato dal vivo
+  (errore 0px su 30 blocchi, 22 su colline/cunette). I pickup NON servivano fix (gia' agganciati).
 - **Rifinitura terreno:** look organico (con l'arte); taratura ampiezza/frequenza colline+cunette;
   togliere codice morto (`floorEdgeYAt`/`buildFloorProfile`, `addBump`/`addPit` disabilitati).
 - **Asset nuovi da integrare** (vedi sezione dedicata sotto): crouch + sfondo parallax.
