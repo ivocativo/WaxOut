@@ -157,7 +157,6 @@ class GameScene extends Phaser.Scene {
     this.blocks = this.physics.add.staticGroup();
     this.platforms = this.physics.add.staticGroup();  // pedane sospese (verticalita')
     this.ceilBlocks = this.physics.add.staticGroup();  // collider a scaletta del soffitto ondulato
-    this.terrainBumps = this.physics.add.staticGroup();  // rilievi del pavimento (gobbe da scavalcare)
     this.enemies = this.physics.add.group();
     this.projectiles = this.physics.add.group();  // palline sputate dai nemici
     this.collapseChunks = this.physics.add.group({ allowGravity: false });  // EVENTO frana
@@ -216,7 +215,6 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.blocks);
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.player, this.ceilBlocks);   // soffitto ondulato solido
-    this.physics.add.collider(this.player, this.terrainBumps); // rilievi da scavalcare (solo il PG)
 
     // La telecamera segue il giocatore dentro al mondo largo.
     this.cameras.main.setBounds(0, 0, this.worldW, H);
@@ -282,7 +280,6 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.projectiles, this.platforms, popProj);
     this.physics.add.collider(this.projectiles, this.ground, popProj);
     this.physics.add.collider(this.projectiles, this.ceilBlocks, popProj);
-    this.physics.add.collider(this.projectiles, this.terrainBumps, popProj);
 
     // Getto di acqua e sapone del giocatore: pulisce il cerume e colpisce i nemici a
     // distanza. (Con overlap(gruppo, oggetto) Phaser puo' invertire gli argomenti:
@@ -319,7 +316,6 @@ class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.shots, this.platforms, hitSolid);
     this.physics.add.overlap(this.shots, this.ground, hitSolid);
     this.physics.add.overlap(this.shots, this.ceilBlocks, hitSolid);
-    this.physics.add.overlap(this.shots, this.terrainBumps, hitSolid);
 
     if (!this.anims.exists('walk')) {
       this.anims.create({
@@ -628,31 +624,10 @@ class GameScene extends Phaser.Scene {
   }
 
   // ---- CONDOTTO A LARGHEZZA VARIABILE (round 4) ----
-  // Profili IRREGOLARI (frastagliati, non ondulati lisci) di soffitto e pavimento: punti di
-  // controllo a distanza variabile con y casuale, interpolati a spezzata. Il look organico vero
-  // arrivera' dopo con l'arte; qui e' la FORMA. Regola di sicurezza: il soffitto non scende mai
-  // oltre `maxY` (apertura minima al pavimento) e resta alto vicino a partenza/goal.
-  // Generatore condiviso di profilo irregolare (STESSO ritmo per soffitto e pavimento, cosi'
-  // sopra e sotto sono "coerenti"): punti di controllo alla stessa distanza, y = base con una
-  // variazione casuale entro [-upAmp, +downAmp]. Alta densita' + ampiezze contenute = irregolare
-  // ma delicato (niente becchi profondi). base tenuto piatto vicino a spawn/goal.
-  _makeProfile(baseY, upAmp, downAmp, opts) {
-    opts = opts || {};
-    const spMin = opts.spMin || 70, spMax = opts.spMax || 140;
-    const clearStart = opts.clearStart || 0, clearEnd = opts.clearEnd || 0;
-    const clampMaxY = opts.clampMaxY != null ? opts.clampMaxY : Infinity;
-    const pts = [];
-    let x = 0;
-    while (x <= this.worldW) {
-      let y = baseY + Phaser.Math.Between(-upAmp, downAmp);
-      if (x < clearStart || x > this.worldW - clearEnd) y = baseY;   // spawn/goal piatti
-      pts.push({ x, y: Math.min(y, clampMaxY) });
-      x += Phaser.Math.Between(spMin, spMax);
-    }
-    pts.push({ x: this.worldW, y: baseY });
-    return pts;
-  }
-
+  // Profilo IRREGOLARE del soffitto: punti di controllo a distanza variabile con y casuale,
+  // interpolati a spezzata. Regola di sicurezza: il soffitto non scende mai oltre `maxY`
+  // (apertura minima al pavimento) e resta alto vicino a partenza/goal.
+  // (Il PAVIMENTO non ha piu' un profilo separato: la sua forma la fa `buildTerrain`.)
   buildCeilingProfile() {
     const floorY = window.CONFIG.HEIGHT - window.CONFIG.GROUND_H;   // 360
     this.MIN_OPEN = 96;                                             // apertura minima garantita
@@ -681,14 +656,6 @@ class GameScene extends Phaser.Scene {
     this._ceilPts = pts;
   }
   ceilingYAt(x) { return this._sampleProfile(this._ceilPts, x, this.CEIL_Y); }
-
-  // Pavimento: bordo irregolare SOLO VISIVO (la camminata resta piatta = sicuro). Stesso ritmo del
-  // soffitto ma ampiezza piccola (su poco, giu' un po' di piu') cosi' il PG non sembra sorvolare gobbe.
-  buildFloorProfile() {
-    const floorY = window.CONFIG.HEIGHT - window.CONFIG.GROUND_H;
-    this._floorPts = this._makeProfile(floorY, 8, 16, { spMin: 70, spMax: 140 });
-  }
-  floorEdgeYAt(x) { return this._sampleProfile(this._floorPts, x, window.CONFIG.HEIGHT - window.CONFIG.GROUND_H); }
 
   // "Soffitto solido" = scaletta di rettangoli statici (uno ogni SEG px) che scendono dall'alto
   // fino al bordo basso locale `ceilingYAt`. Cosi' i corpi sbattono la testa al soffitto locale
@@ -1071,17 +1038,8 @@ class GameScene extends Phaser.Scene {
   buildHazards() {
     const lvl = window.GameState.level;
     this.slimeZones = [];
-    this.bumpZones = [];      // fasce occupate dai RILIEVI (per non sovrapporre altre insidie)
-    this.pitZones = [];       // fasce delle BUCHE (lette in update per il danno)
     const slimeCount = lvl >= 2 ? Phaser.Math.Clamp(1 + Math.floor(lvl / 3), 1, 4) : 0;
     for (let i = 0; i < slimeCount; i++) this.addSlimeZone();
-
-    // RILIEVI/BUCHE a rettangolo (round 4) DISABILITATI: sostituiti dal TERRENO a gradini
-    // camminabile (`buildTerrain`, prototipo). Il codice resta finche' il nuovo look e' approvato.
-    const bumpCount = 0;
-    for (let i = 0; i < bumpCount; i++) this.addBump();
-    const pitCount = 0;
-    for (let i = 0; i < pitCount; i++) this.addPit();
 
     // Gocce dal soffitto (dal lvl 2): "movers" contiene le GOCCE che cadono (riusa l'overlap
     // col giocatore per il danno), "drips" sono gli emettitori fissi a soffitto.
@@ -1099,41 +1057,10 @@ class GameScene extends Phaser.Scene {
       const x = Phaser.Math.Between(280, this.worldW - 320 - w);
       const cx = x + w / 2;
       const nearMembrane = this.membraneXs.some((mx) => Math.abs(mx - cx) < 150 + margin);
-      const bands = [].concat(this.slimeZones || [], this.bumpZones || [], this.pitZones || []);
-      const nearZone = bands.some((z) => x < z.x2 + 60 && x + w > z.x1 - 60);
+      const nearZone = (this.slimeZones || []).some((z) => x < z.x2 + 60 && x + w > z.x1 - 60);
       if (!nearMembrane && !nearZone) return x;
     }
     return null;
-  }
-
-  // RILIEVO (round 4): gobba SOLIDA sul pavimento, alta al massimo un salto → si SCAVALCA.
-  // Collide solo col GIOCATORE (i nemici gommosi la "sorpassano", cosi' non restano incastrati).
-  addBump() {
-    const w = Phaser.Math.Between(34, 62);
-    const x = this.pickHazardX(w, 20);
-    if (x == null) return;
-    const C = window.CONFIG.COLORS;
-    const h = Phaser.Math.Between(38, 82);          // saltabile (l'apice del salto e' ben piu' alto)
-    const cx = x + w / 2;
-    const r = this.add.rectangle(cx, this.groundTop - h / 2, w, h, C.ground).setDepth(4.6);
-    r.setStrokeStyle(2, C.groundDark, 0.9);
-    this.physics.add.existing(r, true);
-    this.terrainBumps.add(r);
-    this.bumpZones.push({ x1: x, x2: x + w });
-  }
-
-  // BUCA (round 4): pozza scura affossata; stando DENTRO a terra si prende danno (update) → si
-  // supera SALTANDO. Solo estetica + fascia memorizzata (il pavimento fisico resta piatto = sicuro).
-  addPit() {
-    const w = Phaser.Math.Between(64, 120);
-    const x = this.pickHazardX(w, 20);
-    if (x == null) return;
-    const cx = x + w / 2, top = this.groundTop;
-    const hole = this.add.rectangle(cx, top + 24, w, 48, 0x2a1016, 0.98).setDepth(4.45);   // interno scuro
-    hole.setStrokeStyle(2, 0x140709, 1);
-    const surf = this.add.rectangle(cx, top + 2, w - 4, 6, 0x7a3340, 0.9).setDepth(4.55);   // "superficie" che ribolle
-    this.tweens.add({ targets: surf, scaleY: 1.7, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
-    this.pitZones.push({ x1: x, x2: x + w });
   }
 
   // Pozza di cerume scivoloso sul pavimento: solo visiva + una fascia x memorizzata in
@@ -3093,14 +3020,6 @@ class GameScene extends Phaser.Scene {
     // Pozze di cerume scivoloso: rallentano il movimento mentre ci si cammina sopra a terra.
     const onSlime = onGround && this.slimeZones && this.slimeZones.some(
       (z) => this.player.x > z.x1 && this.player.x < z.x2);
-
-    // BUCHE (round 4): stando A TERRA dentro una buca si prende danno periodico → si supera SALTANDO
-    // (in aria = sopra la buca = salvo). Nessun contraccolpo (srcX = player.x) per non spingerlo in giro.
-    if (onGround && this.pitZones && this.pitZones.some((z) => this.player.x > z.x1 && this.player.x < z.x2)
-        && now >= (this._pitHurtAt || 0)) {
-      this._pitHurtAt = now + 500;
-      this.hurtPlayer(8 + Math.floor(window.GameState.level / 3), this.player.x);
-    }
 
     // Abilità CALAMITA: i bonus di cerume vicini volano verso il giocatore (raccolta a distanza).
     // EVOLUZIONE Buco Nero (evoMagnet): raggio molto più ampio.
