@@ -116,6 +116,23 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
   aggancio al terreno era un no-op). Verifica dal vivo (lvl 4, god-mode): 30 blocchi con errore 0px
   (22 su colline/cunette), nemici agganciati 0px, zero errori, nessun crash su 150 frame. I pickup a
   terra NON servivano fix (nascono su pedane elevate o alla morte dei nemici, gia' agganciati).
+---
+
+## ROUND 5 — SFONDO a strati (FATTO 2026-07-20, commit `be4eb3c`)
+Sistema a **SET**: 3 immagini pittoriche (far/mid/near) in parallax dietro soffitto e terreno.
+Restano PITTORICHE di proposito — contrasto voluto coi personaggi pixel-art, deciso con l'utente.
+Un set ogni 5 livelli (cambia dopo il boss). Manopole in `GameGfx.BG_LAYERS`, pipeline in
+`tools/bake_background_set.ps1`. **La procedura per aggiungere set e' in memoria
+(`earwaxwar-background-pipeline`): all'utente basta dire "voglio altri sfondi".**
+Fatto anche: soffitto piu' ALTO e meno variabile (media 43 invece di ~80, escursione 30-66 invece
+di 140+) per lasciare respirare lo sfondo; protuberanze vecchie DISATTIVATE (stonavano).
+- [ ] **Rigenerare le PROTUBERANZE** in stile con lo sfondo nuovo, poi riattivare la chiamata a
+  `GameGfx.drawProtuberances` in `buildLevel` (il meccanismo di piazzamento e' intatto).
+- [ ] **Altri set** quando l'utente genera le immagini (aggiungere N a `window.BG_SETS`).
+- [ ] Valutare il peso: 3,4 MB a set, APK ~14 MB.
+
+---
+
 - **Resta (rifinitura/taratura, dopo il playtest utente):** aspetto ORGANICO vero del terreno (con
   l'arte; ora e' color-carne + linea scura); taratura ampiezza/frequenza di colline e cunette (a
   volte un livello esce tutto colline o tutte cunette — vedi `buildTerrain`, random walk ±70 da h=40);

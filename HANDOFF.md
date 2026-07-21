@@ -6,17 +6,18 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-20 · Ultimo commit di lavoro pushato: `d6e50cd` (fix cerume su terreno)._
+_Ultimo aggiornamento: 2026-07-20 · Ultimo commit di lavoro pushato: `be4eb3c` (sfondo a 3 strati)._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); hotfix freeze-spawn e salto boss; **APP ANDROID via GitHub Actions** (APK_
 _installabile dal telefono, larghezza adattiva); **Round 4 — CONDOTTO/TERRENO:** soffitto ondulato_
 _con stanze ampie + collisione, e **TERRENO stile Terraria** (colline + cunette) su cui camminano_
-_PG e nemici via "mappa di altezze" (heightmap-snap); **✅ BUG CERUME su terreno RISOLTO** (`d6e50cd`:_
-_cumuli/membrane/pozze/nemici/ombra boss agganciati a `terrainTopAt`). Dettaglio in `ROADMAP.md`._
-_**STATO ORA:** round 4 quasi chiuso (manca solo rifinitura terreno). Prossimi passi: integrare_
-_**crouch** e **sfondo parallax** (§Asset nuovi), togliere il codice morto del terreno, tarare i_
-_numeri (col playtest). L'utente RIMANDA lo store; rifinisce gameplay/estetica. Nuova sessione:_
-_riparte da QUI + dal blocco round 4 in `ROADMAP.md`._
+_PG e nemici via "mappa di altezze" (heightmap-snap); **✅ BUG CERUME su terreno RISOLTO** (`d6e50cd`);_
+_**✅ fix corpo a corpo** (`ae6abd4`: cerume e nemici non tornano piu' al vecchio livello piatto);_
+_**✅ ROUND 5 — SFONDO a 3 strati** (`be4eb3c`: parallax pittorico a set, soffitto piu' alto,_
+_protuberanze vecchie disattivate). Dettaglio in `ROADMAP.md`._
+_**STATO ORA:** sfondo fatto e approvato. Prossimi passi: **BUG salto nelle cunette** (§DA FARE),_
+_rigenerare le protuberanze in stile, rifinitura terreno, integrare il **crouch** (§Asset nuovi),_
+_tarare i numeri col playtest. L'utente RIMANDA lo store; rifinisce gameplay/estetica._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -172,11 +173,28 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   (`MUTATORS`: fretta, orda, corazza, poca gravità, cuccagna, cerume ostinato) + **eventi casuali**
   (`EVENTS`, ~25%, indipendenti dai mutatori): Fuggitivo Dorato, Frana di cerume, Sciame improvviso.
 - **Ostacoli:** pozze scivolose + gocce dal soffitto. Membrane di cerume con fisica a celle (collasso).
+- **Sfondo (dal 2026-07-20):** SET di 3 immagini **pittoriche** (far/mid/near) in parallax dietro
+  soffitto e terreno. Volutamente NON pixelate: il contrasto con i personaggi pixel-art e' una
+  scelta approvata dall'utente. Un set ogni 5 livelli (cambia dopo il boss). Manopole per strato
+  in `GameGfx.BG_LAYERS` (y, velocita', scala, opacita', tinta: il lontano smorzato e il vicino a
+  colori pieni = prospettiva atmosferica). **Per aggiungere set c'e' una procedura pronta in
+  memoria (`earwaxwar-background-pipeline`): basta che l'utente dica "voglio altri sfondi".**
+  Pipeline in `tools/bake_background_set.ps1` (ridimensiona, scontorna il magenta, specchia).
 - **Mobile:** touch, canvas che si ri-adatta alla rotazione, tool per giocare da telefono.
 
 ---
 
 ## DA FARE
+
+### 🐞 BUG APERTO — nelle CUNETTE il PG non salta (segnalato utente 2026-07-20)
+Dentro un avvallamento il personaggio resta "ancorato" al pavimento: il salto non parte.
+**Ipotesi forte da verificare per prima cosa** (non ancora indagata nel codice): il bordo
+inferiore del mondo fisico e' fermo a `H - gh` = **360** (`physics.world.setBounds` in `create`),
+mentre le cunette scendono fino a **396** (`TERR_DIP` 36). Nella cunetta il corpo si trova SOTTO
+quel limite e, avendo `collideWorldBounds`, ogni frame viene rispinto dentro **con la velocita'
+verticale azzerata** → l'impulso del salto viene cancellato. Se confermato, il fix e' abbassare il
+bordo del mondo sotto la cunetta piu' profonda (il collider di sicurezza `this.ground` sta gia' a
+~408, quindi il limite puo' scendere li'). ⚠️ Verificare che il paracadute continui a funzionare.
 
 ### Correzioni playtest — DUE GIRI CHIUSI E PUSHATI ✅
 Round 1 (21 segnalazioni) e Round 2 (15 segnalazioni) entrambi completati e pushati (fino a
@@ -296,13 +314,11 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   `this.crouching` in `GameScene.update` (oggi c'e' solo uno "schiacciamento" segnaposto via scale).
   **Dubbi da chiedere all'utente:** 36 frame sono tanti per un accovacciamento — e' un CICLO (giu'→su)
   o una posa tenuta? Sostituire del tutto lo schiacciamento attuale?
-- **SFONDO PARALLAX a 5 strati:** in `assets/backgrounds/` c'e' `background set 1.png` (1536×1024, UNA
-  immagine con 5 fasce etichettate: primo piano / piano terra-grotta / corpo grotta / lontano / sfondo)
-  e `background.png` (1913×822). **Deciso con l'utente:** lui **esporta i 5 strati come PNG SEPARATI
-  con TRASPARENZA** (per un parallax vero con profondita'). Quando li fornisce: ritagliare/embeddare
-  (`embed_assets.ps1`) e **riscrivere `gfx.js drawBackground`** per usarli come strati parallax
-  (scrollFactor diversi, i vicini davanti coi buchi trasparenti) al posto dello sfondo attuale
-  (`bg_flesh_01_px` + strati procedurali). Coerente con l'obiettivo "uniformare l'estetica".
+- ✅ **SFONDO PARALLAX — FATTO 2026-07-20** (`be4eb3c`), ma per una strada diversa da quella
+  ipotizzata qui: il primo tentativo (tagliare a mano i layer da UNA immagine e upscalarli con
+  chainner) e' stato **abbandonato** — quei layer avevano solo 139-250px di altezza vera e a
+  schermo venivano poltiglia. Ora si generano **3 immagini separate gia' grandi** con chiave
+  magenta. Vedi §Cosa c'e' gia' e la memoria `earwaxwar-background-pipeline`.
 
 **4. AUDIO**
 - Musica: migliorata (acustica + boss punk) ma l'utente la trova ancora **un filo ripetitiva/asettica**
