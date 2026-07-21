@@ -1400,6 +1400,9 @@ class GameScene extends Phaser.Scene {
   // COLLASSA in un cumulo. I blocchi "da soffitto" (ceiling) NON cadono (restano appesi).
   settleWaxColumn(col) {
     const B = window.CONFIG.BLOCK;
+    // La riga 0 di QUESTA colonna poggia sulla superficie LOCALE del terreno (come in
+    // addWaxBlock): senza questo il cerume che collassa tornava alla vecchia quota piatta 360.
+    const colBase = this.terrainTopAt(col * B + B / 2);
     const inCol = this.blocks.getChildren()
       .filter((b) => b.active && b.col === col && !b.ceiling)
       .sort((a, b) => a.row - b.row);
@@ -1407,7 +1410,7 @@ class GameScene extends Phaser.Scene {
     inCol.forEach((b) => {
       if (b.row !== target) {                          // c'è un vuoto sotto: cade
         b.row = target;
-        const newY = this.groundTop - target * B - B / 2;
+        const newY = colBase - target * B - B / 2;
         b.y = newY; b.refreshBody();                   // fisica (collider) subito alla nuova quota
         const newBaseY = newY + (b.waxOY || 0);
         b.waxBaseY = newBaseY;
@@ -3233,10 +3236,18 @@ class GameScene extends Phaser.Scene {
         e._grounded = e.body.blocked.down || e.body.touching.down;
       } else {
         const surf = this.terrainTopAt(e.x);
-        // aggancio se NON sta salendo in un salto (vy >= -30: esclude affondi/balzi -190/-480/…) e i
-        // piedi sono entro il range dalla superficie (i balzi grandi hanno i piedi ben piu' in alto → passano).
-        if (e.body.velocity.y >= -30 && (e.body.bottom - surf) >= -44) {
-          e.body.y -= Phaser.Math.Clamp(e.body.bottom - surf, -44, 22);
+        const dy = e.body.bottom - surf;   // >0 = piedi SOTTO la superficie (dentro il terreno)
+        if (dy > 0) {
+          // SPROFONDATO: risale SEMPRE, senza il gate sulla velocita'. Serve dopo il rinculo di una
+          // bastonata su una collina: il nemico veniva sbalzato, il gate teneva lo snap spento
+          // mentre ricadeva, e restava piantato al vecchio livello piatto (360) senza riagganciarsi.
+          e.body.y -= Math.min(dy, 22);
+          if (e.body.velocity.y > 0) e.body.velocity.y = 0;
+          e._grounded = true;
+        } else if (e.body.velocity.y >= -30 && dy >= -44) {
+          // aggancio se NON sta salendo in un salto (vy >= -30: esclude affondi/balzi -190/-480/…) e i
+          // piedi sono entro il range dalla superficie (i balzi grandi hanno i piedi ben piu' in alto → passano).
+          e.body.y -= Phaser.Math.Clamp(dy, -44, 22);
           if (e.body.velocity.y > 0) e.body.velocity.y = 0;
           e._grounded = true;
         } else {
