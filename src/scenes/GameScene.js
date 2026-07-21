@@ -487,7 +487,11 @@ class GameScene extends Phaser.Scene {
     this.ensureHealPickups();    // garantisce un minimo di cure (la vita non si ricarica piu' a fine livello)
     this.buildHazards();         // pozze scivolose + gocce dal soffitto
     this.buildGoal();
-    window.GameGfx.drawProtuberances(this);   // scenografia organica (pavimento + soffitto)
+    // PROTUBERANZE DISATTIVATE (2026-07-20): le vecchie immagini (coralli/rovi) stonavano col
+    // nuovo sfondo pittorico a 3 strati. Il meccanismo di piazzamento resta in
+    // GameGfx.drawProtuberances: per riattivarle bastera' rimettere la chiamata qui dopo aver
+    // rigenerato l'arte in stile con lo sfondo.
+    // window.GameGfx.drawProtuberances(this);
 
     this.totalBlocks = this.blocks.countActive(true);
     this.blocksLeft = this.totalBlocks;
@@ -648,23 +652,26 @@ class GameScene extends Phaser.Scene {
     this.MIN_OPEN = 96;                                             // apertura minima garantita
     const maxY = floorY - this.MIN_OPEN;                            // il soffitto non scende oltre
     this.CEIL_MIN = 8;                                              // punto piu' ALTO (quasi bordo schermo)
-    // Componente LENTA (punti radi): crea ZONE ampie e strette sostenute, non jitter. Puo' salire
-    // quasi al bordo alto (stanze ampie) o scendere a un restringimento delicato.
+    // Componente LENTA (punti radi): crea ZONE ampie e strette sostenute, non jitter.
+    // Escursione VOLUTAMENTE contenuta (2026-07-20): il soffitto resta ALTO e varia poco, cosi'
+    // lascia vedere lo sfondo a 3 strati e non schiaccia il condotto. Prima arrivava a 150
+    // (restringimenti marcati) e l'insieme risultava troppo mosso.
+    const CEIL_LOW = 72;                                            // punto piu' BASSO del soffitto
     const slow = [];
     let sx = 0;
-    while (sx <= this.worldW) { slow.push({ x: sx, y: Phaser.Math.Between(this.CEIL_MIN, 150) }); sx += Phaser.Math.Between(520, 900); }
-    slow.push({ x: this.worldW, y: 60 });
+    while (sx <= this.worldW) { slow.push({ x: sx, y: Phaser.Math.Between(this.CEIL_MIN, CEIL_LOW) }); sx += Phaser.Math.Between(520, 900); }
+    slow.push({ x: this.worldW, y: 50 });
     // Profilo fine = zona lenta + rugosita' piccola (stesso ritmo/carattere del pavimento).
     const pts = [];
     let x = 0;
     while (x <= this.worldW) {
-      const base = this._sampleProfile(slow, x, 60);
-      let y = base + Phaser.Math.Between(-14, 14);
+      const base = this._sampleProfile(slow, x, 50);
+      let y = base + Phaser.Math.Between(-8, 8);
       if (x < 640 || x > this.worldW - 460) y = Math.min(base, this.CEIL_Y);   // spawn/goal: mai piu' stretti del default
       pts.push({ x, y: Phaser.Math.Clamp(y, this.CEIL_MIN, maxY) });
       x += Phaser.Math.Between(70, 140);
     }
-    pts.push({ x: this.worldW, y: 60 });
+    pts.push({ x: this.worldW, y: 50 });
     this._ceilPts = pts;
   }
   ceilingYAt(x) { return this._sampleProfile(this._ceilPts, x, this.CEIL_Y); }

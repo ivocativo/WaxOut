@@ -23,3 +23,14 @@ package-lock.json
 
 # APK scaricato in locale per l'installazione via WiFi (non versionare)
 *.apk
+
+# Strumento di upscale usato una volta per gli sfondi (110MB tra modelli e cache).
+# NON serve al gioco: l'upscale e' stato ABBANDONATO, gli sfondi si generano gia' grandi.
+chainner/
+
+# Primo tentativo di sfondo a strati (35MB): layer ricavati tagliando una sola immagine e poi
+# upscalati -> avevano solo 139-250px di altezza vera, inutilizzabili. Sostituiti dal set 2.
+assets/backgrounds/1/
+
+# Registrazioni schermo occasionali
+*.mp4

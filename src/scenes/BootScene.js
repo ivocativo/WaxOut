@@ -25,6 +25,20 @@ class BootScene extends Phaser.Scene {
     // Fondale gia' pixelato+posterizzato (tools/bake_bg_pixel.ps1); niente elaborazione
     // canvas a runtime (che si romperebbe da file://).
     aimg('bg_flesh_px', 'assets/backgrounds/bg_flesh_01_px.png');
+    // SET DI SFONDO: 3 strati di parallax (lontano/medio/vicino) DIETRO a soffitto e terreno.
+    // Restano PITTORICI di proposito (contrasto voluto con i personaggi pixel-art), quindi non
+    // sono pixelati/posterizzati come il resto. Preparati da tools/bake_background_set.ps1:
+    // il 'far' e' un fondo pieno (JPG, leggero), gli altri due hanno la trasparenza scontornata
+    // dal magenta (PNG). Un set ogni 5 livelli, cambia dopo il boss (vedi GameGfx.bgSetFor).
+    // Per aggiungere un set: crea assets/backgrounds/<N>/ con fondale/mid/primo piano, lancia
+    // lo script, e aggiungi N alla lista qui sotto.
+    window.BG_SETS = [2];
+    window.BG_SETS.forEach((s) => {
+      const dir = 'assets/backgrounds/' + s + '/';
+      aimg('bg' + s + '_far', dir + 'bg' + s + '_far.jpg');
+      aimg('bg' + s + '_mid', dir + 'bg' + s + '_mid.png');
+      aimg('bg' + s + '_near', dir + 'bg' + s + '_near.png');
+    });
     // PROTUBERANZE (immagini AI vere, provvisorie ma in stile). Pavimento e soffitto.
     aimg('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');   // colonna (pavimento)
     aimg('prot_coral_branch', 'assets/protuberances/prot_coral_branch.png'); // rovi ramificati (pavimento)

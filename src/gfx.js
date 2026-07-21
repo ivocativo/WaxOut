@@ -19,8 +19,62 @@ window.GameGfx = {
   // La GRANA (pixel + colori ridotti) e' gia' "cotta" nel PNG da tools/bake_bg_pixel.ps1.
   BG_ZOOM: 2.0,
 
+  // ---------- SET DI SFONDO a 3 strati (pittorici) ----------
+  // Un set = 3 immagini (assets/backgrounds/<N>/, preparate da tools/bake_background_set.ps1)
+  // montate come strati di PARALLAX: lontano/medio/vicino scorrono a velocita' crescenti, e la
+  // differenza di velocita' e' cio' che da' la sensazione di profondita'. Stanno tutti DIETRO a
+  // soffitto e terreno (disegnati a depth 4 e 4.3): lo sfondo scorre TRA di essi.
+  // Gli strati sono ancorati allo SCHERMO (scrollFactor 0) e si muovono spostando la texture
+  // (tilePositionX in updateBackground), cosi' si ripetono all'infinito su livelli di qualunque
+  // lunghezza senza dover essere larghi quanto il mondo.
+  // Il set cambia a FASCE di 5 livelli, cioe' dopo ogni boss (i boss sono i multipli di 5).
+  //
+  // Manopole per strato: y = bordo alto sullo schermo, f = velocita' di parallax, scale =
+  // ingrandimento della texture. NOTA su 'near': le colate pendono dal BORDO ALTO
+  // dell'immagine, quindi lo strato va abbassato (y positivo) o finiscono nascoste dietro al
+  // soffitto invece di sporgere dentro il condotto.
+  // alpha/tint servono a dare la PROSPETTIVA ATMOSFERICA: piu' uno strato e' lontano, piu' e'
+  // smorzato e tende al colore della foschia. Senza questo i tre strati hanno lo stesso
+  // contrasto, sembrano tutti alla stessa distanza e l'insieme risulta solo "affollato".
+  // NB: le immagini del set sono SPECCHIATE dallo script ([originale|riflesso]), cosi' quando lo
+  // strato si ripete scorrendo non si vede la riga verticale della giuntura. Questo raddoppia la
+  // larghezza e abbassa l'altezza a parita' di peso: le 'scale' qui sotto tengono conto di quello.
+  BG_LAYERS: [
+    { role: 'far',  y: -40, f: 0.10, scale: 1.02, depth: -15, alpha: 1.00, tint: 0xffffff },
+    { role: 'mid',  y: -40, f: 0.22, scale: 1.38, depth: -14, alpha: 0.96, tint: 0xefe2ea },
+    { role: 'near', y: -60, f: 0.40, scale: 1.32, depth: -13, alpha: 1.00, tint: 0xffffff },
+  ],
+
+  bgSetFor(level) {
+    const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
+    if (!sets) return null;
+    return sets[Math.floor((Math.max(1, level) - 1) / 5) % sets.length];
+  },
+
   drawBackground(scene) {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
+    const lvl0 = (window.GameState && window.GameState.level) || 1;
+    const set = this.bgSetFor(lvl0);
+    const keys = set != null ? this.BG_LAYERS.map((L) => 'bg' + set + '_' + L.role) : [];
+    if (keys.length && keys.every((k) => scene.textures.exists(k))) {
+      // Sfasamento orizzontale diverso per livello (stesso livello -> stesso sfondo): con gli
+      // strati che si ripetono basta questo per non rivedere la stessa inquadratura.
+      scene.bgBaseX = ((lvl0 * 137) % 997) / 997 * 800;
+      scene.bgBaseY = 0;
+      scene.bgLayers = this.BG_LAYERS.map((L, i) => {
+        const key = keys[i];
+        const h = scene.textures.get(key).getSourceImage().height * L.scale;
+        const ts = scene.add.tileSprite(0, L.y, W, h, key)
+          .setOrigin(0, 0).setScrollFactor(0).setDepth(L.depth);
+        ts.tileScaleX = L.scale; ts.tileScaleY = L.scale;
+        if (L.alpha != null) ts.setAlpha(L.alpha);
+        if (L.tint && L.tint !== 0xffffff) ts.setTint(L.tint);
+        return { s: ts, f: L.f };
+      });
+      this.updateBackground(scene);
+      return;
+    }
+    // --- RIPIEGO: vecchio fondale unico (se il set non e' disponibile) ---
     const ZOOM = window.__BG_ZOOM || this.BG_ZOOM;
     // Fondale gia' pixelato+posterizzato: si usa direttamente a pixel netti (NEAREST),
     // niente canvas/getImageData a runtime (che da file:// si romperebbero).
