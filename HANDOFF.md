@@ -186,15 +186,18 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 
 ## DA FARE
 
-### 🐞 BUG APERTO — nelle CUNETTE il PG non salta (segnalato utente 2026-07-20)
-Dentro un avvallamento il personaggio resta "ancorato" al pavimento: il salto non parte.
-**Ipotesi forte da verificare per prima cosa** (non ancora indagata nel codice): il bordo
-inferiore del mondo fisico e' fermo a `H - gh` = **360** (`physics.world.setBounds` in `create`),
-mentre le cunette scendono fino a **396** (`TERR_DIP` 36). Nella cunetta il corpo si trova SOTTO
-quel limite e, avendo `collideWorldBounds`, ogni frame viene rispinto dentro **con la velocita'
-verticale azzerata** → l'impulso del salto viene cancellato. Se confermato, il fix e' abbassare il
-bordo del mondo sotto la cunetta piu' profonda (il collider di sicurezza `this.ground` sta gia' a
-~408, quindi il limite puo' scendere li'). ⚠️ Verificare che il paracadute continui a funzionare.
+### ✅ BUG CUNETTE (salto bloccato) — RISOLTO 2026-07-20
+L'ipotesi era giusta ed e' stata confermata riproducendo il bug: il bordo inferiore del mondo
+fisico stava a `H - gh` = **360**, mentre le cunette scendono a **396**. Dentro una cunetta il
+corpo era fuori dal mondo e, avendo `collideWorldBounds`, ogni frame veniva rispinto dentro **con
+la velocita' verticale azzerata** → l'impulso del salto spariva all'istante. Misurato prima del
+fix: apice del salto **0px** nella cunetta (il PG non si staccava di un pixel) contro un salto
+regolare sul piano. **Fix:** bordo del mondo portato a `H - gh + 48` = 408, cioe' alla quota del
+collider di sicurezza `this.ground`, che resta la rete di protezione.
+Verificato dopo il fix: cunetta piu' profonda possibile (396) → apice **141px**, come sul piano;
+3 cunette in 3 livelli diversi → apice 106 e riatterraggio esatto sulla superficie (scarto 0);
+rete di sicurezza ok (PG lanciato a y=700 viene ripreso, non sfonda); nemici sprofondati 0px;
+61 fps, zero errori console.
 
 ### Correzioni playtest — DUE GIRI CHIUSI E PUSHATI ✅
 Round 1 (21 segnalazioni) e Round 2 (15 segnalazioni) entrambi completati e pushati (fino a

@@ -106,12 +106,18 @@ class GameScene extends Phaser.Scene {
     // testa invece di sparire nel vuoto sopra. `CEIL_Y` e' salvato sulla scena: lo riusa anche
     // `buildPlatforms` (B.2) per non far salire le pedane oltre lo spazio per testa+salto.
     this.CEIL_Y = Math.round(gh * 0.28);
-    // Il "fondo" del mondo fisico coincide con la SUPERFICIE del pavimento (H-gh):
-    // rete di sicurezza: chi ha collideWorldBounds (giocatore e nemici) non puo' mai
-    // cadere sotto il pavimento, qualunque cosa accada al suo corpo fisico.
+    // Il "fondo" del mondo fisico sta alla quota del collider di SICUREZZA (H-gh+48 = 408), non
+    // alla vecchia linea del pavimento piatto (H-gh = 360).
+    // ⚠️ PERCHE' (bug corretto 2026-07-20): col terreno del round 4 le CUNETTE scendono fino a
+    // 396, cioe' SOTTO 360. Con il fondo a 360 il giocatore dentro una cunetta era fuori dal
+    // mondo, e ogni frame il motore lo rispingeva dentro AZZERANDOGLI la velocita' verticale:
+    // l'impulso del salto veniva cancellato all'istante e il PG restava incollato al fondo della
+    // cunetta. Misurato: apice del salto 0px nelle cunette contro un salto normale sul piano.
+    // Il fondo a 408 sta sotto la cunetta piu' profonda, quindi non interferisce mai, e la rete
+    // di sicurezza resta: chi cade oltre trova il collider `this.ground` proprio li'.
     // Bordo alto del mondo a 0: il soffitto (ondulato) lo fanno i collider a scaletta di
     // `buildCeilingColliders`, cosi' nelle zone AMPIE il giocatore puo' salire in alto davvero.
-    this.physics.world.setBounds(0, 0, this.worldW, H - gh);
+    this.physics.world.setBounds(0, 0, this.worldW, H - gh + 48);
 
     // CONDOTTO A LARGHEZZA VARIABILE (round 4): il soffitto ondeggia e scende (pinch) in alcuni
     // tratti → passaggi stretti/ampi. Il profilo va calcolato PRIMA di disegnare il soffitto e di
