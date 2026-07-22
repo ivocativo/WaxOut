@@ -55,9 +55,30 @@ del giocatore quello che oggi è un sorteggio.
 - **Fatto quando:** ogni livello non-boss è preceduto da una scelta; il livello generato rispetta
   ciò che è stato scelto (verificabile con un controllo automatico, vedi A.5).
 
-## A.4 — Taratura della durata 🧠
-- [ ] **Misurare quanto dura una run** fino a `RUN_LEVELS` (serve il playtest dell'utente).
-  Riferimento dalle fonti: 20-30 minuti, meno su telefono. Se 15 livelli sono troppi, abbassare.
+## A.4 — Durata: ✅ CONFERMATA dal playtest (2026-07-22)
+L'utente: «se si prendono i potenziamenti giusti, in 20 minuti al 15° ci si arriva». E' dentro la
+finestra indicata dalle fonti (20-30 min, meno su telefono). **`RUN_LEVELS = 15` resta.**
+
+## A.4b — Economia: ✅ MISURATA (2026-07-22), NON toccare i prezzi
+L'utente: «partendo da zero è molto difficile arrivare al 15°». **Non è un difetto**: nel genere la
+prima run non si vince, ci si arriva accumulando potenziamenti permanenti, ed è ciò che da' valore
+al finale. Il rischio da escludere era che il divario si chiudesse troppo lentamente. Misurato:
+
+| cerume disponibile in una run perfetta (15 livelli) | **7.840** |
+|---|---|
+| moltiplicatore globale alla raccolta (`CONFIG.WAX_GAIN`) | **×0,55** |
+| → incassabile in una run perfetta | **~4.300** |
+| costo di TUTTI gli `UNLOCKS` | 5.960 |
+| costo di TUTTI i `BLUEPRINTS` | 2.450 |
+| **costo totale** | **8.410** |
+
+Comprare tutto costa ~2 run perfette, realisticamente **6-10 run normali** (nessuno pulisce il 100%
+e le prime run muoiono presto). E' dentro la finestra 5-10 indicata dalle fonti → **l'economia e'
+sana**. La difficolta' percepita non e' fame di risorse: e' abilita' e scalata dei nemici, cioe' la
+forma giusta per il genere.
+- ⚠️ **Se un domani la progressione risultasse lenta, la manopola e' `CONFIG.WAX_GAIN` (0,55)**:
+  un solo numero che quasi dimezza gli incassi, molto meglio che ritoccare dodici prezzi.
+- [ ] Rimisurare solo SE dopo il finale il playtest dice che si arriva alla vittoria troppo tardi.
 
 ## A.5 — Difficoltà crescente dopo la vittoria 🧠 poi 🤖
 - [ ] Dopo la prima vittoria si sblocca un livello di difficoltà opzionale (nome a tema, es.
@@ -97,6 +118,30 @@ I nemici sono personaggi: il procedurale non basta, serve arte. **Stessa pipelin
   (oggi un ripiego): le varianti Corazzato/Esplosivo/Split diventano varianti di colore o dettaglio.
 - [ ] Le ANIMAZIONI restano fuori da questo blocco (servirebbe AutoSprite = abbonamento). Prima le
   immagini ferme, che già cambiano tutto.
+
+---
+
+---
+
+# BLOCCO C — ASSEDIO: la tattica migliore contraddice l'obiettivo 🧠
+**Scoperto dal playtest dell'utente (2026-07-22):** «per sopravvivere conviene andare in cima a un
+cumulo di cerume e resistere da lì». E' una strategia EMERGENTE, di per se' un buon segno — ma
+attenzione a cosa implica: **il gioco chiede di PULIRE il cerume, e la mossa vincente è
+CONSERVARNE un cumulo per starci sopra.** Se resta l'unica via che funziona, l'Assedio diventa
+"sali e aspetta": si risolve una volta e poi si ripete identico.
+
+Tre strade (da decidere con l'utente, la 2 è la proposta):
+1. **Punire il camping**: i moscerini volano gia' — se puntassero chi sta in alto, il cumulo
+   smetterebbe di essere un rifugio sicuro.
+2. ⭐ **Farlo consumare**: il cumulo si sgretola mentre lo si usa come piattaforma. Il giocatore
+   guadagna TEMPO, non sicurezza; la posizione diventa una RISORSA che si spende. Mantiene valida
+   la scoperta dell'utente ma le mette un prezzo, e soprattutto **riallinea la tattica
+   all'obiettivo** invece di contraddirlo.
+3. **Accettarla e progettarla**: l'Assedio diventa esplicitamente "difendi una posizione", con
+   l'arena dedicata gia' in arretrato (F.2b).
+
+NB: l'utente conferma che **l'Assedio funziona ed e' molto difficile** — quindi non e' rotto, e'
+solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 
 ---
 
