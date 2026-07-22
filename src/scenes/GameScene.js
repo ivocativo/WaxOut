@@ -1163,12 +1163,13 @@ class GameScene extends Phaser.Scene {
   }
 
   addPlatform(x, y, w) {
-    const C = window.CONFIG.COLORS;
     const h = 16;
-    const r = this.add.rectangle(x, y, w, h, C.ground).setDepth(4);
-    r.setStrokeStyle(2, C.groundDark, 0.85);
+    // Il rettangolo resta il CORPO FISICO (quota d'appoggio e collisione invariate) ma non si
+    // vede: l'aspetto lo disegna GameGfx.paintLedge, in tinta col terreno e col soffitto.
+    const r = this.add.rectangle(x, y, w, h).setVisible(false);
     this.physics.add.existing(r, true);
     this.platforms.add(r);
+    window.GameGfx.paintLedge(this, x, y, w, h);
   }
 
   // Il timpano in fondo a destra: traguardo del livello. Raggiungerlo = vittoria.

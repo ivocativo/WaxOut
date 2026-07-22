@@ -124,6 +124,44 @@ window.GameGfx = {
     return g;
   },
 
+  // PEDANA: mensola di tessuto, stessa tavolozza e stesso trattamento della massa (velature dal
+  // piano d'appoggio verso il basso). Il rettangolo fisico resta invariato e invisibile: qui si
+  // disegna solo l'aspetto, quindi la collisione e la quota d'appoggio non cambiano di un pixel.
+  paintLedge(scene, x, y, w, h) {
+    const P = this.CARNE;
+    const g = scene.add.graphics().setDepth(4.35);
+    const sx = x - w / 2, top = y - h / 2;
+    const SPESSORE = 24;                       // quanto scende sotto il piano d'appoggio
+    const ang = { tl: 5, tr: 5, bl: 11, br: 11 };
+
+    g.fillStyle(P.profondo, 1);
+    g.fillRoundedRect(sx, top, w, SPESSORE, ang);
+    // velature: piu' si sta in alto piu' se ne accumulano -> il piano d'appoggio e' illuminato,
+    // il sottopancia resta scuro (e' da li' che si capisce che e' una sporgenza e non una riga)
+    for (let k = 6; k >= 1; k--) {
+      g.fillStyle(P.crosta, 0.2);
+      g.fillRoundedRect(sx, top, w, SPESSORE * (k / 6), ang);
+    }
+    // qualche grumo sul bordo superiore: toglie l'aria di rettangolo
+    for (let i = 0; i < Math.max(2, Math.round(w / 34)); i++) {
+      const bx = sx + Phaser.Math.Between(6, Math.max(7, w - 6));
+      const r = Phaser.Math.Between(5, 10);
+      g.fillStyle(P.crosta, 0.85);
+      g.fillEllipse(bx, top + 2, r * 2.1, r * 1.1);
+    }
+    // filo di luce sul piano dove si atterra
+    g.fillStyle(P.bordo, 0.8);
+    g.fillRect(sx + 2, top, w - 4, 2);
+    // una o due gocce appese sotto
+    for (let i = 0; i < Phaser.Math.Between(1, 2); i++) {
+      const dx = sx + Phaser.Math.Between(8, Math.max(9, w - 8));
+      const dr = Phaser.Math.Between(3, 5);
+      g.fillStyle(P.profondo, 0.9);
+      g.fillEllipse(dx, top + SPESSORE + dr, dr * 1.6, dr * 2.6);
+    }
+    return g;
+  },
+
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
     if (!sets) return null;
