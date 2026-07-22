@@ -118,6 +118,18 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
   terra NON servivano fix (nascono su pedane elevate o alla morte dei nemici, gia' agganciati).
 ---
 
+## PIANO TECNICO concordato con l'utente (2026-07-21) — procedere IN QUEST'ORDINE
+1. ✅ **Pulizia codice morto** (`791afb5`): rilievi/buche e profilo pavimento.
+2. ✅ **Controlli automatici** (`4752bd7`): `python tools\controlla.py`, 47 controlli. Vedi
+   `HANDOFF.md` §Controlli automatici. Hanno subito trovato un bug vero (pedane sul terreno).
+3. [ ] **Pavimento e soffitto**: sono rimasti marroni piatti ed e' ora la cosa che stona di piu'
+   nell'inquadratura, con lo sfondo nuovo dietro.
+4. [ ] **Revisione completa del codice** — DOPO che l'estetica si e' assestata, cosi' non si
+   pulisce codice che sta per essere riscritto, e con i controlli a fare da rete. Se si fa:
+   conviene prima mappare `GameScene.js` (3200 righe) con un subagente.
+
+---
+
 ## ROUND 5 — SFONDO a strati (FATTO 2026-07-20, commit `be4eb3c`)
 Sistema a **SET**: 3 immagini pittoriche (far/mid/near) in parallax dietro soffitto e terreno.
 Restano PITTORICHE di proposito — contrasto voluto coi personaggi pixel-art, deciso con l'utente.

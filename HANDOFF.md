@@ -76,6 +76,25 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 
 ---
 
+## ✅ CONTROLLI AUTOMATICI (dal 2026-07-21) — lanciarli PRIMA di ogni commit
+
+```
+python tools\controlla.py
+```
+47 controlli in ~2m40s. Apre il gioco in un browser invisibile (Playwright), inietta
+`tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
+realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
+cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
+volanti bloccati, spawn addosso al giocatore, boss incollato a terra, condotto non attraversabile,
+piu' una passata **senza god-mode** (col god-mode acceso i bug di DANNO restano invisibili).
+
+Serve una tantum: `python -m pip install playwright` e `python -m playwright install chromium`
+(gia' fatto su questo PC; Node NON e' installato, Python 3.12 si').
+
+Quando un controllo fallisce: **prima capire se e' rotto il gioco o il controllo.** E' successo 3
+volte su 3 al primo giro — il boss "non saltava" solo perche' il test non gli avvicinava mai il
+giocatore. Verificare il caso a mano in preview prima di toccare il gioco.
+
 ## Come provare il gioco
 
 **Preview per l'assistente:** `preview_start {name:"earwaxwar"}` (porta 8123) da `.claude/launch.json`
