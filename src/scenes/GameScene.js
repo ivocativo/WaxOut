@@ -760,12 +760,17 @@ class GameScene extends Phaser.Scene {
     // altrimenti e' irraggiungibile / in conflitto col soffitto. Usa `ceilingYAt(px)` al posto del
     // vecchio `CEIL_Y` fisso. Corpo del PG ~40px + margine 16px. `px` = x della pedana.
     const clampAbove = (refY, rawY, px) => Math.max(rawY, refY - MAXUP, (px != null ? this.ceilingYAt(px) : this.CEIL_Y) + 56);
+    // ⚠️ L'appoggio da cui si salta e' la superficie LOCALE del terreno, non la vecchia linea
+    // piatta 360 (bug trovato dai controlli automatici il 2026-07-20): usando 360 su una collina
+    // la pedana finiva DENTRO il terreno, e dentro una cunetta restava troppo in alto per essere
+    // raggiunta (misurate pedane a 161px contro un massimo saltabile di 117).
+    const suolo = (px) => this.terrainTopAt(px);
 
     this.membranes.forEach((m) => {
       if (m.type !== 'short') return;
       const px = Math.max(200, m.x - 110);
       if (px >= bossArenaX) return;
-      const py = clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(72, 96), px);
+      const py = clampAbove(suolo(px), suolo(px) - Phaser.Math.Between(72, 96), px);
       this.addPlatform(px, py, 110);
     });
 
@@ -773,22 +778,27 @@ class GameScene extends Phaser.Scene {
     let secretPlaced = false;
     for (let i = 0; i < xs.length - 1; i++) {
       const gapW = xs[i + 1] - xs[i];
-      let lowY = this.groundTop;   // superficie da cui si raggiunge la pedana alta (suolo se non c'e' quella bassa)
+      let lowY = null, lowPx = null;   // pedana bassa: da li' si sale a quella alta (null = si sale dal terreno)
       // Pedana bassa: quasi sempre presente se il varco e' abbastanza largo.
       if (gapW > 260 && Math.random() < 0.7) {
         const lowX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.25, 0.4));
         if (lowX < bossArenaX) {
-          const py = clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(90, 130), lowX);
+          const py = clampAbove(suolo(lowX), suolo(lowX) - Phaser.Math.Between(90, 130), lowX);
           this.addPlatform(lowX, py, Phaser.Math.Between(90, 120));
           if (Math.random() < 0.7) this.addWaxPickup(lowX, py - 26, Math.random() < 0.35);   // a volte CURA
-          lowY = py;
+          lowY = py; lowPx = lowX;
         }
       }
       // Pedana alta: premia chi sale a cercarla.
       if (Math.random() < 0.55) {
         const midX = Math.round(xs[i] + gapW * Phaser.Math.FloatBetween(0.5, 0.75));
         if (midX < bossArenaX) {
-          const py = clampAbove(lowY, this.groundTop - Phaser.Math.Between(150, 220), midX);
+          // Ci si puo' appoggiare alla pedana bassa SOLO se e' abbastanza vicina in orizzontale:
+          // in un salto si copre ~175px, quindi una pedana bassa lontana non e' un vero appoggio
+          // e la pedana alta risulterebbe irraggiungibile (trovato dai controlli il 2026-07-20).
+          const vicina = (lowY != null && Math.abs(midX - lowPx) < 170);
+          const rif = vicina ? lowY : suolo(midX);
+          const py = clampAbove(rif, suolo(midX) - Phaser.Math.Between(150, 220), midX);
           this.addPlatform(midX, py, Phaser.Math.Between(90, 130));
           if (Math.random() < 0.75) this.addWaxPickup(midX, py - 26, Math.random() < 0.45);   // pedana alta: piu' spesso CURA
           // SEGRETO (non segnalato): a volte, sopra questa pedana, uno scrigno ancora piu'
@@ -806,7 +816,7 @@ class GameScene extends Phaser.Scene {
     // Rampa d'avvio prima della prima membrana (stesso bug delle pedane: anche questa deve
     // restare a portata di un salto solo dal suolo).
     const rampX = Math.max(200, xs[0] - 240);
-    this.addPlatform(rampX, clampAbove(this.groundTop, this.groundTop - Phaser.Math.Between(110, 150), rampX), 120);
+    this.addPlatform(rampX, clampAbove(suolo(rampX), suolo(rampX) - Phaser.Math.Between(110, 150), rampX), 120);
   }
 
   // Azzera i modificatori ai valori "neutri" (nessun effetto) + rimette la gravita' di default.
