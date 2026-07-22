@@ -34,3 +34,6 @@ assets/backgrounds/1/
 
 # Registrazioni schermo occasionali
 *.mp4
+
+# Schermate generate da tools/schermata.py: usa e getta, non vanno versionate
+schermata*.png
