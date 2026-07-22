@@ -1053,11 +1053,9 @@ class GameScene extends Phaser.Scene {
     const w = Phaser.Math.Between(90, 170);
     const x = this.pickHazardX(w);
     if (x == null) return;
-    const C = window.CONFIG.COLORS;
-    const cx = x + w / 2, y = this.terrainTopAt(cx);   // superficie LOCALE del terreno
-    const g = this.add.rectangle(cx, y - 4, w, 9, C.slime, 0.88).setDepth(4.5);
-    g.setStrokeStyle(1, C.slimeGloss, 0.5);
-    this.tweens.add({ targets: g, scaleY: 1.3, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.inOut' });
+    // La patina SEGUE il profilo del terreno (prima era una barra dritta: su una pendenza
+    // restava staccata dal suolo). Aspetto e luccichii: GameGfx.paintSlick.
+    window.GameGfx.paintSlick(this, x, x + w, (px) => this.terrainTopAt(px));
     this.slimeZones.push({ x1: x, x2: x + w });
   }
 
@@ -1596,13 +1594,24 @@ class GameScene extends Phaser.Scene {
     const bLo = left, bHi = Math.max(px - gap, left);           // dietro
     const aOk = aHi - aLo > 20, bOk = bHi - bLo > 20;
     const wantAhead = preferSide === 1 ? true : preferSide === -1 ? false : (Math.random() < 0.7);
-    let x;
-    if (aOk && (wantAhead || !bOk)) x = Phaser.Math.Between(aLo, aHi);
-    else if (bOk) x = Phaser.Math.Between(bLo, bHi);
-    else x = farthestEdge();                                    // sezione stretta: il punto piu' lontano, mai addosso
-    // Rete di sicurezza: mai piu' vicino di 130px al giocatore, se la sezione lo consente
-    // (prima il ripiego poteva far nascere un nemico sopra lo spawn → morte istantanea).
-    if (Math.abs(x - px) < 130) x = farthestEdge();
+    const scegli = () => {
+      let x;
+      if (aOk && (wantAhead || !bOk)) x = Phaser.Math.Between(aLo, aHi);
+      else if (bOk) x = Phaser.Math.Between(bLo, bHi);
+      else x = farthestEdge();                                  // sezione stretta: il punto piu' lontano, mai addosso
+      // Rete di sicurezza: mai piu' vicino di 130px al giocatore, se la sezione lo consente
+      // (prima il ripiego poteva far nascere un nemico sopra lo spawn → morte istantanea).
+      if (Math.abs(x - px) < 130) x = farthestEdge();
+      return x;
+    };
+    // Un nemico non deve nascere DENTRO un cumulo di cerume: ci resta incastrato a spingere
+    // senza avanzare (segnalato il 2026-06-30, ritrovato dai controlli automatici il 2026-07-21).
+    // Si scarta il punto occupato e se ne prova un altro; se proprio non se ne trova uno libero
+    // si tiene l'ultimo, cosi' non si sta mai peggio di prima.
+    const occupato = (cx) => this.blocks.getChildren().some((b) => b.active
+      && Math.abs(b.x - cx) < 30 && Math.abs(b.y - (this.terrainTopAt(cx) - 20)) < 46);
+    let x = scegli();
+    for (let tent = 0; tent < 8 && occupato(x); tent++) x = scegli();
     return Math.round(Phaser.Math.Clamp(x, left, right));
   }
 

@@ -47,8 +47,6 @@ window.CONFIG = {
     dirt: 0x7a5a3a,
     dirtLight: 0x9a7650,
     dirtDark: 0x4f3a24,
-    slime: 0xcf9a34,
-    slimeGloss: 0xfbe38b,
     outline: 0x14161f,
     hpGood: 0x4caf50,
     hpBad: 0xe74c3c,

@@ -162,6 +162,47 @@ window.GameGfx = {
     return g;
   },
 
+  // POZZA SCIVOLOSA. Prima era una barra dritta color senape: su un terreno in pendenza non lo
+  // seguiva, e soprattutto quel giallo si confondeva col CERUME da raccogliere. Ora e' una
+  // patina bagnata FREDDA (verde-acqua) che segue il profilo del terreno: contro il rosa della
+  // carne salta all'occhio, e non somiglia a niente altro nel gioco. La forma e' a lente
+  // (sottile ai bordi) perche' una pozza non ha spigoli.
+  SCIVOLO: { film: 0x45b8a6, lucido: 0xe4fffa },
+
+  paintSlick(scene, x1, x2, profilo) {
+    const S = this.SCIVOLO;
+    const g = scene.add.graphics().setDepth(4.5);
+    const PASSO = 6, SPESSORE = 17, larg = Math.max(1, x2 - x1);
+    const spess = (x) => Math.max(2, SPESSORE * Math.sin(Math.PI * (x - x1) / larg));
+
+    const sopra = [], sotto = [];
+    for (let x = x1; x <= x2; x += PASSO) {
+      const y = profilo(x);
+      sopra.push({ x, y: y - spess(x) });
+      sotto.push({ x, y: y + 2 });
+    }
+    g.fillStyle(S.film, 0.78);
+    g.fillPoints(sopra.concat(sotto.reverse()), true);
+    // riflesso: filo chiaro lungo il bordo alto = superficie bagnata che riflette
+    g.lineStyle(2.5, S.lucido, 0.8);
+    g.beginPath();
+    sopra.forEach((p, i) => { if (i === 0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y); });
+    g.strokePath();
+
+    // due o tre luccichii che pulsano: e' il segnale "qui si scivola"
+    for (let i = 0; i < Phaser.Math.Between(2, 3); i++) {
+      const gx = Phaser.Math.Between(x1 + 12, x2 - 12);
+      const e = scene.add.ellipse(gx, profilo(gx) - 5, Phaser.Math.Between(14, 26), 4, S.lucido, 0.75)
+        .setDepth(4.55);
+      scene.tweens.add({
+        targets: e, alpha: 0.15, scaleX: 1.5, yoyo: true, repeat: -1,
+        duration: Phaser.Math.Between(700, 1100), ease: 'Sine.inOut',
+        delay: Phaser.Math.Between(0, 500),
+      });
+    }
+    return g;
+  },
+
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
     if (!sets) return null;
