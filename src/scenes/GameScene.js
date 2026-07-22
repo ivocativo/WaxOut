@@ -1471,6 +1471,12 @@ class GameScene extends Phaser.Scene {
     e.setCollideWorldBounds(true);
     if (cfg.fly) e.body.setAllowGravity(false);
     else e.setBounce(0.1);
+    // GRAVITA' SPENTA finche' sta comparendo. Durante l'emersione il nemico e' `spawning`, e lo
+    // snap al terreno lo SALTA apposta: se pero' la gravita' resta accesa il corpo CADE attraverso
+    // il suolo e lo si vede sprofondare per qualche istante, per poi essere riacchiappato a fine
+    // animazione (misurato fino a 24px sotto la superficie; segnalato dall'utente 2026-07-22).
+    // La rimette this.endSpawn().
+    e.body.setAllowGravity(false);
     e.body.setSize(cfg.body[0], cfg.body[1], true);
     e.hp = cfg.hp; e.maxHp = cfg.hp;
     e.speed = cfg.speed;
@@ -1514,6 +1520,14 @@ class GameScene extends Phaser.Scene {
     return e;
   }
 
+  // Fine della comparsa: da qui il nemico e' "vivo" e torna soggetto a gravita' e snap al terreno.
+  // Va chiamata da OGNI animazione di comparsa (emersione, caduta dal soffitto, pop dello split).
+  endSpawn(e) {
+    if (!e || !e.body) return;
+    e.spawning = false;
+    if (e.kind !== 'fly') e.body.setAllowGravity(true);   // i volanti restano senza gravita'
+  }
+
   // Comparsa istantanea per i figli dello SPLIT: pop rapido sul posto, niente emersione dal
   // terreno. Resta "spawning" (inerte) per una manciata di ms, come le altre comparse.
   splitPop(e, targetScale) {
@@ -1522,7 +1536,7 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: e, scaleX: targetScale, scaleY: targetScale, alpha: 1,
       duration: 150, ease: 'Back.out',
-      onComplete: () => { e.spawning = false; },
+      onComplete: () => this.endSpawn(e),
     });
   }
 
@@ -1628,7 +1642,7 @@ class GameScene extends Phaser.Scene {
       targets: e, scaleY: targetScale, alpha: 1,
       duration: big ? 600 : 380, ease: 'Back.out',
       onComplete: () => {
-        e.spawning = false;
+        this.endSpawn(e);
         // assestamento gommoso
         this.tweens.add({ targets: e, scaleX: targetScale * 1.1, scaleY: targetScale * 0.9, yoyo: true, duration: 90 });
       },
@@ -1645,7 +1659,7 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: e, scaleX: targetScale, scaleY: targetScale, duration: 420, ease: 'Quad.out' });
     this.tweens.add({
       targets: e, y: restY, duration: 560, ease: 'Bounce.out',
-      onComplete: () => { e.spawning = false; },
+      onComplete: () => this.endSpawn(e),
     });
   }
 

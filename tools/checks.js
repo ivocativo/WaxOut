@@ -207,7 +207,7 @@ window.__earwaxChecks = function (opts) {
     //     Sprofondamenti: bug 30/06 "i nemici finiscono sotto la linea del pavimento".
     //     Volanti: rischio segnalato l'11/07 e mai verificato (moscerino contro una pedana).
     const gs2 = avviaLivello(lv);
-    let maxConsecutivi = 0, pgAffondato = 0, volanteFermo = 0;
+    let maxConsecutivi = 0, pgAffondato = 0, volanteFermo = 0, sprofSpawn = 0;
     const consecutivi = new Map(), fermi = new Map();
     for (let i = 0; i < FRAME_GIOCO; i++) {
       t += 16.6; g.loop.step(t);
@@ -218,7 +218,17 @@ window.__earwaxChecks = function (opts) {
         if (vivi.length) gs2.damageEnemy(vivi[0], 1, true);     // bastonata: provoca il rinculo
       }
       gs2.enemies.getChildren().forEach((e) => {
-        if (!e.active || e.spawning) return;
+        if (!e.active) return;
+        // ANCHE durante la comparsa: escluderla e' il motivo per cui questo controllo non aveva
+        // visto il bug del 2026-07-22 (i nemici cadevano sotto il suolo mentre "emergevano",
+        // perche' lo snap li salta ma la gravita' no). Chi emerge non deve MAI finire sotto.
+        if (e.spawning) {
+          if (e.kind !== 'fly') {
+            const giu = e.body.bottom - gs2.terrainTopAt(e.x);
+            if (giu > sprofSpawn) sprofSpawn = giu;
+          }
+          return;
+        }
         if (e.kind === 'fly') {
           const fermo = Math.abs(e.body.velocity.x) + Math.abs(e.body.velocity.y) < 5;
           const c = fermo ? (fermi.get(e) || 0) + 1 : 0;
@@ -241,6 +251,8 @@ window.__earwaxChecks = function (opts) {
     else ko('giocatore non sprofondato', lv, 'sceso ' + Math.round(pgAffondato) + 'px sotto la superficie');
     if (volanteFermo <= 90) ok('volanti non incastrati', lv, 'max ' + volanteFermo + ' frame immobili');
     else ko('volanti non incastrati', lv, 'un volante e\' rimasto immobile ' + volanteFermo + ' frame');
+    if (sprofSpawn <= 6) ok('comparsa senza sprofondare', lv, 'max ' + Math.round(sprofSpawn) + 'px sotto la superficie');
+    else ko('comparsa senza sprofondare', lv, 'un nemico e\' sceso ' + Math.round(sprofSpawn) + 'px sotto il terreno mentre compariva');
 
     // [8] SFONDO — 3 strati caricati (regressione del sistema a set).
     const strati = (gs2.bgLayers || []).length;
