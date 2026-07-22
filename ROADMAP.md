@@ -1,188 +1,116 @@
-# Earwax War — Piano esecutivo (blocco "Round 4 — Condotto a larghezza variabile")
+# Earwax War — Piano esecutivo
 
-> 📄 **A cosa serve questo file:** è la "lista di lavoro" del blocco in corso (caselle da spuntare),
-> usa e getta. Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole: god-mode nei test MA anche ≥1 prova SENZA god-mode (bug di danno/traversabilità), i18n EN+IT
-> per stringhe nuove, commit solo su richiesta.
+> 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
+> Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (51 controlli);
+> god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
+> il font pixel non li rende); commit solo su richiesta dell'utente.
 
-_Preparato 2026-07-18 da Opus. Scelto dall'utente come primo blocco di "contenuti nuovi" — non serve_
-_grafica nuova, usa il rendering e la fisica che ci sono già._
+_Preparato 2026-07-22 da Opus. I blocchi A e B nascono dalla ricerca sulle best practice del genere_
+_(sintesi e fonti in `HANDOFF.md` §Principi di design) e dalla richiesta dell'utente._
 
----
-
-## Obiettivo e decisioni di design
-Oggi il condotto è un tunnel di **altezza fissa** (soffitto piatto y≈50, pavimento piatto y=360 →
-apertura 310px per tutto il livello). Vogliamo che la **larghezza (apertura verticale) VARI** lungo il
-livello: tratti **ampi** (arene aperte) e tratti **stretti** (passaggi angusti). Rinfresca ogni livello.
-
-**Decisioni (per tenere il rischio basso):**
-- **Il PAVIMENTO resta PIATTO e walkable ovunque** (niente pendii/gradini → zero rischio "player
-  incastrato"). La variazione viene **dal SOFFITTO che ondeggia** e scende (pinch) in alcuni tratti.
-- **Regola di SICUREZZA ASSOLUTA — traversabilità:** l'apertura al pavimento (`360 - ceilingYAt(x)`)
-  non deve MAI scendere sotto ~90px, così il giocatore passa SEMPRE camminando (corpo PG ~60px). Un
-  pinch non può mai chiudere il condotto. (Opzione futura: pinch un filo più bassi che obbligano ad
-  accovacciarsi — solo se garantiamo che l'accovacciato passi; RIMANDATO a dopo.)
-- **Niente pinch** sopra l'area di partenza (primi ~600px) né sopra il timpano/goal (ultimo tratto).
-- Il **bordo alto del mondo fisico resta a `CEIL_Y`** (il punto più alto); i pinch sono collider
-  statici che scendono sotto di esso.
-
-## Come funziona (profilo del soffitto)
-- Nuovo `buildCeilingProfile()` (in `create()` prima di `buildLevel`) genera 2-5 "pinch" per livello
-  (cresce col livello), a x casuali (fuori da partenza/goal), ciascuno con **profondità** e **larghezza**
-  casuali entro limiti sicuri; rampe morbide (coseno) tra ampio e stretto.
-- Helper `ceilingYAt(x)` → y del BORDO BASSO del soffitto in quel punto (default `CEIL_Y`, più in basso
-  nei pinch). Tutto ciò che "pende dal soffitto" userà questo invece del vecchio `CEIL_Y` fisso.
+**Chi esegue cosa.** 🤖 = adatto a Sonnet (meccanico, specificato fino in fondo).
+🧠 = serve Opus (decisione di design, giudizio estetico, o taratura da fare guardando il gioco).
 
 ---
 
-## GRUPPO VC-A — Profilo + disegno del soffitto  🎨(codice)
-- [ ] **VC-A.1** `buildCeilingProfile()` + `ceilingYAt(x)` (con clamp di sicurezza sull'apertura min).
-- [ ] **VC-A.2** Ridisegnare il soffitto come **forma piena che segue il profilo** (Graphics, stessa
-  palette carnosa `C.ground`/`C.groundDark`, campionando ogni ~16px) al posto della fascia piatta
-  attuale (`create()` righe ~132-135). Verifica visiva: tratti ampi e stretti ben leggibili.
+# BLOCCO A — Dare un FINALE alla run + scelta del percorso
 
-## GRUPPO VC-B — Collisione del soffitto ondulato  🧱
-- [ ] **VC-B.1** Nei pinch, **collider statici** (gruppo dedicato `ceilingBlocks`, come `platforms`)
-  che scendono da `CEIL_Y` fino a `ceilingYAt(x)` — una "scaletta" di 3-5 rettangoli per pinch che
-  approssima la rampa morbida (collisione AABB). Collider un filo più ALTI del bordo visivo (~4-6px)
-  così non si vede il PG "entrare" nel soffitto. Aggiungere i collider a player + enemies +
-  projectiles (come i `blocks`).
-- [ ] **VC-B.2** Verifica CHIAVE — **traversabilità automatica**: su molte generazioni (≥20 livelli),
-  simulare/controllare che il PG possa andare da spawn al goal (nessun pinch invalica l'apertura min).
-  + prova SENZA god-mode: il PG non muore/incastra nei pinch. Il salto sbatte il soffitto nei tratti
-  bassi (blocked.up) ma a terra passa sempre.
+**Perché.** Oggi `UpgradeScene` fa `GameState.level += 1` all'infinito: **non esiste la vittoria**,
+una partita può finire solo con la morte. Le fonti sono concordi che una run ha bisogno di una
+conclusione, e senza vittoria non è possibile la meccanica di ritenzione più forte del genere (la
+difficoltà crescente che il giocatore sceglie DOPO aver vinto). È il buco più grande del gioco.
+Inoltre il giocatore non sceglie mai il percorso: il tipo di livello è deciso dal numero
+(`levelNum % 5`), quindi manca del tutto la decisione rischio/ricompensa.
 
-## GRUPPO VC-C — Agganciare tutto ciò che dipende dal soffitto al profilo LOCALE  🔗
-Sostituire il `CEIL_Y` fisso con `ceilingYAt(x)` dove qualcosa pende/è ancorato in alto:
-- [ ] **VC-C.1** Pedane (`buildPlatforms`, `clampAbove`): il tetto minimo diventa
-  `ceilingYAt(px) + 56` invece di `CEIL_Y + 56` (nessuna pedana dentro il soffitto locale).
-- [ ] **VC-C.2** Stalattiti terremoto (`addStalactite`, y=`CEIL_Y`) e chunk frana (`CEIL_Y+4`) →
-  `ceilingYAt(cx)`.
-- [ ] **VC-C.3** Gocce dal soffitto (`addDripHazard`/`updateDrips`, `topY`) → `ceilingYAt(cx)`.
-- [ ] **VC-C.4** Cumuli di cerume a soffitto (`buildCeilingMound`) → ancorare a `ceilingYAt(mx)`.
-- [ ] **VC-C.5** Controllare volanti (restY 90-170): nei pinch profondi assicurarsi che non restino
-  sopra il soffitto locale (clamp la quota di hover a `ceilingYAt+margine`).
+## A.1 — Traguardo e vittoria 🤖
+- [ ] `CONFIG.RUN_LEVELS = 15` in `state.js` (numero da tarare dopo, vedi A.4).
+- [ ] In `UpgradeScene`, dove oggi c'è `level += 1`: se il livello appena finito è `RUN_LEVELS`,
+  andare a una **nuova `VictoryScene`** invece che al livello successivo.
+- [ ] `src/scenes/VictoryScene.js`: titolo, riepilogo (livelli, cerume in banca, tempo totale),
+  pulsanti **Nuova run** / **Menu**. Stesso stile di `MenuScene`.
+- [ ] `Meta` (`src/meta.js`): salvare `vittorie` (contatore) e `miglioreLivello`.
+- [ ] i18n EN+IT per tutte le stringhe nuove.
+- **Fatto quando:** si arriva a fine run e si vede la vittoria; il cerume viene messo in banca come
+  a fine livello normale; `controlla.py` verde.
 
-## GRUPPO VC-D — Tuning, sicurezza, chiusura  🎚️
-- [ ] **VC-D.1** Tarare numero/profondità/larghezza dei pinch per livello (crescono col livello ma
-  restano equi). Garantire: partenza e goal sempre ampi; apertura min rispettata ovunque.
-- [ ] **VC-D.2** Giro finale: nessuna stringa i18n nuova prevista; niente errori console;
-  performance ok (i collider extra sono pochi e statici). Aggiornare `HANDOFF.md`.
+## A.2 — Boss finale 🧠 poi 🤖
+- [ ] Il livello `RUN_LEVELS` è un boss, ma **diverso** dal Tappo di Cerume dei livelli 5/10:
+  più vita, una fase in più. Design della fase in più: da decidere con l'utente.
+- [ ] Riusare `levelKind === 'boss'` con un flag `finale: true`.
+
+## A.3 — Scelta tra DUE PORTE 🤖
+Il pezzo con il miglior rapporto impatto/lavoro: **non serve contenuto nuovo**, rende una scelta
+del giocatore quello che oggi è un sorteggio.
+- [ ] Dopo la carta di potenziamento, mostrare **due opzioni per il livello successivo**, ognuna
+  con: tipo di livello (`normale`/`corsa`/`assedio`/`sciame`), eventuale modificatore (`MUTATORS`)
+  e una **anteprima della ricompensa** (es. "cerume ×1,5").
+- [ ] Le due opzioni devono essere DIVERSE tra loro e contrapposte: una più rischiosa e più ricca,
+  una più sicura e più povera.
+- [ ] La scelta scrive `GameState.prossimoLivello = { kind, mutator, waxMult }`; `GameScene.create`
+  legge quello **invece** di decidere da `levelNum % 5`. Se assente (primo livello), comportamento
+  attuale.
+- [ ] I livelli **boss restano fissi** (multipli di 5 e finale): lì niente scelta.
+- [ ] i18n EN+IT.
+- **Fatto quando:** ogni livello non-boss è preceduto da una scelta; il livello generato rispetta
+  ciò che è stato scelto (verificabile con un controllo automatico, vedi A.5).
+
+## A.4 — Taratura della durata 🧠
+- [ ] **Misurare quanto dura una run** fino a `RUN_LEVELS` (serve il playtest dell'utente).
+  Riferimento dalle fonti: 20-30 minuti, meno su telefono. Se 15 livelli sono troppi, abbassare.
+
+## A.5 — Difficoltà crescente dopo la vittoria 🧠 poi 🤖
+- [ ] Dopo la prima vittoria si sblocca un livello di difficoltà opzionale (nome a tema, es.
+  "Infezione 1, 2, 3…"), scelto nel menu prima di partire. Ogni gradino aggiunge un peggioramento
+  (nemici più duri / meno cerume / comparse più fitte) e aumenta la ricompensa.
+- [ ] `Meta` salva il gradino più alto superato.
+- [ ] Nuovi controlli in `tools/checks.js`: la run finisce a `RUN_LEVELS`; la scelta tra porte
+  produce davvero il livello scelto; la difficoltà scelta viene applicata.
 
 ---
 
-## Ordine: VC-A → VC-B → VC-C → VC-D
-Ciclo per gruppo: implementa → collaudo DAL VIVO (god-mode + una prova senza) → screenshot/dati →
-riferisci in italiano semplice → chiedi se committare. Numeri (n. pinch, profondità, larghezze) da
-TARARE col playtest dell'utente. **Priorità assoluta: il condotto resta sempre attraversabile.**
+# BLOCCO B — Restyling NEMICI e TIMPANO
 
-### PROTOTIPO TERRENO stile Terraria (2026-07-18) — l'utente ha bocciato i rilievi-rettangolo
-Feedback utente: i rilievi a rettangolo erano brutti, le buche non si notavano. Nuova direzione
-approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). Fatto un PROTOTIPO
-(solo personaggio):
-- `buildTerrain()` genera un profilo di ALTEZZA a pendenze dolci (colline sopra il pavimento),
-  quantizzato a gradini di `TERR_STEP=18`; disegno VISIVO a mattoni (`terrainHeightAt`/`terrainTopAt`).
-- Camminata via **MAPPA DI ALTEZZE** (heightmap-snap) nel player update: aggancio i piedi a
-  `terrainTopAt` frame per frame (sposto `body.y`, NON lo sprite — l'orizzontale resta al motore).
-  Niente blocchi-collisione → niente "cuciture" che incastravano. Cap salita 26/frame, discesa 34.
-- **Trappole tecniche risolte:** (1) blocchi separati catturavano il PG sugli spigoli → passato a
-  heightmap; (2) `body.updateFromGameObject()` ogni frame CONGELA l'orizzontale → uso `body.y -= …`.
-- Rilievi-rettangolo e pozze-buca del round 4 DISABILITATI (bumpCount/pitCount = 0); il codice
-  `addBump`/`addPit` resta finche' il terreno non e' confermato, poi si rimuove.
-- Verificato: PG cammina su/giu' colline fino a 108px, mai incastrato.
+**Perché.** Sono gli ultimi elementi con la vecchia estetica: i nemici sono pixel-art generata da
+codice (`PixelArt.fromGrid` in `BootScene`) e il timpano è uno sprite vecchio. Ora che sfondo,
+terreno, soffitto, pedane e pozze parlano la stessa lingua, stonano loro.
 
-**VERSIONE COMPLETA — l'utente ha approvato ("procedi"). Fatta in tappe:**
-- ✅ **Tappa A — nemici sul terreno (2026-07-19):** heightmap-snap anche per i nemici a terra
-  (nel loop update, prima dell'IA): aggancio `body.y` a `terrainTopAt`, `e._grounded` sostituisce
-  `blocked.down` in TUTTI i controlli "a terra" dell'IA (blob/flea/hopper/boss/spit). Soglia snap
-  `vy>=-30 && |feet-surf|<=34` (i balzi grandi -190/-480/-600 hanno i piedi ben piu' in alto →
-  passano; il jitter da fermo -2 e' incluso). Verificato: blob cammina su/giu' colline (54px),
-  grounded, piedi incollati, zero incastri. NB: `blocked.down` rimasto solo nello snap stesso.
-- ✅ **Tappa B — cunette (2026-07-19):** il profilo terreno ora scende SOTTO il pavimento
-  (`terrainHeightAt` ammette valori negativi, fino a `TERR_DIP=36`); colline fino a `TERR_MAXH=132`.
-  Il pavimento piatto (disegno + collider a 360) e' stato TOLTO: `buildTerrain` disegna tutto il
-  terreno seguendo `terrainTopAt` (colline + cunette, riempimento a gradini + linea di superficie),
-  e il collider `this.ground` e' sceso a un BACKSTOP di sicurezza (~408, sotto la cunetta piu'
-  profonda). Snap in discesa esteso a -44 (player + nemici) per entrare/uscire dalle cunette.
-  Verificato: traversata completa di un livello con colline (+126) e cunette (-36), sale/scende,
-  mai incastrato, non cade oltre il backstop, terreno disegnato (grafica depth 4.3), zero errori.
-- ✅ **BUG CERUME su terreno — RISOLTO 2026-07-20 (commit `d6e50cd`).** Tutto cio' che "sta sul
-  pavimento" era ancorato alla vecchia quota piatta `groundTop` (360) → col terreno round 4
-  risultava sospeso sopra le cunette o infilato nelle colline. Ora usa la superficie LOCALE
-  `terrainTopAt(x)`: cumuli a pavimento (`buildFloorMound`/`addWaxBlock`, nuovo param `baseY`),
-  membrane (`buildMembrane.mk`), pozze scivolose (`addSlimeZone`), comparsa/sbuffo nemici
-  (spawn `restY` + `emergeFromGround`), ombra del boss nel balzo, splat di frane/gocce che cadono.
-  Trappola risolta: `buildTerrain()` girava DOPO le membrane → spostato PRIMA (altrimenti il loro
-  aggancio al terreno era un no-op). Verifica dal vivo (lvl 4, god-mode): 30 blocchi con errore 0px
-  (22 su colline/cunette), nemici agganciati 0px, zero errori, nessun crash su 150 frame. I pickup a
-  terra NON servivano fix (nascono su pedane elevate o alla morte dei nemici, gia' agganciati).
+## B.1 — Timpano: VIA CODICE 🧠
+Il timpano è una membrana astratta, quindi **non serve arte nuova**: si disegna come abbiamo fatto
+per terreno e soffitto, ed è coerente per costruzione.
+- [ ] `GameGfx.paintEardrum(scene, x, y, w, h)`: membrana ovale con la tavolozza `CARNE`, anelli
+  concentrici, velature, e il "respiro" già presente (tween di scala).
+- [ ] Sostituire lo sprite `eardrum` in `buildGoal`, tenendo invariati posizione e area del
+  traguardo. **Non toccare la logica di vittoria del livello.**
+
+## B.2 — Nemici: immagini AI 🧠 (poi 🤖 per l'integrazione)
+I nemici sono personaggi: il procedurale non basta, serve arte. **Stessa pipeline degli sfondi**
+(vedi memoria `earwaxwar-background-pipeline`), che ha già funzionato:
+- [ ] Opus scrive i prompt (uno per nemico: cerumino, crosta, gorgogliante, moscerino, pulce,
+  saltatore, boss), con le regole già collaudate: **vista piatta di lato**, **sfondo MAGENTA puro
+  #FF00FF** come colore-chiave, formato più largo possibile, stessa tavolozza tra tutti.
+- [ ] L'utente genera; io scontorno e ridimensiono (lo scontorno stretto esiste già in
+  `tools/bake_background_set.ps1`, va estratto in uno strumento riusabile).
+- [ ] Integrazione in `BootScene` al posto delle texture da codice. **Hitbox e scale NON vanno
+  cambiati** (`cfg.body`, `cfg.scale` in `spawnEnemy`): cambia solo l'immagine.
+- [ ] ⚠️ **Conseguenza voluta:** con nemici disegnati si possono togliere le **aureole élite**
+  (oggi un ripiego): le varianti Corazzato/Esplosivo/Split diventano varianti di colore o dettaglio.
+- [ ] Le ANIMAZIONI restano fuori da questo blocco (servirebbe AutoSprite = abbonamento). Prima le
+  immagini ferme, che già cambiano tutto.
+
 ---
 
-## PIANO TECNICO concordato con l'utente (2026-07-21) — procedere IN QUEST'ORDINE
-1. ✅ **Pulizia codice morto** (`791afb5`): rilievi/buche e profilo pavimento.
-2. ✅ **Controlli automatici** (`4752bd7`): `python tools\controlla.py`, 47 controlli. Vedi
-   `HANDOFF.md` §Controlli automatici. Hanno subito trovato un bug vero (pedane sul terreno).
-3. ✅ **Pavimento, soffitto, pedane e pozze** (`50329e1`, `31f6b3d`, `145e0ea`): ridisegnati via
-   codice come massa di tessuto, in tinta col fondale. Nessuna palette marrone/senape residua.
-   Dettaglio e trappole gia' pagate: `HANDOFF.md` §Cosa c'e' gia'.
-4. [ ] **Revisione completa del codice** — DOPO che l'estetica si e' assestata, cosi' non si
-   pulisce codice che sta per essere riscritto, e con i controlli a fare da rete. Se si fa:
-   conviene prima mappare `GameScene.js` (3300 righe) con un subagente.
-
-### In attesa: PLAYTEST dell'utente sull'APK (scaricato 2026-07-22, commit `145e0ea`)
-E' cambiato molto visivamente e il giudizio in movimento e' diverso da quello sugli screenshot.
-
-### Aperti, in ordine di quanto sono pronti
-- [ ] **Sfoltire l'APK**: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
-  Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Non urgente, ma cresce a ogni set di sfondo.
-- [ ] **Protuberanze** da rigenerare in stile e riattivare (il meccanismo di piazzamento e' intatto
-  in `GameGfx.drawProtuberances`, basta rimettere la chiamata in `buildLevel`). Finche' sono
-  disattivate, togliere anche il loro caricamento da BootScene fa risparmiare 1,8 MB.
-- [ ] **Crouch**: 36 frame gia' forniti dall'utente, servono 2 risposte sue (vedi §Asset nuovi).
+# APERTI, in ordine di quanto sono pronti
+- [ ] **Sfoltire l'APK** 🤖: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
+  Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Il primo pezzo (togliere il caricamento delle
+  protuberanze disattivate) vale 1,8 MB e risparmia memoria sul telefono.
+- [ ] **Protuberanze** da rigenerare in stile e riattivare (il meccanismo è intatto in
+  `GameGfx.drawProtuberances`, basta rimettere la chiamata in `buildLevel`).
+- [ ] **Crouch**: 36 frame già forniti, servono 2 risposte dell'utente (vedi `HANDOFF.md`
+  §Asset nuovi): è un ciclo o una posa tenuta? sostituisce lo schiacciamento attuale?
 - [ ] **Tarature col playtest** e verifica dal vivo dell'**Assedio**, mai giocato davvero.
 - [ ] **Altri set di sfondo**: procedura pronta, basta che l'utente dica "voglio altri sfondi".
-
----
-
-## ROUND 5 — SFONDO a strati (FATTO 2026-07-20, commit `be4eb3c`)
-Sistema a **SET**: 3 immagini pittoriche (far/mid/near) in parallax dietro soffitto e terreno.
-Restano PITTORICHE di proposito — contrasto voluto coi personaggi pixel-art, deciso con l'utente.
-Un set ogni 5 livelli (cambia dopo il boss). Manopole in `GameGfx.BG_LAYERS`, pipeline in
-`tools/bake_background_set.ps1`. **La procedura per aggiungere set e' in memoria
-(`earwaxwar-background-pipeline`): all'utente basta dire "voglio altri sfondi".**
-Fatto anche: soffitto piu' ALTO e meno variabile (media 43 invece di ~80, escursione 30-66 invece
-di 140+) per lasciare respirare lo sfondo; protuberanze vecchie DISATTIVATE (stonavano).
-- [ ] **Rigenerare le PROTUBERANZE** in stile con lo sfondo nuovo, poi riattivare la chiamata a
-  `GameGfx.drawProtuberances` in `buildLevel` (il meccanismo di piazzamento e' intatto).
-- [ ] **Altri set** quando l'utente genera le immagini (aggiungere N a `window.BG_SETS`).
-- [ ] Valutare il peso: 3,4 MB a set, APK ~14 MB.
-
----
-
-- **Resta (rifinitura/taratura, dopo il playtest utente):** aspetto ORGANICO vero del terreno (con
-  l'arte; ora e' color-carne + linea scura); taratura ampiezza/frequenza di colline e cunette (a
-  volte un livello esce tutto colline o tutte cunette — vedi `buildTerrain`, random walk ±70 da h=40);
-  `floorEdgeYAt`/`buildFloorProfile` ora INUTILIZZATI (codice morto da rimuovere); `addBump`/`addPit`
-  (rilievi/pozze del round 4) DISABILITATI (bumpCount/pitCount=0) e da rimuovere. + integrare
-  **crouch** e **sfondo parallax** (vedi HANDOFF §Asset nuovi da integrare).
-
----
-
-## STATO: FATTO E VERIFICATO (2026-07-18) — poi rifiniture su richiesta utente
-Implementato e collaudato dal vivo (dati + screenshot, god-mode e prove senza):
-- **VC-A** profili IRREGOLARI (spezzata) di soffitto e pavimento; pavimento irregolare SOLO VISIVO
-  (camminata piatta = sicuro). Generatore condiviso `_makeProfile` (stesso ritmo = coerenti).
-- **Rifinitura utente 1:** restringimenti soffitto più DELICATI e coerenti col pavimento.
-- **Rifinitura utente 2:** soffitto MOLTO più variabile — componente "lenta" che crea **stanze ampie**
-  (soffitto fin quasi al bordo alto, apertura ~350) alternate a tratti raccolti; apertura min ~227
-  (sempre attraversabile).
-- **VC-B** collisione soffitto = scaletta di collider statici (`ceilBlocks`) che segue il profilo;
-  bordo alto mondo → 0 così le stanze ampie sono raggiungibili. Verificato: zona alta raggiungibile,
-  zona bassa ferma la testa.
-- **VC-C** pedane clampate sotto il soffitto LOCALE (0 conflitti su test); stalattiti/frane/gocce/
-  cumuli-a-soffitto ancorati a `ceilingYAt`; moscerini tenuti sotto il soffitto locale.
-- **RILIEVI** (`terrainBumps`): gobbe solide saltabili, collidono col SOLO giocatore (nemici le
-  sorpassano). **BUCHE** (`pitZones`): pozze scure che feriscono se ci stai a terra → si saltano.
-  Verificato: rilievo blocca la camminata e si scavalca col salto; buca toglie ~20 HP in ~2s.
-- Zero errori console. **Look organico VERO da fare dopo con l'arte** (ora è la FORMA, spigolosa).
-NON ancora committato al momento della scrittura di questa riga.
+- [ ] **Revisione completa del codice** 🧠: da fare DOPO che l'estetica si è assestata, con i
+  controlli a fare da rete. Conviene prima mappare `GameScene.js` (3300 righe) con un subagente.
+- [ ] **Freeze sul PC allo Start Run**: aperto e depriorizzato (l'utente gioca dal telefono), ma da
+  chiarire prima dello store.

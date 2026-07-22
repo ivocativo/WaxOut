@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `145e0ea`._
+_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `5bee03d`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -303,6 +303,47 @@ disattivate ma ancora CARICATE da BootScene — sprecano anche memoria sul telef
 `bg_flesh_01.jpg` (0,9 MB, si usa solo la sua versione lavorata). Con altri set di sfondo il
 problema cresce. Idea: una convenzione per il materiale di lavorazione (es. non copiare i file
 sorgente dei set) invece di una lista di esclusioni fragile.
+
+---
+
+## 🎯 Principi di design (ricerca sulle best practice del genere, 2026-07-22)
+Sintesi filtrata su QUESTO gioco: non ripetere l'analisi, è già stata fatta. Fonti in fondo.
+
+**Cosa il gioco fa già bene** (confermato dalle fonti, non toccarlo per "migliorarlo"): scelta tra
+3 carte con rarità, evoluzioni che fondono abilità, progressione permanente (banca → potenziamenti
+e progetti), varietà di livelli/mutatori/eventi, e soprattutto il **game feel** (hit-stop, coyote
+time, salto ad altezza variabile, juice) — che le fonti indicano come la base non negoziabile.
+
+**I tre buchi individuati**, in ordine di importanza:
+1. **La run non finisce mai.** `UpgradeScene` fa `level += 1` senza limite: si può solo morire, mai
+   vincere. Le fonti: una run ha bisogno di una conclusione (troppo corta = nessuna soddisfazione,
+   infinita = tedio). Senza vittoria è anche impossibile la meccanica di ritenzione più forte del
+   genere: la **difficoltà crescente che il giocatore sceglie dopo aver vinto** (il "Calore" di
+   Hades, le Ascensioni di Slay the Spire) — è ciò che trasforma 5 ore di gioco in 50. → BLOCCO A.
+2. **Nessuna scelta di percorso.** Il tipo di livello è deciso da `levelNum % 5`: il giocatore non
+   decide mai niente tra un livello e l'altro. La lezione di Dead Cells sono le **due porte**
+   ("veloce ma fragile" contro "sicuro ma lento"): stessa roba che c'è già, ma **scelta** invece che
+   sorteggiata. Miglior rapporto impatto/lavoro di tutta l'analisi. → BLOCCO A.3.
+3. **Un solo personaggio, una sola arma.** Nelle fonti la varietà all'AVVIO (personaggi o armi con
+   partenze diverse) è ciò che spinge a rigiocare per *provare*, non solo per progredire. Il sistema
+   dell'arma-in-mano intercambiabile esiste già: 2-3 armi con feel diverso moltiplicano le run senza
+   toccare i livelli. → non ancora pianificato, candidato naturale dopo il BLOCCO A.
+
+**Quasi gratis:** nel negozio mostrare anche ciò che NON ci si può ancora permettere, con nome e
+prezzo. Vedere l'oggetto desiderato poco sopra le proprie possibilità è letteralmente il gancio
+dell'"ancora una partita".
+
+**Da NON fare adesso** (da giochi maturi, ruberebbero tempo ai punti sopra): run giornaliere,
+obiettivi, statistiche, classifiche.
+
+**Numero da misurare:** quanto dura una run. Riferimento delle fonti: **20-30 minuti**, meno su
+telefono. Lo può misurare solo l'utente giocando, e da lì si tara `CONFIG.RUN_LEVELS`.
+
+_Fonti: [Bugnet, meta-progression](https://bugnet.io/blog/how-to-design-a-roguelite-meta-progression) ·_
+_[Kokutech, Dead Cells](https://www.kokutech.com/blog/gamedev/design-patterns/flow-state/dead-cells) ·_
+_[Medium, "one hour roguelite"](https://medium.com/game-marketing/essay-the-one-hour-roguelite-404e73d0afa9) ·_
+_[Medium, lunghezza della run](https://medium.com/@todorovicnik2/video-games-roguelite-restart-length-of-a-perfect-run-ef8078c76495) ·_
+_[Kokutech, Vampire Survivors](https://www.kokutech.com/blog/gamedev/design-patterns/power-fantasy/vampire-survivors)_
 
 ---
 
