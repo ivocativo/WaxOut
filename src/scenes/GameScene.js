@@ -129,29 +129,14 @@ class GameScene extends Phaser.Scene {
     // Il PAVIMENTO (terreno) vero lo disegna `buildTerrain()` seguendo il profilo `terrainTopAt`
     // (colline + cunette). Qui creiamo solo il collider di SICUREZZA (backstop) ben SOTTO il
     // terreno: la superficie d'appoggio vera la fa la "mappa di altezze" nel player/enemy update.
-    // (`groundGfx` serve sotto per disegnare il SOFFITTO.)
-    const groundGfx = this.add.graphics().setDepth(4);
     this.ground = this.add.rectangle(this.worldW / 2, (H - gh + 48) + gh / 2, this.worldW, gh).setVisible(false);
     this.physics.add.existing(this.ground, true);
 
-    // Soffitto VISIBILE ondulato (round 4): forma piena che segue il profilo `ceilingYAt(x)`,
-    // stessa palette carnosa del pavimento. Nei pinch scende dentro il condotto (passaggi stretti).
-    // Campionato ogni 16px. (Il collider vero dei pinch lo aggiunge il gruppo VC-B; il bordo alto
-    // del mondo resta a `CEIL_Y`.)
-    const CSTEP = 16;
-    const ceilPts = [{ x: 0, y: -200 }];
-    for (let x = 0; x <= this.worldW; x += CSTEP) ceilPts.push({ x, y: this.ceilingYAt(x) });
-    ceilPts.push({ x: this.worldW, y: this.ceilingYAt(this.worldW) });
-    ceilPts.push({ x: this.worldW, y: -200 });
-    groundGfx.fillStyle(C.ground, 1);
-    groundGfx.fillPoints(ceilPts, true);
-    groundGfx.lineStyle(5, C.groundDark, 1);                  // "bordo" del soffitto lungo il profilo
-    groundGfx.beginPath();
-    for (let x = 0; x <= this.worldW; x += CSTEP) {
-      const y = this.ceilingYAt(x);
-      if (x === 0) groundGfx.moveTo(x, y); else groundGfx.lineTo(x, y);
-    }
-    groundGfx.strokePath();
+    // Soffitto VISIBILE ondulato (round 4): segue il profilo `ceilingYAt(x)`. Nei pinch scende
+    // dentro il condotto (passaggi stretti). Il collider vero dei pinch lo aggiunge il gruppo VC-B.
+    // L'ASPETTO lo fa GameGfx.paintOrganicMass (massa di tessuto disegnata via codice); la FORMA
+    // resta questa, che e' gameplay.
+    window.GameGfx.paintOrganicMass(this, (x) => this.ceilingYAt(x), { verso: -1, lontano: -220, depth: 4 });
 
     // Gruppi
     this.blocks = this.physics.add.staticGroup();
@@ -697,22 +682,11 @@ class GameScene extends Phaser.Scene {
     }
     pts.push({ x: this.worldW, y: 0 });
     this._terrainPts = pts;
-    // DISEGNO del terreno seguendo `terrainTopAt` (colline + cunette), riempimento a gradini +
-    // linea di superficie. La COLLISIONE la fa la "mappa di altezze" (heightmap-snap) nel update,
-    // non blocchi fisici → niente cuciture che incastrano. Nelle cunette il riempimento parte piu'
-    // in basso, cosi' sopra si vede lo sfondo (avvallamento).
-    const g = this.add.graphics().setDepth(4.3);
-    const SS = 16;
-    const poly = [{ x: 0, y: H + 200 }];
-    for (let cx = 0; cx <= this.worldW; cx += SS) poly.push({ x: cx, y: this.terrainTopAt(cx) });
-    poly.push({ x: this.worldW, y: this.terrainTopAt(this.worldW) });
-    poly.push({ x: this.worldW, y: H + 200 });
-    g.fillStyle(C.ground, 1);
-    g.fillPoints(poly, true);
-    g.lineStyle(5, C.groundDark, 1);
-    g.beginPath();
-    for (let cx = 0; cx <= this.worldW; cx += SS) { const y = this.terrainTopAt(cx); if (cx === 0) g.moveTo(cx, y); else g.lineTo(cx, y); }
-    g.strokePath();
+    // DISEGNO del terreno seguendo `terrainTopAt` (colline + cunette). La COLLISIONE la fa la
+    // "mappa di altezze" (heightmap-snap) nel update, non blocchi fisici → niente cuciture che
+    // incastrano. L'ASPETTO lo fa GameGfx.paintOrganicMass (massa di tessuto disegnata via
+    // codice, stessi toni del fondale); la FORMA resta questa, che e' gameplay.
+    window.GameGfx.paintOrganicMass(this, (x) => this.terrainTopAt(x), { verso: 1, lontano: H + 200, depth: 4.3 });
   }
   // Altezza del terreno in x (POSITIVO = collina sopra il pavimento, NEGATIVO = cunetta sotto),
   // quantizzata a gradini di TERR_STEP.

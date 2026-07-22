@@ -110,10 +110,21 @@ window.__earwaxChecks = function (opts) {
     if (incastrabili.length === 0) {
       ok('nessun nemico incastrato nel cerume', lv);
     } else {
-      avanza(gs, 180);
-      const bloccati = incastrabili.filter((r) => r.e.active && Math.abs(r.e.x - r.x0) < 4);
-      if (bloccati.length === 0) ok('nessun nemico incastrato nel cerume', lv, incastrabili.length + ' sovrapposti ma si sono liberati');
-      else ko('nessun nemico incastrato nel cerume', lv, bloccati.length + ' nemici fermi dentro il cerume dopo 3 secondi');
+      // "Fermo" non vuol dire "incastrato": certi nemici (il Gorgogliante) stanno apposta immobili
+      // a sputare. E' incastrato solo chi SPINGE per muoversi senza riuscirci, cioe' ha velocita'
+      // orizzontale ma non avanza. Contarli come bloccati dava falsi allarmi.
+      incastrabili.forEach((r) => { r.spinte = 0; r.xPrec = r.e.x; });
+      for (let i = 0; i < 180; i++) {
+        avanza(gs, 1);
+        incastrabili.forEach((r) => {
+          if (!r.e.active) return;
+          if (Math.abs(r.e.body.velocity.x) > 10 && Math.abs(r.e.x - r.xPrec) < 0.5) r.spinte++;
+          r.xPrec = r.e.x;
+        });
+      }
+      const bloccati = incastrabili.filter((r) => r.e.active && r.spinte > 60);
+      if (bloccati.length === 0) ok('nessun nemico incastrato nel cerume', lv, incastrabili.length + ' sovrapposti ma liberi di muoversi');
+      else ko('nessun nemico incastrato nel cerume', lv, bloccati.length + ' nemici spingono contro il cerume senza avanzare');
     }
 
     // [4] PEDANE RAGGIUNGIBILI — bugfix E.3 (11/07): pedane troppo in alto = irraggiungibili.

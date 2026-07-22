@@ -45,6 +45,85 @@ window.GameGfx = {
     { role: 'near', y: -60, f: 0.40, scale: 1.32, depth: -13, alpha: 1.00, tint: 0xffffff },
   ],
 
+  // ---------- MASSA ORGANICA (terreno e soffitto) ----------
+  // Terreno e soffitto erano due lastroni di colore piatto marrone: con lo sfondo pittorico
+  // dietro erano diventati la cosa piu' fuori posto dell'inquadratura. Qui vengono disegnati
+  // via codice (nessun asset) come una SEZIONE DI TESSUTO: massa profonda scura, corpo, crosta
+  // vicino alla superficie e un filo di luce sul bordo — cioe' gli stessi toni del fondale.
+  // NB: e' solo aspetto. La FORMA resta quella generata dal gameplay (colline, cunette,
+  // strettoie) e la collisione non viene toccata.
+  CARNE: {
+    profondo: 0x2b0f18,   // in fondo alla massa (quasi buio)
+    crosta:   0xc2455f,   // appena sotto la superficie, satura come il fondale
+    bordo:    0xe89aad,   // filo di luce sul bordo
+  },
+
+  // profilo(x) -> y del bordo della massa.
+  // verso: +1 la massa sta SOTTO il bordo (terreno), -1 sta SOPRA (soffitto).
+  // lontano: y dove la massa "finisce" fuori schermo.
+  paintOrganicMass(scene, profilo, opts) {
+    const verso = opts.verso, lontano = opts.lontano;
+    // PASSO 16 e non 8: ogni velatura e' un poligono lungo tutto il livello, quindi raddoppiare i
+    // punti raddoppia il costo di costruzione del livello (misurato: si era piu' che raddoppiato).
+    // A 16px la silhouette e' identica a vedersi.
+    const W = scene.worldW, PASSO = 16;
+    const P = this.CARNE;
+    const g = scene.add.graphics().setDepth(opts.depth);
+
+    const bordo = [];
+    for (let x = 0; x <= W; x += PASSO) bordo.push({ x, y: profilo(x) });
+    bordo.push({ x: W, y: profilo(W) });
+
+    // Fascia di massa tra due profondita' (a = piu' vicina al bordo, b = piu' dentro).
+    // Il confine interno ONDEGGIA: se fosse dritto la sfumatura sembrerebbe una fascia
+    // orizzontale dipinta sopra, invece cosi' la massa respira come tessuto vero.
+    const fase = Phaser.Math.FloatBetween(0, 6.28);
+    const onda = (x, d) => d * (0.78 + 0.44 * Math.sin(x * 0.0085 + fase));
+    const banda = (a, b) => bordo.map((p) => ({ x: p.x, y: p.y + verso * a }))
+      .concat(bordo.slice().reverse().map((p) => ({ x: p.x, y: p.y + verso * onda(p.x, b) })));
+
+    // 1) massa profonda fino a fuori schermo
+    g.fillStyle(P.profondo, 1);
+    g.fillPoints(bordo.map((p) => ({ x: p.x, y: p.y }))
+      .concat([{ x: W, y: lontano }, { x: 0, y: lontano }]), true);
+
+    // 2) SFUMATURA verso la superficie, fatta con VELATURE trasparenti sovrapposte invece che con
+    // tinte piene: ogni fascia aggiunge un velo di crosta, e piu' ci si avvicina al bordo piu'
+    // veli si accumulano. Con le tinte piene si vedevano i GRADINI paralleli alla superficie;
+    // cosi' la transizione e' continua.
+    // La profondita' deve stare DENTRO l'altezza visibile (~180px sotto la superficie): con 230
+    // il buio restava fuori schermo e il terreno sembrava una tinta unita slavata.
+    const VELI = 10, PROFONDITA = 120;
+    for (let k = VELI; k >= 1; k--) {
+      g.fillStyle(P.crosta, 0.16);
+      g.fillPoints(banda(0, k * (PROFONDITA / VELI)), true);
+    }
+
+    // 4) macchie: bolle piu' chiare/scure dentro la massa, per togliere l'effetto tinta unita
+    // Macchie appena percettibili: prima erano scure e tonde e sembravano buchi/chiazze.
+    for (let x = 20; x < W; x += Phaser.Math.Between(38, 74)) {
+      const prof = Phaser.Math.Between(24, 150);
+      const r = Phaser.Math.Between(14, 30);
+      const chiara = Math.random() < 0.6;
+      g.fillStyle(chiara ? P.crosta : P.profondo, chiara ? 0.16 : 0.14);
+      g.fillEllipse(x, profilo(x) + verso * prof, r * 2.6, r * 1.1);
+    }
+    // 5) grumi sul bordo: spezzano la linea netta. Sul TERRENO restano sotto la superficie (se
+    //    sporgessero il PG sembrerebbe camminare sospeso); sul SOFFITTO possono pendere.
+    for (let x = 16; x < W; x += Phaser.Math.Between(34, 78)) {
+      const r = Phaser.Math.Between(7, 17);
+      const dentro = verso > 0 ? r * 0.75 : -r * 0.15;   // terreno: dentro / soffitto: sporge
+      g.fillStyle(P.bordo, 0.28);                        // appena accennati: piu' marcati
+      g.fillEllipse(x, profilo(x) + verso * dentro, r * 2.8, r * 1.3);   // sembravano bollicine
+    }
+    // 6) filo di luce sul bordo (dove batte la luce del condotto)
+    g.lineStyle(3, P.bordo, 0.75);
+    g.beginPath();
+    bordo.forEach((p, i) => { if (i === 0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y); });
+    g.strokePath();
+    return g;
+  },
+
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
     if (!sets) return null;
