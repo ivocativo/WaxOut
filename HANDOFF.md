@@ -6,18 +6,22 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-20 · Ultimo commit di lavoro pushato: `be4eb3c` (sfondo a 3 strati)._
+_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `145e0ea`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
-_3 atmosfere, boss punk); hotfix freeze-spawn e salto boss; **APP ANDROID via GitHub Actions** (APK_
-_installabile dal telefono, larghezza adattiva); **Round 4 — CONDOTTO/TERRENO:** soffitto ondulato_
-_con stanze ampie + collisione, e **TERRENO stile Terraria** (colline + cunette) su cui camminano_
-_PG e nemici via "mappa di altezze" (heightmap-snap); **✅ BUG CERUME su terreno RISOLTO** (`d6e50cd`);_
-_**✅ fix corpo a corpo** (`ae6abd4`: cerume e nemici non tornano piu' al vecchio livello piatto);_
-_**✅ ROUND 5 — SFONDO a 3 strati** (`be4eb3c`: parallax pittorico a set, soffitto piu' alto,_
-_protuberanze vecchie disattivate). Dettaglio in `ROADMAP.md`._
-_**STATO ORA:** sfondo fatto e approvato. Prossimi passi: **BUG salto nelle cunette** (§DA FARE),_
-_rigenerare le protuberanze in stile, rifinitura terreno, integrare il **crouch** (§Asset nuovi),_
-_tarare i numeri col playtest. L'utente RIMANDA lo store; rifinisce gameplay/estetica._
+_3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
+_soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
+_**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
+_**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
+_pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
+_Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 47 controlli automatici (§sotto)._
+_**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
+_dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
+_fissa** — sepolte nelle colline o irraggiungibili (`4752bd7`); **nemici che nascevano dentro il_
+_cerume** (`145e0ea`). Gli ultimi due li hanno TROVATI i controlli automatici._
+_**STATO ORA:** il piano tecnico in `ROADMAP.md` e' ai passi 1-3 fatti. In attesa del PLAYTEST_
+_dell'utente sull'APK. Poi: sfoltire l'APK (§APP ANDROID), rigenerare le protuberanze, integrare il_
+_**crouch** (§Asset nuovi), tarare i numeri. L'utente RIMANDA lo store; rifinisce gameplay/estetica._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -90,6 +94,10 @@ piu' una passata **senza god-mode** (col god-mode acceso i bug di DANNO restano 
 
 Serve una tantum: `python -m pip install playwright` e `python -m playwright install chromium`
 (gia' fatto su questo PC; Node NON e' installato, Python 3.12 si').
+
+**Schermate senza aprire finestre:** `python tools\schermata.py [livello] [x] [file.png]` salva un
+fotogramma del gioco (predefinito: `schermata.png` nella cartella del gioco, gia' in .gitignore).
+Serve a giudicare l'aspetto ed e' il RIPIEGO quando il pannello del preview si impunta — successo.
 
 Quando un controllo fallisce: **prima capire se e' rotto il gioco o il controllo.** E' successo 3
 volte su 3 al primo giro — il boss "non saltava" solo perche' il test non gli avvicinava mai il
@@ -192,6 +200,17 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   (`MUTATORS`: fretta, orda, corazza, poca gravità, cuccagna, cerume ostinato) + **eventi casuali**
   (`EVENTS`, ~25%, indipendenti dai mutatori): Fuggitivo Dorato, Frana di cerume, Sciame improvviso.
 - **Ostacoli:** pozze scivolose + gocce dal soffitto. Membrane di cerume con fisica a celle (collasso).
+- **Terreno, soffitto, pedane, pozze (dal 2026-07-21, VIA CODICE — nessun asset):**
+  `GameGfx.paintOrganicMass` disegna terreno e soffitto come sezione di tessuto (massa quasi buia
+  in profondita', velature di crosta satura verso la superficie, filo di luce sul bordo);
+  `paintLedge` fa le pedane a mensola (piano d'appoggio illuminato, sottopancia scuro);
+  `paintSlick` la pozza scivolosa come patina verde-acqua che SEGUE il profilo del terreno.
+  Tavolozza condivisa in `GameGfx.CARNE`. ⚠️ Tutto questo e' solo ASPETTO: forma e collisione
+  restano quelle del gameplay. Trappole gia' pagate, annotate nel codice: tinte piene sovrapposte
+  = gradini visibili (servono velature trasparenti); sfumatura troppo profonda = tinta unita
+  slavata (il buio deve entrare nei ~180px visibili); confine interno dritto = sembra una fascia
+  dipinta sopra (deve ondeggiare). Il verde-acqua della pozza non e' un vezzo: il senape di prima
+  si confondeva col cerume da raccogliere.
 - **Sfondo (dal 2026-07-20):** SET di 3 immagini **pittoriche** (far/mid/near) in parallax dietro
   soffitto e terreno. Volutamente NON pixelate: il contrasto con i personaggi pixel-art e' una
   scelta approvata dall'utente. Un set ogni 5 livelli (cambia dopo il boss). Manopole per strato
@@ -274,6 +293,16 @@ main → GitHub compila → `gh run download` scarica l'APK → messo in `Earwax
 l'utente lo prende dal telefono via `GIOCA-SU-TELEFONO.cmd` (`http://<IP>:8123/EarwaxWar.apk`) e lo
 installa. **Larghezza ADATTIVA** (main.js) → niente bande nere ai lati. L'app parte e gira sul telefono.
 Resta: **icona app personalizzata** (ora generica), e la pubblicazione vera sullo store (rimandata).
+
+### 📦 APK da SFOLTIRE (misurato 2026-07-22, non urgente ma cresce)
+L'APK e' passato da 14 a **22 MB** e **~8 MB sono sprecati**: il workflow fa `cp -r assets www/`,
+cioe' copia TUTTA la cartella senza distinguere il materiale di LAVORAZIONE da quello di GIOCO.
+Dentro l'APK finiscono: le immagini sorgente degli sfondi (`fondale.png`, `mid.png`,
+`primo piano.png` = 5,4 MB, servono solo a ri-generare gli asset), le **protuberanze** (1,8 MB, oggi
+disattivate ma ancora CARICATE da BootScene — sprecano anche memoria sul telefono) e
+`bg_flesh_01.jpg` (0,9 MB, si usa solo la sua versione lavorata). Con altri set di sfondo il
+problema cresce. Idea: una convenzione per il materiale di lavorazione (es. non copiare i file
+sorgente dei set) invece di una lista di esclusioni fragile.
 
 ---
 

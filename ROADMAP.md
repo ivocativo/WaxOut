@@ -122,11 +122,25 @@ approvata: **terreno irregolare a gradini** (montagnole, saliscendi, cunette). F
 1. ✅ **Pulizia codice morto** (`791afb5`): rilievi/buche e profilo pavimento.
 2. ✅ **Controlli automatici** (`4752bd7`): `python tools\controlla.py`, 47 controlli. Vedi
    `HANDOFF.md` §Controlli automatici. Hanno subito trovato un bug vero (pedane sul terreno).
-3. [ ] **Pavimento e soffitto**: sono rimasti marroni piatti ed e' ora la cosa che stona di piu'
-   nell'inquadratura, con lo sfondo nuovo dietro.
+3. ✅ **Pavimento, soffitto, pedane e pozze** (`50329e1`, `31f6b3d`, `145e0ea`): ridisegnati via
+   codice come massa di tessuto, in tinta col fondale. Nessuna palette marrone/senape residua.
+   Dettaglio e trappole gia' pagate: `HANDOFF.md` §Cosa c'e' gia'.
 4. [ ] **Revisione completa del codice** — DOPO che l'estetica si e' assestata, cosi' non si
    pulisce codice che sta per essere riscritto, e con i controlli a fare da rete. Se si fa:
-   conviene prima mappare `GameScene.js` (3200 righe) con un subagente.
+   conviene prima mappare `GameScene.js` (3300 righe) con un subagente.
+
+### In attesa: PLAYTEST dell'utente sull'APK (scaricato 2026-07-22, commit `145e0ea`)
+E' cambiato molto visivamente e il giudizio in movimento e' diverso da quello sugli screenshot.
+
+### Aperti, in ordine di quanto sono pronti
+- [ ] **Sfoltire l'APK**: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
+  Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Non urgente, ma cresce a ogni set di sfondo.
+- [ ] **Protuberanze** da rigenerare in stile e riattivare (il meccanismo di piazzamento e' intatto
+  in `GameGfx.drawProtuberances`, basta rimettere la chiamata in `buildLevel`). Finche' sono
+  disattivate, togliere anche il loro caricamento da BootScene fa risparmiare 1,8 MB.
+- [ ] **Crouch**: 36 frame gia' forniti dall'utente, servono 2 risposte sue (vedi §Asset nuovi).
+- [ ] **Tarature col playtest** e verifica dal vivo dell'**Assedio**, mai giocato davvero.
+- [ ] **Altri set di sfondo**: procedura pronta, basta che l'utente dica "voglio altri sfondi".
 
 ---
 
