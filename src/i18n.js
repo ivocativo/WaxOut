@@ -41,6 +41,8 @@ window.I18n = (function () {
       hud_abilities: 'Abilities: {list}',
       // --- Banner di gioco ---
       game_boss_in: '!  THE WAX PLUG APPROACHES  !',
+      game_boss_finale_in: '!!  THE GREAT WAX PLUG  !!',
+      game_boss_collapse: 'THE CANAL COLLAPSES!  Wax rains down!',
       game_swarm_in: 'SWARM INCOMING!',
       game_goal: 'CLEAN THE EAR CANAL!',
       game_rush_in: 'RUSH!  Reach the eardrum before time runs out!',
@@ -249,6 +251,8 @@ window.I18n = (function () {
       hud_abilities: 'Abilita: {list}',
       // --- Banner di gioco ---
       game_boss_in: '!  ARRIVA IL TAPPO DI CERUME  !',
+      game_boss_finale_in: '!!  IL GRAN TAPPO DI CERUME  !!',
+      game_boss_collapse: 'IL CONDOTTO CROLLA!  Piove cerume!',
       game_swarm_in: 'SCIAME IN ARRIVO!',
       game_goal: 'PULISCI IL CONDOTTO!',
       game_rush_in: 'CORSA!  Raggiungi il timpano prima che scada il tempo!',

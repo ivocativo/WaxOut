@@ -104,6 +104,10 @@ class GameScene extends Phaser.Scene {
     // undefined = nessuna porta per questo livello (comportamento a sorteggio attuale).
     this._doorMutatorId = mutatoreForzato;
     this._doorWaxMult = waxMultPorta;
+    // BOSS FINALE (round A, A.2): l'ultimo livello e' sempre un boss (RUN_LEVELS e' multiplo di 5),
+    // ma quello e' il GRAN TAPPO — piu' vita e una TERZA fase (vedi spawnEnemy/bossAI). I boss
+    // intermedi (liv. 5, 10) restano quelli di sempre a 2 fasi.
+    this.isFinale = (levelNum === window.CONFIG.RUN_LEVELS);
     // Soglia di pulizia per completare: default 0.8; la CORSA non chiede pulizia (basta
     // arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
     if (this.levelKind === 'rush') this.cleanGoal = 0;
@@ -357,7 +361,8 @@ class GameScene extends Phaser.Scene {
       spawnDelay = Math.max(2000, 3200 - lvl * 120);
       this.spawnEnemy('boss');
       this.spawnEnemy();
-      this.showBanner(window.I18n.t('game_boss_in'), '#ffb04a');
+      this.showBanner(window.I18n.t(this.isFinale ? 'game_boss_finale_in' : 'game_boss_in'),
+        this.isFinale ? '#ff5252' : '#ffb04a');
     } else if (this.levelKind === 'swarm') {
       this.maxEnemies = Math.min(4 + lvl, 9);
       spawnDelay = Math.max(800, 1700 - lvl * 110);
@@ -1434,6 +1439,7 @@ class GameScene extends Phaser.Scene {
       cfg = { tex: 'enemy_spit', hp: 45 + lvl * 5, speed: 28, dmg: 12 + lvl, wax: 9, bit: 'bit_dirt', body: [26, 24], spit: true, projDmg: 9 + lvl * 2, spitEvery: 2200 };
     } else if (kind === 'boss') {
       cfg = { tex: 'enemy_boss', hp: 420 + lvl * 40, speed: 34, dmg: 20 + lvl * 2, wax: 60 + lvl * 6, bit: 'bit_hard', body: [60, 54], spit: true, projDmg: 12 + lvl * 2, spitEvery: 1500, boss: true };
+      if (this.isFinale) { cfg.hp = Math.round(cfg.hp * 1.7); cfg.wax = Math.round(cfg.wax * 1.5); }   // A.2: il GRAN TAPPO
     } else if (kind === 'flea') {
       // Pulce: piccola, debole, salta di CONTINUO verso il giocatore (non un singolo affondo
       // come il cerumino) - fastidiosa piu' che pericolosa, presto in partita per varieta'.
@@ -1547,6 +1553,7 @@ class GameScene extends Phaser.Scene {
       e.bossAtk = null;                                         // stato attacco balzo+schiacciata (vedi bossAI)
       e.slamReadyAt = this.time.now + Phaser.Math.Between(2500, 4000);   // niente slam nei primissimi istanti
       e.slamShadow = null;                                      // ombra a terra durante il balzo (round 2, D.1)
+      e.finale = !!this.isFinale;                               // A.2: il GRAN TAPPO ha una terza fase (vedi bossAI)
       e.once('destroy', () => { if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; } });
     }
 
@@ -2526,7 +2533,7 @@ class GameScene extends Phaser.Scene {
         e.setVelocityX(0);
         if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; }
         this.bossSlamFx(e, e.x, e.y);
-        e.slamReadyAt = now + (e._enraged ? 3000 : 4500);
+        e.slamReadyAt = now + (e._collapse ? 2200 : (e._enraged ? 3000 : 4500));
       }
       return;
     }
@@ -2535,12 +2542,27 @@ class GameScene extends Phaser.Scene {
     e.setFlipX(dir < 0);
 
     const enraged = e.hp <= e.maxHp * 0.5;
-    if (enraged && !e._enraged) {                 // passaggio di fase
+    if (enraged && !e._enraged) {                 // passaggio di fase (2a): FURIA
       e._enraged = true;
       this.cameras.main.shake(200, 0.01);
       this.showBanner(window.I18n.t('game_boss_enrage'), '#ff7043');
       e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
       e._summonAt = now + 2500;
+    }
+
+    // FINALE, terza fase a 25% HP (round A, A.2): il condotto CROLLA. Parte la frana di cerume dal
+    // soffitto (l'infrastruttura dell'evento 'quake', mai usata sui boss normali) e l'offesa sale
+    // ancora — sputo a 5 vie e slam piu' ravvicinato (vedi sotto). Scatta UNA volta sola.
+    if (e.finale && e.hp <= e.maxHp * 0.25 && !e._collapse) {
+      e._collapse = true;
+      this.cameras.main.shake(450, 0.018);
+      // yPos piu' basso (175): normalmente furia (50%) e crollo (25%) scattano in momenti diversi,
+      // ma un colpo molto forte puo' attraversare entrambe le soglie nello stesso frame -> cosi' i
+      // due banner non si sovrappongono mai (quello della furia sta a 118).
+      this.showBanner(window.I18n.t('game_boss_collapse'), '#ff5252', 175);
+      this.placeStalactites();
+      this.scheduleQuakePulse();
+      e.spitEvery = Math.max(500, Math.round(e.spitEvery * 0.7));
     }
 
     // Pronto + giocatore abbastanza vicino + boss a terra: parte il telegrafo dello slam.
@@ -2563,7 +2585,8 @@ class GameScene extends Phaser.Scene {
       e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : 0xffffff);
       if (now - e.spitWindupAt >= 320) {
         e.clearTint(); e.spitWindupAt = 0;
-        if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
+        if (e._collapse) { this.spitAt(e, -240); this.spitAt(e, -120); this.spitAt(e, 0); this.spitAt(e, 120); this.spitAt(e, 240); }  // 5 vie (finale)
+        else if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
         else this.spitAt(e, 0);
         e.nextSpit = now + e.spitEvery;
       }

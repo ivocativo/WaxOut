@@ -485,7 +485,53 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [17] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [17] BOSS FINALE (round A, A.2): al livello RUN_LEVELS il boss ha piu' vita e una TERZA fase
+  // ("crollo": frana di cerume dal soffitto a 25% HP). I boss INTERMEDI (liv. 5) non cambiano.
+  {
+    window.GameState.infezione = 0;   // isolare il fattore finale dallo scaling infezione
+
+    const bossDelLivello = (lv) => {
+      fermaMeta();
+      window.GameState.reset();
+      window.GameState.level = lv;
+      g.scene.start('GameScene');
+      passaTick();
+      const gs = g.scene.getScene('GameScene');
+      avanza(gs, 40);   // lascia finire la comparsa del boss
+      return { gs, boss: gs.enemies.getChildren().find((e) => e.active && e.kind === 'boss') };
+    };
+    // porta il boss a fase "crollo" (20% HP) e fa girare l'IA una volta.
+    const forzaFase3 = (gs, boss) => {
+      if (!boss) return false;
+      boss.bossAtk = null;
+      boss.hp = Math.round(boss.maxHp * 0.2);
+      gs.bossAI(boss, gs.time.now);
+      return true;
+    };
+
+    const F = bossDelLivello(window.CONFIG.RUN_LEVELS);
+    const hpAttesaFinale = Math.round((420 + window.CONFIG.RUN_LEVELS * 40) * 1.7);
+    const finaleFlag = !!(F.boss && F.boss.finale);
+    const hpFinaleOk = !!(F.boss && F.boss.maxHp === hpAttesaFinale);
+    forzaFase3(F.gs, F.boss);
+    const crolloOk = !!(F.boss && F.boss._collapse === true && F.gs.quakeTimer);
+
+    const M = bossDelLivello(5);
+    const hpNormaleOk = !!(M.boss && M.boss.maxHp === (420 + 5 * 40) && !M.boss.finale);
+    forzaFase3(M.gs, M.boss);
+    const intermedioNoCrollo = !!(M.boss && !M.boss._collapse);
+
+    if (finaleFlag && hpFinaleOk && crolloOk && hpNormaleOk && intermedioNoCrollo) {
+      ok('boss finale: piu vita + terza fase', window.CONFIG.RUN_LEVELS,
+        'hp ' + (F.boss && F.boss.maxHp) + ' (boss liv.5: ' + (M.boss && M.boss.maxHp) + '), crollo ok');
+    } else {
+      ko('boss finale: piu vita + terza fase', window.CONFIG.RUN_LEVELS,
+        'finaleFlag=' + finaleFlag + ' hpFinaleOk=' + hpFinaleOk + ' crolloOk=' + crolloOk
+        + ' hpNormaleOk=' + hpNormaleOk + ' intermedioNoCrollo=' + intermedioNoCrollo);
+    }
+  }
+
+  // [18] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 
