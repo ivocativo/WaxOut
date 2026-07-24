@@ -203,51 +203,8 @@ window.GameGfx = {
     return g;
   },
 
-  // TIMPANO (round B, B.1): il traguardo in fondo al condotto, disegnato VIA CODICE (niente sprite
-  // vecchio) come una membrana tesa — coerente col resto ora dipinto a codice. Piu' CHIARA e
-  // perlacea delle pareti, cosi' salta all'occhio come "meta" da raggiungere: cerchi concentrici
-  // (la membrana tesa), un cono di luce (il riflesso tipico del timpano) e un alone di carne che la
-  // raccorda alla parete. "Respira" con un tween di scala. La logica di vittoria NON dipende da
-  // questo: usa `goalX` (vedi GameScene.buildGoal), qui c'e' solo l'aspetto.
-  TIMPANO: {
-    socket:   0x2b0f18,   // incasso scuro dietro la membrana
-    membrana: 0xe6b3ba,   // base perlacea (piu' chiara della carne)
-    anello:   0xc07f8b,   // cerchi concentrici (membrana tesa)
-    riflesso: 0xfff2f4,   // cono di luce
-  },
-  paintEardrum(scene, cx, cy, w, h) {
-    const P = this.TIMPANO;
-    const g = scene.add.graphics().setDepth(3).setPosition(cx, cy);   // disegna in locale attorno a (0,0)
-    const hw = w / 2, hh = h / 2;
-
-    // 1) incasso scuro un filo piu' grande: stacca la membrana dalla parete.
-    g.fillStyle(P.socket, 1);
-    g.fillEllipse(0, 0, w * 1.12, h * 1.06);
-    // 2) membrana perlacea + ombra morbida appena dentro il bordo: le da' l'aria di membrana TESA
-    // e incavata invece di un disco piatto.
-    g.fillStyle(P.membrana, 1);
-    g.fillEllipse(0, 0, w, h);
-    g.lineStyle(7, P.socket, 0.3);
-    g.strokeEllipse(0, 0, w * 0.9, h * 0.9);
-    // 3) cerchi concentrici (verso il centro, sempre piu' stretti): la tensione della membrana.
-    for (let k = 5; k >= 1; k--) {
-      const t = k / 6;
-      g.lineStyle(2, P.anello, 0.28);
-      g.strokeEllipse(0, 0, w * t, h * t);
-    }
-    // 4) cono di luce in alto a sinistra (riflesso caratteristico del timpano).
-    g.fillStyle(P.riflesso, 0.5);
-    g.fillEllipse(-hw * 0.28, -hh * 0.30, w * 0.30, h * 0.20);
-    g.fillStyle(P.riflesso, 0.28);
-    g.fillEllipse(-hw * 0.18, -hh * 0.18, w * 0.5, h * 0.34);
-    // 5) alone di carne sul bordo che raccorda alla parete.
-    g.lineStyle(4, this.CARNE ? this.CARNE.bordo : 0xe89aad, 0.7);
-    g.strokeEllipse(0, 0, w, h);
-
-    // "Respiro": la membrana pulsa piano (stesso ritmo del vecchio sprite).
-    scene.tweens.add({ targets: g, scaleX: 1.05, scaleY: 1.03, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    return g;
-  },
+  // (Il timpano non e' piu' disegnato via codice: dal round B.1 e' un'immagine AI scontornata,
+  // caricata in BootScene come 'eardrum' e piazzata da GameScene.buildGoal.)
 
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;

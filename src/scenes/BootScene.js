@@ -21,7 +21,8 @@ class BootScene extends Phaser.Scene {
     // Per aggiornarle: sostituisci il PNG e rilancia tools/embed_assets.ps1.
     const A = window.ASSET_DATA || {};
     const aimg = (key, file) => this.load.image(key, A[key] || file);
-    // (lo sprite 'eardrum' non si carica piu': il timpano ora e' disegnato via codice, round B.1.)
+    // Timpano: immagine AI scontornata (fondo magenta) + pixellizzata (tools/bake_sprite.ps1), round B.1.
+    aimg('eardrum', 'assets/sprites/eardrum_px.png');
     // Fondale gia' pixelato+posterizzato (tools/bake_bg_pixel.ps1); niente elaborazione
     // canvas a runtime (che si romperebbe da file://).
     aimg('bg_flesh_px', 'assets/backgrounds/bg_flesh_01_px.png');
