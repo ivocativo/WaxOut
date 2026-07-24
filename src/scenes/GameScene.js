@@ -1461,6 +1461,31 @@ class GameScene extends Phaser.Scene {
     cfg.dmg = Math.max(1, Math.round(cfg.dmg * (this.mutEnemyDmg || 1)));
     if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * (this.mutEnemyDmg || 1)));
 
+    // ART (round B.2): gli sprite nemici sono immagini AI, di dimensioni diverse dalle vecchie
+    // texture pixel. Ricalcolo scala e hitbox dalla TEXTURE caricata: `dispH` = altezza a schermo
+    // voluta (~come prima), `hbW/hbH` = hitbox nel MONDO (invariata rispetto a prima). Cosi' fisica
+    // e feel restano quelli, cambia solo l'immagine. `_artW/_artH` servono ad ancorare il corpo in
+    // BASSO (i piedi a terra): le nuove immagini sono RITAGLIATE, senza il bordo trasparente che
+    // sui vecchi sprite assorbiva l'offset. NB: cfg.scale qui e' la scala RISULTANTE, usata da
+    // targetScale/elite-tank/split come prima.
+    const ART = {
+      enemy_blob:   { dispH: 40, hbW: 40, hbH: 34 },
+      enemy_crust:  { dispH: 40, hbW: 40, hbH: 34 },
+      enemy_spit:   { dispH: 40, hbW: 30, hbH: 26 },
+      enemy_fly:    { dispH: 40, hbW: 26, hbH: 20 },
+      enemy_flea:   { dispH: 34, hbW: 20, hbH: 16 },
+      enemy_hopper: { dispH: 48, hbW: 40, hbH: 30 },
+      enemy_boss:   { dispH: 96, hbW: 64, hbH: 56 },
+    };
+    const art = ART[cfg.tex];
+    if (art && this.textures.exists(cfg.tex)) {
+      const src = this.textures.get(cfg.tex).getSourceImage();
+      const sc = art.dispH / src.height;
+      cfg.scale = sc;
+      cfg.body = [Math.max(4, Math.round(art.hbW / sc)), Math.max(4, Math.round(art.hbH / sc))];
+      cfg._artW = src.width; cfg._artH = src.height;
+    }
+
     // FIGLIO DELLO SPLIT: piu' piccolo, debole E MENO DANNOSO del genitore (due figli ~= un
     // genitore anche come minaccia: senza ridurre anche il danno, due figli farebbero insieme
     // il doppio del danno del genitore invece che l'equivalente).
@@ -1517,7 +1542,9 @@ class GameScene extends Phaser.Scene {
       // superficie LOCALE del terreno (terrainTopAt), cosi' il corpo e lo sbuffo di comparsa
       // appoggiano sul terreno sotto x, non sulla vecchia linea piatta 360.
       surfY = this.terrainTopAt(x);
-      y = surfY - (cfg.body[1] * targetScale) / 2;
+      // corpo ancorato in basso: la quota di riposo usa l'ALTEZZA A SCHERMO dello sprite (frame x
+      // scala), non l'altezza della hitbox, cosi' i piedi appoggiano sul terreno.
+      y = surfY - ((cfg._artH || cfg.body[1]) * targetScale) / 2;
     }
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
@@ -1533,7 +1560,14 @@ class GameScene extends Phaser.Scene {
     // animazione (misurato fino a 24px sotto la superficie; segnalato dall'utente 2026-07-22).
     // La rimette this.endSpawn().
     e.body.setAllowGravity(false);
-    e.body.setSize(cfg.body[0], cfg.body[1], true);
+    if (cfg._artW) {
+      // Hitbox ANCORATA IN BASSO nel fotogramma (i piedi del nemico a terra): le immagini AI sono
+      // ritagliate, senza il bordo trasparente che sui vecchi sprite centrava il corpo.
+      e.body.setSize(cfg.body[0], cfg.body[1]);
+      e.body.setOffset((cfg._artW - cfg.body[0]) / 2, cfg._artH - cfg.body[1]);
+    } else {
+      e.body.setSize(cfg.body[0], cfg.body[1], true);
+    }
     e.hp = cfg.hp; e.maxHp = cfg.hp;
     e.speed = cfg.speed;
     e.contactDamage = cfg.dmg;

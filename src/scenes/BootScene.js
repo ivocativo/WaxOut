@@ -11,9 +11,16 @@ class BootScene extends Phaser.Scene {
     const img = (key, name, file) => this.load.image(key, D[name] || ('assets/sprites/' + file));
     img('player_a', 'hero_idle', 'hero_idle.png');
     img('player_b', 'hero_idle', 'hero_idle.png');   // walk = idle finche' non c'e' il frame di corsa
-    img('enemy_blob', 'cerumino', 'cerumino.png');
-    img('enemy_crust', 'crosta', 'crosta.png');
     img('wax_glob', 'wax_glob', 'wax_glob.png');
+
+    // NEMICI (round B.2): immagini AI scontornate + pixellizzate (tools/bake_sprite.ps1), tutte in
+    // assets/sprites/enemies/. Sostituiscono le vecchie texture (cerumino/crosta erano PNG, gli
+    // altri 5 erano generati a codice con PixelArt.fromGrid — ora rimosso). Caricate DIRETTAMENTE
+    // dal file (non via `img`) per non passare dai vecchi data URI in SPRITE_DATA, che avrebbero
+    // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
+    [['enemy_blob', 'cerumino'], ['enemy_crust', 'crosta'], ['enemy_spit', 'gorgogliante'],
+     ['enemy_fly', 'moscerino'], ['enemy_flea', 'pulce'], ['enemy_hopper', 'saltatore'],
+     ['enemy_boss', 'boss']].forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
 
     // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
     // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
@@ -67,111 +74,9 @@ class BootScene extends Phaser.Scene {
     const PA = window.PixelArt;
     const sE = window.CONFIG.PIXEL_SCALE_ENEMY;
 
-    // player_a/player_b, enemy_blob, enemy_crust e wax_glob ora arrivano da PNG
-    // (vedi preload). Qui sotto restano le texture ancora generate da codice.
-
-    // --- Nemico "Moscerino" (vola e insegue in aria) ---
-    const fPal = {
-      w: 0x7fae3a,   // corpo verde "germe"
-      L: 0xd8e8f5,   // ali chiare
-      o: C.outline,
-    };
-    const moscerino = [
-      '....wwww....',
-      '...wwwwww...',
-      '..wwowwoww..',
-      '.LwwwwwwwwL.',
-      'LLwwwwwwwwLL',
-      '.LwwwwwwwwL.',
-      '..wwwwwwww..',
-      '...woooow...',
-      '....w..w....',
-    ];
-    PA.fromGrid(this, 'enemy_fly', moscerino, fPal, sE);
-
-    // --- Nemico "Gorgogliante" (sputa cerume a distanza) ---
-    const gPal = {
-      w: 0x3fae9c,   // corpo turchese "infetto"
-      L: 0x86d9cb,   // riflesso chiaro
-      o: C.outline,
-    };
-    const gorgogliante = [
-      '...wwwwww...',
-      '..wwwwwwww..',
-      '.wwLwwwwLww.',
-      'wwwwwwwwwwww',
-      'wwoowwwwooww',
-      'wwwwwwwwwwww',
-      '.woooooooow.',
-      '.wwwwwwwwww.',
-      '..ww....ww..',
-    ];
-    PA.fromGrid(this, 'enemy_spit', gorgogliante, gPal, sE);
-
-    // --- Nemico "Pulce" (salta di continuo, piccola e fastidiosa) ---
-    const pPal = {
-      w: 0x5a6b2e,   // corpo verde-oliva "acaro"
-      L: 0x8fae4a,   // riflesso chiaro
-      g: 0x3a4a1e,   // zampe posteriori (piu' scure)
-      o: C.outline,
-    };
-    const pulce = [
-      '....o.o....',
-      '...wwwww...',
-      '..wwowoww..',
-      '.wwLwwwLww.',
-      '.wwwwwwwww.',
-      '.wwwwwwwww.',
-      '..wwwwwww..',
-      '.g.......g.',
-      'gg.......gg',
-      'g.........g',
-    ];
-    PA.fromGrid(this, 'enemy_flea', pulce, pPal, sE);
-
-    // --- Nemico "Saltatore" (balzo enorme e telegrafato, atterraggio ad onda) ---
-    const hPal = {
-      w: 0x8a6a3a,   // corpo bruno-cricket
-      L: 0xc9a86a,   // riflesso chiaro
-      g: 0x5c4420,   // zampe posteriori (piu' scure, piu' grosse della Pulce)
-      o: C.outline,
-    };
-    const saltatore = [
-      '.....o.o.......',
-      '....wwwwww.....',
-      '...wwowowww....',
-      '..wwLwwwwLww...',
-      '..wwwwwwwwww...',
-      '..wwwwwwwwww...',
-      '...wwwwwwww....',
-      '..g........g...',
-      '.gg........gg..',
-      'gg..........gg.',
-      'g............g.',
-    ];
-    PA.fromGrid(this, 'enemy_hopper', saltatore, hPal, sE);
-
-    // --- BOSS "Tappo di Cerume" (grande, due volte la scala) ---
-    const bPal = {
-      w: C.waxHard,
-      L: C.waxHardLight,
-      o: C.outline,
-    };
-    const tappo = [
-      '..oooooooooo..',
-      '.owwwwwwwwwwo.',
-      'owwLLwwwwLLwwo',
-      'owwwwwwwwwwwwo',
-      'owwoowwwwoowwo',
-      'owwoowwwwoowwo',
-      'owwwwwwwwwwwwo',
-      'owwoooooooowwo',
-      'owwwwwwwwwwwwo',
-      '.owwwwwwwwwwo.',
-      '..owwwwwwwwo..',
-      '...oooooooo...',
-    ];
-    PA.fromGrid(this, 'enemy_boss', tappo, bPal, sE * 2);
+    // player e i 7 NEMICI (round B.2) ora arrivano da PNG (vedi preload): le texture
+    // procedurali di moscerino/gorgogliante/pulce/saltatore/boss sono state rimosse. Qui sotto
+    // restano solo le texture ancora generate da codice (proiettili, blocchi, particelle, armi).
 
     // Proiettile OSTILE dei nemici (sputo): texture propria, ben diversa dal cerume
     // raccoglibile 'wax_glob' (round 2, A.3 — prima erano la stessa immagine e si confondevano).

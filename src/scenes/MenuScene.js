@@ -42,8 +42,12 @@ class MenuScene extends Phaser.Scene {
     // Mascotte (spazio libero adesso: non piu' schiacciate contro il blocco comandi)
     const guy = this.add.sprite(W / 2 - 150, 300, 'player_a').setScale(2.6);
     this.tweens.add({ targets: guy, y: '-=12', duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const blob = this.add.sprite(W / 2 + 150, 310, 'enemy_blob').setScale(2.6);
-    this.tweens.add({ targets: blob, scaleY: 2.28, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // Mascotte nemico: scala calcolata dalla texture (l'immagine AI e' molto piu' grande della
+    // vecchia texture pixel — a scala fissa 2.6 sarebbe gigantesca). ~150px di altezza.
+    const blob = this.add.sprite(W / 2 + 150, 320, 'enemy_blob');
+    const bs = 150 / blob.height;
+    blob.setScale(bs);
+    this.tweens.add({ targets: blob, scaleY: bs * 0.9, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // Pulsante: rettangolo con bordo + ombra leggera (stesso linguaggio del negozio, un po'
     // piu' rifinito) invece del vecchio testo piatto su sfondo giallo pieno.

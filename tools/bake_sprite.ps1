@@ -52,8 +52,12 @@ for ($y = 0; $y -lt $h; $y++) {
   for ($x = 0; $x -lt $w; $x++) {
     $i = $row + $x * 4
     [int]$b = $bytes[$i]; [int]$gr = $bytes[$i+1]; [int]$r = $bytes[$i+2]
-    if ($gr -lt 70 -and $r -gt 200 -and $b -gt 200 -and [Math]::Abs($r - $b) -lt 45) {
-      $bytes[$i]=0; $bytes[$i+1]=0; $bytes[$i+2]=0; $bytes[$i+3]=0    # magenta puro -> trasparente
+    # Chiave FONDO MAGENTA/ROSA: rosso alto, verde basso, blu alto e ben sopra il verde. Prende il
+    # magenta puro (#FF00FF) E il rosa acceso (es. 255,51,170) che qualche generazione usa al posto
+    # del magenta. Sicura sull'arte di QUESTO gioco: le creature sono ambra/marrone (blu basso ->
+    # $b>130 salta), verde/turchese (verde alto -> $gr<90 salta), i riflessi bianchi (verde alto).
+    if ($gr -lt 90 -and $r -gt 190 -and $b -gt 130 -and ($b - $gr) -gt 50) {
+      $bytes[$i]=0; $bytes[$i+1]=0; $bytes[$i+2]=0; $bytes[$i+3]=0    # fondo -> trasparente
       continue
     }
     $m = [Math]::Min($r, $b) - $gr
