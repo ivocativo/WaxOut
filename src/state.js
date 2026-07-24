@@ -27,8 +27,15 @@ window.CONFIG = {
   PIXEL_SCALE_ENEMY: 3,
   // Manopola globale sul cerume guadagnato AUTOMATICAMENTE (pulizia del muro + raccolta
   // pickup, incluse le palline lasciate dai nemici morti): scala TUTTO il guadagno passivo,
-  // cosi' l'economia si tara da un punto solo. Da aggiustare col playtest (F.1a).
+  // cosi' l'economia si tara da un punto solo. Misurata 2026-07-22 (vedi ROADMAP A.4b): SANA,
+  // non toccare i prezzi UNLOCKS/BLUEPRINTS, e' questa l'unica manopola da girare se mai servisse.
   WAX_GAIN: 0.55,
+
+  // Quanti livelli compongono una RUN COMPLETA (round A, A.1): raggiunto e superato questo
+  // livello (che e' sempre un boss, essendo multiplo di 5) la run e' VINTA -> VictoryScene invece
+  // che al livello successivo. Confermato dal playtest utente 2026-07-22: ~20 minuti a 15 livelli
+  // quando si sopravvive, dentro la finestra 20-30 min indicata dalle fonti (vedi HANDOFF.md).
+  RUN_LEVELS: 15,
 
   // Palette a tema "orecchio / cerume / sporco"
   COLORS: {
@@ -129,6 +136,14 @@ window.GameState = {
   wax: 0,
   player: null,
   ownedAbilities: [],   // es. 'doublejump', 'dash', 'hammer'
+  // Scelta del percorso (round A, A.3): scritta da DoorScene, letta e CONSUMATA (azzerata subito
+  // dopo) da GameScene.create(). null/assente = comportamento a sorteggio di sempre (livello 1,
+  // o livelli boss che non passano mai da una porta).
+  prossimoLivello: null,
+  // Istante di inizio RUN (Date.now(), non l'orologio di gioco: serve per il tempo REALE
+  // trascorso, mostrato in VictoryScene). E' l'unico punto del codice di gameplay che tocca
+  // l'orologio di sistema.
+  runStartAt: 0,
 
   newPlayer() {
     // Applica i potenziamenti permanenti acquistati al negozio.
@@ -183,6 +198,8 @@ window.GameState = {
     this.level = 1;
     this.wax = 0;
     this.ownedAbilities = [];
+    this.prossimoLivello = null;
+    this.runStartAt = Date.now();
     this.player = this.newPlayer();
     // Lo sblocco permanente "Doppio Salto Innato" (UNLOCKS.djump) da' gia' l'abilita' da
     // subito (vedi newPlayer) ma non passa mai dalla carta 'doublejump' dell'UpgradeScene:

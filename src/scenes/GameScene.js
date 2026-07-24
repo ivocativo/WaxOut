@@ -76,17 +76,34 @@ class GameScene extends Phaser.Scene {
     // inizio RUN è piena, la imposta newPlayer). Ci si cura raccogliendo i pickup-cura.
     window.GameState.player.hp = Phaser.Math.Clamp(window.GameState.player.hp, 1, window.GameState.player.maxHp);
 
-    // Tipo di questo livello: boss ogni 5, sciame ogni 5 (sfasato). Gli altri di solito sono
-    // "normali", ma dal lvl 2 spesso diventano un TIPO SPECIALE con obiettivo/regole diverse
-    // (pulizia profonda / corsa / assedio) per rompere la monotonia.
+    // Tipo di questo livello: boss ogni 5 (FISSO, mai una porta — round A, A.3). Per tutti gli
+    // altri, se DoorScene ha lasciato una scelta del giocatore la si usa (window.GameState.
+    // prossimoLivello, scritta da DoorScene e CONSUMATA qui, subito azzerata cosi' non resta per
+    // il livello dopo); altrimenti comportamento a sorteggio di sempre (livello 1: non passa mai
+    // da una porta, perche' UpgradeScene/DoorScene non sono ancora girate).
     const levelNum = window.GameState.level;
-    let kind = (levelNum % 5 === 0) ? 'boss' : (levelNum % 5 === 3) ? 'swarm' : 'normal';
-    if (kind === 'normal' && levelNum >= 2) {
-      const r = Math.random();
-      if (r < 0.28) kind = 'rush';
-      else if (r < 0.56) kind = 'siege';
+    const porta = window.GameState.prossimoLivello;
+    window.GameState.prossimoLivello = null;
+    let kind, mutatoreForzato, waxMultPorta;
+    if (levelNum % 5 === 0) {
+      kind = 'boss';
+    } else if (porta) {
+      kind = porta.kind;
+      mutatoreForzato = (porta.mutator === undefined) ? null : porta.mutator;   // null = "nessun modificatore", scelto apposta
+      waxMultPorta = porta.waxMult;
+    } else {
+      kind = (levelNum % 5 === 3) ? 'swarm' : 'normal';
+      if (kind === 'normal' && levelNum >= 2) {
+        const r = Math.random();
+        if (r < 0.28) kind = 'rush';
+        else if (r < 0.56) kind = 'siege';
+      }
     }
     this.levelKind = kind;
+    // Letti da chooseMutator() (chiamata piu' sotto, dopo buildCeilingProfile/drawBackground):
+    // undefined = nessuna porta per questo livello (comportamento a sorteggio attuale).
+    this._doorMutatorId = mutatoreForzato;
+    this._doorWaxMult = waxMultPorta;
     // Soglia di pulizia per completare: default 0.8; la CORSA non chiede pulizia (basta
     // arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
     if (this.levelKind === 'rush') this.cleanGoal = 0;
@@ -148,7 +165,11 @@ class GameScene extends Phaser.Scene {
 
     this.buildCeilingColliders();   // il "soffitto solido" che segue il profilo (dopo i gruppi)
 
-    this.chooseMutator();   // regola casuale di questo livello (prima di costruirlo: incide su cerume/nemici)
+    this.chooseMutator();   // regola casuale (o della porta) di questo livello (prima di costruirlo)
+    // Ricompensa promessa dalla PORTA (round A, A.3), SEPARATA dall'eventuale mutatore: si
+    // moltiplica sopra a quanto chooseMutator() ha gia' impostato (di norma 1, salvo mutatori che
+    // toccano il cerume — 'bonanza' e' escluso dal pool delle porte apposta per non sovrapporsi).
+    if (this._doorWaxMult) this.mutWaxMult = (this.mutWaxMult || 1) * this._doorWaxMult;
     this.chooseEvent();     // evento a tempo indipendente (puo' capitare insieme a un mutatore)
     this.buildLevel();
 
@@ -801,11 +822,22 @@ class GameScene extends Phaser.Scene {
     this.mutator = null;
   }
 
-  // Sceglie (a volte) un MODIFICATORE per questo livello e lo applica. Niente mutatori nei
-  // primissimi livelli e nei livelli boss (per non sovraccaricare). Il banner lo mostra create().
+  // Sceglie un MODIFICATORE per questo livello e lo applica. Niente mutatori nei livelli boss.
+  // Round A, A.3: se una PORTA ha deciso per questo livello (this._doorMutatorId, letto in
+  // create()), il modificatore non e' piu' un sorteggio ma la scelta del giocatore — forzato al
+  // 100% (o esplicitamente NESSUNO, se la porta prescelta prometteva "nessun modificatore": non
+  // deve uscirne uno a sorpresa, o l'anteprima mostrata nella porta diventerebbe bugiarda).
+  // undefined = nessuna porta per questo livello (livello 1): comportamento a sorteggio di sempre.
   chooseMutator() {
     this.resetMutators();
-    if (window.GameState.level < 2 || this.levelKind === 'boss') return;
+    if (this.levelKind === 'boss') return;
+    if (this._doorMutatorId !== undefined) {
+      if (this._doorMutatorId === null) return;
+      this.mutator = window.MUTATORS.find((m) => m.id === this._doorMutatorId) || null;
+      if (this.mutator) this.mutator.apply(this);
+      return;
+    }
+    if (window.GameState.level < 2) return;
     if (Math.random() > 0.55) return;   // ~55% dei livelli ha un mutatore
     this.mutator = Phaser.Utils.Array.GetRandom(window.MUTATORS);
     this.mutator.apply(this);

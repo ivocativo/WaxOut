@@ -190,8 +190,27 @@ class UpgradeScene extends Phaser.Scene {
     if (u.ability && window.GameState.ownedAbilities.indexOf(u.ability) === -1) {
       window.GameState.ownedAbilities.push(u.ability);
     }
+
+    // RUN COMPLETATA (round A, A.1): il livello appena finito e' l'ultimo (window.GameState.level
+    // non e' ancora stato incrementato: qui vale ancora il livello che si e' appena chiuso). Si
+    // incassa il cerume come a fine run (stesso meccanismo di gameOver) + si segna la vittoria, e
+    // si va alla VITTORIA invece che al livello successivo.
+    const finishedLevel = window.GameState.level;
+    if (finishedLevel >= window.CONFIG.RUN_LEVELS) {
+      const meta = window.Meta.bankRun(window.GameState.wax, finishedLevel);
+      window.Meta.recordWin();
+      this.scene.start('VictoryScene', { earned: window.GameState.wax, bank: meta.bank, levels: finishedLevel });
+      return;
+    }
+
     window.GameState.level += 1;
-    this.scene.start('GameScene');
+    // SCELTA DEL PERCORSO (round A, A.3): ogni livello NON-boss e' preceduto da una porta.
+    // I livelli boss (multipli di 5, stessa regola di GameScene.create) restano fissi.
+    if (window.GameState.level % 5 === 0) {
+      this.scene.start('GameScene');
+    } else {
+      this.scene.start('DoorScene');
+    }
   }
 }
 window.UpgradeScene = UpgradeScene;

@@ -7,7 +7,7 @@ window.Meta = (function () {
   const KEY = 'earwaxwar.meta.v1';
 
   function defaults() {
-    return { bank: 0, bestLevel: 1, runs: 0, unlocks: {} };
+    return { bank: 0, bestLevel: 1, runs: 0, wins: 0, unlocks: {} };
   }
 
   function load() {
@@ -20,6 +20,7 @@ window.Meta = (function () {
         bank: data.bank || 0,
         bestLevel: data.bestLevel || 1,
         runs: data.runs || 0,
+        wins: data.wins || 0,   // round A, A.1: run PORTATE A TERMINE (non solo giocate)
         unlocks: Object.assign({}, data.unlocks || {}),
       };
     } catch (e) { return defaults(); }
@@ -45,6 +46,10 @@ window.Meta = (function () {
     },
 
     unlockLevel(id) { return state.unlocks[id] || 0; },
+
+    // Vittoria della run (round A, A.1): separato da bankRun perche' una run puo' finire per
+    // morte (bankRun da solo) o per vittoria (bankRun + recordWin).
+    recordWin() { state.wins += 1; save(); return state; },
 
     spend(amount) {
       if (state.bank < amount) return false;

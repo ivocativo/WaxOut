@@ -320,7 +320,137 @@ window.__earwaxChecks = function (opts) {
     else ko('sopravvive fermo allo start (senza god-mode)', 1, 'morto restando fermo nei primi 4 secondi');
   }
 
-  // [12] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // ---------------------------------------------------------------- BLOCCO A (round A, 22/07):
+  // finale della run + scelta del percorso. Le prove [12]-[13] testano il CONTRATTO piu' a
+  // rischio (GameScene.create() che legge window.GameState.prossimoLivello), bypassando la UI
+  // (click sulle carte) per restare veloci e mirate; [14]-[15] verificano l'instradamento e la
+  // vittoria passando per le scene vere (UpgradeScene/DoorScene), chiamando i loro metodi
+  // direttamente invece di simulare i click.
+  const STOP_META = ['UpgradeScene', 'DoorScene', 'VictoryScene', 'PauseScene', 'ShopScene', 'MenuScene', 'GameScene'];
+  const fermaMeta = () => STOP_META.forEach((k) => { try { g.scene.stop(k); } catch (e) {} });
+  // `this.scene.start(...)` chiamato da DENTRO un metodo di scena (es. UpgradeScene.choose(),
+  // DoorScene.choose()) e' ACCODATO da Phaser, non immediato: serve un tick del loop prima che
+  // la nuova scena compaia in getScenes(true) (o che la sua create() sia girata). Verificato
+  // riproducendo il problema: senza questo tick i controlli [13]-[15] fallivano non perche' il
+  // gioco fosse rotto, ma perche' leggevano lo stato un istante troppo presto.
+  const passaTick = (n) => { for (let i = 0; i < (n || 2); i++) { t += 16.6; g.loop.step(t); } };
+
+  // [12] PORTA RISPETTATA DA GameScene — il livello generato deve rispettare ESATTAMENTE tipo,
+  // modificatore e ricompensa scelti alla porta (contratto window.GameState.prossimoLivello).
+  {
+    const provaPortaSu = (lv, porta) => {
+      fermaMeta();
+      window.GameState.reset();
+      window.GameState.level = lv;
+      window.GameState.prossimoLivello = porta;
+      g.scene.start('GameScene');
+      const gs = g.scene.getScene('GameScene');
+      avanza(gs, 4);
+      return gs;
+    };
+
+    // porta RISCHIOSA: tipo + mutatore forzato (100%, non piu' un sorteggio) + ricompensa x2.
+    const gsR = provaPortaSu(6, { kind: 'siege', mutator: 'armored', waxMult: 2 });
+    const kindOkR = gsR.levelKind === 'siege';
+    const mutOkR = !!gsR.mutator && gsR.mutator.id === 'armored' && gsR.mutEnemyHp === 1.7;
+    const waxOkR = Math.abs((gsR.mutWaxMult || 1) - 2) < 0.01;
+    const consumataR = window.GameState.prossimoLivello == null;   // non deve restare per il livello dopo
+    if (kindOkR && mutOkR && waxOkR && consumataR) {
+      ok('porta rispettata (rischiosa)', 6, 'kind=' + gsR.levelKind + ' mutatore=' + gsR.mutator.id + ' waxMult=' + gsR.mutWaxMult);
+    } else {
+      ko('porta rispettata (rischiosa)', 6, 'kind=' + gsR.levelKind + '(atteso siege) mutatore=' + (gsR.mutator && gsR.mutator.id)
+        + '(atteso armored) waxMult=' + gsR.mutWaxMult + '(atteso 2) consumata=' + consumataR);
+    }
+
+    // porta SICURA: "nessun modificatore" deve restare TALE — non deve uscirne uno a sorpresa,
+    // o l'anteprima mostrata nella porta ("nessun modificatore") diventerebbe bugiarda.
+    const gsS = provaPortaSu(7, { kind: 'normal', mutator: null, waxMult: 1 });
+    const kindOkS = gsS.levelKind === 'normal';
+    const mutOkS = gsS.mutator === null;
+    const waxOkS = Math.abs((gsS.mutWaxMult || 1) - 1) < 0.01;
+    if (kindOkS && mutOkS && waxOkS) ok('porta rispettata (sicura, nessun modificatore)', 7);
+    else ko('porta rispettata (sicura, nessun modificatore)', 7, 'kind=' + gsS.levelKind + ' mutatore=' + (gsS.mutator && gsS.mutator.id) + ' waxMult=' + gsS.mutWaxMult);
+  }
+
+  // [13] DoorScene GENERA una scelta valida e CONSUMABILE da GameScene.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 6;
+    g.scene.start('DoorScene');
+    passaTick();
+    const ds = g.scene.getScene('DoorScene');
+    const dueLati = Array.isArray(ds.doors) && ds.doors.length === 2;
+    const diverse = dueLati && ds.doors[0].kind !== ds.doors[1].kind;
+    if (dueLati && diverse) {
+      ds.choose(ds.doors[1]);
+      // Leggere window.GameState.prossimoLivello PRIMA del tick: GameScene.create() la CONSUMA
+      // (la azzera) come sua primissima azione, quindi dopo il tick sarebbe gia' null.
+      const impostata = window.GameState.prossimoLivello;
+      const combacia = impostata && impostata.kind === ds.doors[1].kind && impostata.waxMult === ds.doors[1].waxMult;
+      passaTick();
+      const versoGioco = g.scene.getScenes(true).some((s) => s.scene.key === 'GameScene');
+      if (combacia && versoGioco) ok('DoorScene genera una scelta valida', 6);
+      else ko('DoorScene genera una scelta valida', 6, 'la scelta non arriva intatta a GameScene');
+    } else {
+      ko('DoorScene genera una scelta valida', 6, 'porte mancanti o identiche tra loro (dueLati=' + dueLati + ')');
+    }
+  }
+
+  // [14] UpgradeScene INSTRADA correttamente: dopo un boss (livello 5) via diretta a GameScene
+  // (niente porta — i boss restano fissi); dopo un livello normale (es. 3) passa da DoorScene.
+  {
+    const cardStub = { id: 'damage', rep: true, apply: (s) => { s.damage += 8; } };
+
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 4;   // il prossimo (5) e' boss
+    g.scene.start('UpgradeScene');
+    passaTick();
+    g.scene.getScene('UpgradeScene').choose(cardStub);
+    passaTick();
+    const dopoBoss = g.scene.getScenes(true).map((s) => s.scene.key);
+    const bossOk = dopoBoss.indexOf('GameScene') !== -1 && dopoBoss.indexOf('DoorScene') === -1 && window.GameState.level === 5;
+
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 3;   // il prossimo (4) NON e' boss
+    g.scene.start('UpgradeScene');
+    passaTick();
+    g.scene.getScene('UpgradeScene').choose(cardStub);
+    passaTick();
+    const dopoNormale = g.scene.getScenes(true).map((s) => s.scene.key);
+    const normaleOk = dopoNormale.indexOf('DoorScene') !== -1 && dopoNormale.indexOf('GameScene') === -1 && window.GameState.level === 4;
+
+    if (bossOk && normaleOk) ok('UpgradeScene instrada boss/porta correttamente', '-');
+    else ko('UpgradeScene instrada boss/porta correttamente', '-', 'dopo boss ok=' + bossOk + '   dopo livello normale ok=' + normaleOk);
+  }
+
+  // [15] VITTORIA al livello finale — completare RUN_LEVELS deve portare a VictoryScene (non al
+  // livello successivo), incassare il cerume come a fine run e segnare la vittoria in Meta.
+  // (Meta scrive su localStorage, ma il browser di questi controlli e' EFFIMERO — niente
+  // rischio per i dati salvati veri del giocatore, che vivono in un profilo/browser separato.)
+  {
+    const cardStub = { id: 'damage', rep: true, apply: (s) => { s.damage += 8; } };
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = window.CONFIG.RUN_LEVELS;
+    window.GameState.wax = 321;
+    const winsPrima = window.Meta.get().wins;
+    const bankPrima = window.Meta.get().bank;
+    g.scene.start('UpgradeScene');
+    passaTick();
+    g.scene.getScene('UpgradeScene').choose(cardStub);
+    passaTick();
+
+    const attive = g.scene.getScenes(true).map((s) => s.scene.key);
+    const versoVittoria = attive.indexOf('VictoryScene') !== -1 && attive.indexOf('GameScene') === -1;
+    const metaOk = window.Meta.get().wins === winsPrima + 1 && window.Meta.get().bank === bankPrima + 321;
+    if (versoVittoria && metaOk) ok('vittoria al livello finale', window.CONFIG.RUN_LEVELS, 'banca +321, vittorie +1');
+    else ko('vittoria al livello finale', window.CONFIG.RUN_LEVELS, 'scene attive: ' + attive.join(',') + '   meta ok: ' + metaOk);
+  }
+
+  // [16] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 
