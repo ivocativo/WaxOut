@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `f59befd`._
+_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `7eff829`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -14,18 +14,18 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 57 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 58 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
 _**nemici che sprofondavano comparendo** (`145e0ea`, `5bee03d`). Diversi trovati DAI controlli._
-_**✅ BLOCCO A quasi completo:** la run ha un FINALE (15 livelli → `VictoryScene`, prima si poteva_
-_solo morire) e una **scelta tra due porte** sicura/rischiosa prima di ogni livello non-boss_
-_(`db4c1eb`, Sonnet); + **difficoltà crescente "Infezione"** 0–5 sbloccata dalla vittoria, nemici_
-_più duri e più cerume (`f59befd`, Opus). Dettaglio in `ROADMAP.md` §BLOCCO A._
-_**STATO ORA:** del BLOCCO A resta solo **A.2** (boss finale piu' tosto del solito, 🧠 design con_
-_l'utente). **BLOCCO B** (nemici+timpano) e **BLOCCO C** (Assedio) ancora da iniziare. In attesa del_
-_PLAYTEST dell'utente su finale/porte/infezione e sull'APK aggiornato. L'utente RIMANDA lo store._
+_**✅ BLOCCO A COMPLETO:** la run ha un FINALE (15 livelli → `VictoryScene`, prima si poteva solo_
+_morire) e una **scelta tra due porte** sicura/rischiosa prima di ogni livello non-boss (`db4c1eb`,_
+_Sonnet); **difficoltà "Infezione"** 0–5 sbloccata dalla vittoria (`f59befd`); **boss FINALE** con_
+_più vita e una terza fase "crollo" — frana di cerume dal soffitto (`7eff829`). Dettaglio in `ROADMAP.md`._
+_**STATO ORA:** Blocco A chiuso. Prossimi: **BLOCCO B** (restyling nemici + timpano) e **BLOCCO C**_
+_(Assedio: la tattica del cumulo-rifugio, decisione di design con l'utente). In attesa del PLAYTEST_
+_dell'utente su tutto il Blocco A + APK aggiornato. L'utente RIMANDA lo store._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -89,7 +89,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-57 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+58 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,

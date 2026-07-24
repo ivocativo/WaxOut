@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (57 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (58 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -33,10 +33,21 @@ Inoltre il giocatore non sceglie mai il percorso: il tipo di livello è deciso d
 - [x] i18n EN+IT.
 - **Verificato:** `controlla.py` 56/56 (2 esecuzioni), screenshot della schermata di vittoria.
 
-## A.2 — Boss finale 🧠 poi 🤖
-- [ ] Il livello `RUN_LEVELS` è un boss, ma **diverso** dal Tappo di Cerume dei livelli 5/10:
-  più vita, una fase in più. Design della fase in più: da decidere con l'utente.
-- [ ] Riusare `levelKind === 'boss'` con un flag `finale: true`.
+## A.2 — Boss finale ✅ FATTO (2026-07-22, commit `7eff829`, Opus)
+- [x] Il livello `RUN_LEVELS` è il **GRAN TAPPO**: `cfg.hp ×1.7` (1734 contro 620 di un boss liv.5),
+  `cfg.wax ×1.5`, banner d'ingresso dedicato. Flag `e.finale` da `this.isFinale = livello ===
+  RUN_LEVELS`. I boss intermedi (5, 10) restano invariati a 2 fasi.
+- [x] **Terza fase a 25% HP** (solo finale): "il condotto CROLLA" → frana di cerume dal soffitto
+  (riusa `placeStalactites`/`scheduleQuakePulse` dell'evento `quake`, mai usata sui boss: nuova
+  dimensione di pericolo verticale) + sputo a 5 vie + slam più ravvicinato. Banner a yPos 175 per
+  non sovrapporsi a quello della furia nel raro doppio-scatto in un frame.
+- [x] i18n EN+IT.
+- **Verificato:** controllo [17] (hp ×1.7 esatto, crollo scatta, boss liv.5 escluso), 58/58;
+  screenshot della terza fase (frana + banner).
+- **Da tarare col playtest:** vita ×1.7 e soglia 25% sono stime; se il finale risulta troppo lungo
+  o troppo facile si girano i numeri (moltiplicatore hp e soglia in `bossAI`/`spawnEnemy`).
+
+### ✅ BLOCCO A COMPLETO (A.1 finale, A.3 porte, A.5 infezione, A.2 boss finale).
 
 ## A.3 — Scelta tra DUE PORTE ✅ FATTO (2026-07-22, commit `db4c1eb`, eseguito da Sonnet)
 - [x] Nuova `src/scenes/DoorScene.js`, dopo la carta di potenziamento: due opzioni CONTRAPPOSTE —
