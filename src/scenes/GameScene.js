@@ -170,6 +170,7 @@ class GameScene extends Phaser.Scene {
     // moltiplica sopra a quanto chooseMutator() ha gia' impostato (di norma 1, salvo mutatori che
     // toccano il cerume — 'bonanza' e' escluso dal pool delle porte apposta per non sovrapporsi).
     if (this._doorWaxMult) this.mutWaxMult = (this.mutWaxMult || 1) * this._doorWaxMult;
+    this.applyInfezione();  // difficolta' crescente scelta per la run (round A, A.5): sopra a tutto
     this.chooseEvent();     // evento a tempo indipendente (puo' capitare insieme a un mutatore)
     this.buildLevel();
 
@@ -816,10 +817,23 @@ class GameScene extends Phaser.Scene {
 
   // Azzera i modificatori ai valori "neutri" (nessun effetto) + rimette la gravita' di default.
   resetMutators() {
-    this.mutEnemySpeed = 1; this.mutEnemyHp = 1; this.mutEnemyWax = 1;
+    this.mutEnemySpeed = 1; this.mutEnemyHp = 1; this.mutEnemyWax = 1; this.mutEnemyDmg = 1;
     this.mutMaxEnemies = 0; this.mutWaxMult = 1; this.mutWaxHp = 1; this.mutQuake = false;
     this.physics.world.gravity.y = window.CONFIG.GRAVITY;
     this.mutator = null;
+  }
+
+  // DIFFICOLTA' "Infezione" (round A, A.5): al grado scelto per la run alza le manopole gia'
+  // esistenti (nemici piu' duri/veloci/dannosi) e la ricompensa. Composta MOLTIPLICATIVAMENTE
+  // sopra a mutatore + porta, quindi va chiamata DOPO chooseMutator() e il waxMult della porta.
+  applyInfezione() {
+    const g = window.GameState.infezione || 0;
+    if (g <= 0) return;
+    const F = window.CONFIG.INFEZIONE;
+    this.mutEnemyHp = (this.mutEnemyHp || 1) * (1 + F.enemyHp * g);
+    this.mutEnemySpeed = (this.mutEnemySpeed || 1) * (1 + F.enemySpeed * g);
+    this.mutEnemyDmg = (this.mutEnemyDmg || 1) * (1 + F.enemyDmg * g);
+    this.mutWaxMult = (this.mutWaxMult || 1) * (1 + F.waxReward * g);
   }
 
   // Sceglie un MODIFICATORE per questo livello e lo applica. Niente mutatori nei livelli boss.
@@ -1432,10 +1446,13 @@ class GameScene extends Phaser.Scene {
       cfg = { tex: 'enemy_blob', hp: 30 + lvl * 4, speed: 72 + lvl * 3, dmg: 11 + lvl * 2, wax: 5, bit: 'bit_wax', body: [26, 22], scale: 1.6 };
     }
 
-    // MODIFICATORE di livello: adatta le statistiche del nemico appena create.
+    // MODIFICATORE di livello (+ INFEZIONE, round A A.5): adatta le statistiche del nemico appena
+    // create. mutEnemyDmg tocca sia il contatto sia il proiettile (di norma 1: lo alza l'infezione).
     cfg.speed = Math.round(cfg.speed * (this.mutEnemySpeed || 1));
     cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1)));
     cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
+    cfg.dmg = Math.max(1, Math.round(cfg.dmg * (this.mutEnemyDmg || 1)));
+    if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * (this.mutEnemyDmg || 1)));
 
     // FIGLIO DELLO SPLIT: piu' piccolo, debole E MENO DANNOSO del genitore (due figli ~= un
     // genitore anche come minaccia: senza ridurre anche il danno, due figli farebbero insieme
@@ -2900,7 +2917,12 @@ class GameScene extends Phaser.Scene {
 
     const T = window.I18n;
     this.hpText.setText(T.t('hud_hp', { hp: Math.ceil(p.hp), max: p.maxHp }));
-    this.levelText.setText(T.t('hud_level', { n: window.GameState.level }));
+    // Grado di infezione accanto al livello, solo se >0 (round A, A.5): cosi' e' sempre chiaro
+    // che la run e' piu' dura del normale.
+    const inf = window.GameState.infezione || 0;
+    this.levelText.setText(inf > 0
+      ? T.t('hud_level_inf', { n: window.GameState.level, inf: inf })
+      : T.t('hud_level', { n: window.GameState.level }));
     const pct = this.totalWax ? Phaser.Math.Clamp(Math.round((this.cleanedWax / this.totalWax) * 100), 0, 100) : 100;
     this.blockText.setText(T.t('hud_clean', { pct: pct }));
     this.waxText.setText(T.t('hud_wax', { n: window.GameState.wax }));

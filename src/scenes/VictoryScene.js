@@ -50,6 +50,15 @@ class VictoryScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
 
+    // Grado di INFEZIONE sbloccato con questa vittoria (round A, A.5): l'invito a rigiocare piu'
+    // duro. Solo se `sbloccato` (un grado nuovo raggiunto, sotto il tetto): lo si sceglie dal menu.
+    if (this.runResult.sbloccato) {
+      this.add.text(W / 2, H / 2 + 48, T.t('victory_inf_unlocked', { n: this.runResult.sbloccato }), {
+        fontFamily: 'monospace', fontSize: '16px', color: '#ff9a8a',
+        stroke: '#14161f', strokeThickness: 3, align: 'center',
+      }).setOrigin(0.5);
+    }
+
     // Pulsanti (stesso linguaggio di MenuScene/gameOver).
     const mkBtn = (x, y, label, onTap, w) => {
       w = w || 190;

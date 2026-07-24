@@ -27,11 +27,13 @@ window.I18n = (function () {
       menu_goal_2: 'After each level you unlock a new ability or weapon.',
       menu_start: 'START RUN',
       menu_shop: 'SHOP (N)',
+      menu_infezione: 'Infection: {n}',
       menu_help_close: 'Tap anywhere to close',
       menu_lang: 'Language: {lang}',
       // --- HUD ---
       hud_hp: 'HP {hp}/{max}',
       hud_level: 'Level {n}',
+      hud_level_inf: 'Level {n}  -  Infection {inf}',
       hud_wall: 'Wall: {left}/{total}',
       hud_goal: 'Eardrum: {pct}%',
       hud_clean: 'Clean: {pct}%',
@@ -186,6 +188,7 @@ window.I18n = (function () {
       victory_sub: 'You cleared all {n} levels',
       victory_stat_wax: 'Wax banked: +{earned}   (in bank: {bank})',
       victory_stat_time: 'Time: {time}',
+      victory_inf_unlocked: 'Infection {n} unlocked! Pick it from the menu.',
       victory_newrun: 'NEW RUN',
       victory_menu: 'MENU',
       // --- Abilita (lista HUD) + armi ---
@@ -232,11 +235,13 @@ window.I18n = (function () {
       menu_goal_2: 'A fine livello sblocchi una nuova abilita o arma.',
       menu_start: 'INIZIA RUN',
       menu_shop: 'NEGOZIO (N)',
+      menu_infezione: 'Infezione: {n}',
       menu_help_close: 'Tocca ovunque per chiudere',
       menu_lang: 'Lingua: {lang}',
       // --- HUD ---
       hud_hp: 'HP {hp}/{max}',
       hud_level: 'Livello {n}',
+      hud_level_inf: 'Livello {n}  -  Infezione {inf}',
       hud_wall: 'Muro: {left}/{total}',
       hud_goal: 'Timpano: {pct}%',
       hud_clean: 'Pulito: {pct}%',
@@ -391,6 +396,7 @@ window.I18n = (function () {
       victory_sub: 'Hai completato tutti i {n} livelli',
       victory_stat_wax: 'Cerume incassato: +{earned}   (in banca: {bank})',
       victory_stat_time: 'Tempo: {time}',
+      victory_inf_unlocked: 'Infezione {n} sbloccata! Scegli dal menu.',
       victory_newrun: 'NUOVA RUN',
       victory_menu: 'MENU',
       // --- Abilita (lista HUD) + armi ---

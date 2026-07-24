@@ -450,7 +450,42 @@ window.__earwaxChecks = function (opts) {
     else ko('vittoria al livello finale', window.CONFIG.RUN_LEVELS, 'scene attive: ' + attive.join(',') + '   meta ok: ' + metaOk);
   }
 
-  // [16] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [16] INFEZIONE — difficolta' crescente (round A, A.5): il grado scelto deve alzare le manopole
+  // dei nemici e la ricompensa. Si misura su un LIVELLO BOSS (5): li' chooseMutator() esce subito
+  // (niente mutatore) e non c'e' porta, quindi le mut* partono pulite da 1 e riflettono SOLO
+  // l'infezione — cosi' il numero atteso e' esatto, senza il rumore di un mutatore casuale.
+  {
+    const factorAt = (grado) => {
+      fermaMeta();
+      window.GameState.reset();
+      window.GameState.infezione = grado;
+      window.GameState.level = 5;
+      g.scene.start('GameScene');
+      passaTick();
+      const gs = g.scene.getScene('GameScene');
+      return { hp: gs.mutEnemyHp, dmg: gs.mutEnemyDmg, speed: gs.mutEnemySpeed, wax: gs.mutWaxMult };
+    };
+    const F = window.CONFIG.INFEZIONE;
+    const base = factorAt(0);
+    const g3 = factorAt(3);
+    const vicino = (a, b) => Math.abs(a - b) < 0.001;
+    const baseOk = vicino(base.hp, 1) && vicino(base.wax, 1);   // grado 0 = nessun effetto
+    const hpOk = vicino(g3.hp, 1 + F.enemyHp * 3);
+    const dmgOk = vicino(g3.dmg, 1 + F.enemyDmg * 3);
+    const speedOk = vicino(g3.speed, 1 + F.enemySpeed * 3);
+    const waxOk = vicino(g3.wax, 1 + F.waxReward * 3);
+    // La vittoria simulata in [15] e' avvenuta al grado 0 -> deve aver sbloccato il grado 1.
+    const sbloccoOk = window.Meta.infezioneUnlocked() >= 1;
+    window.GameState.infezione = 0;   // non lasciarla sporca per eventuali prove successive
+    if (baseOk && hpOk && dmgOk && speedOk && waxOk && sbloccoOk) {
+      ok('infezione applica scaling e sblocco', '-', 'grado 3: hp x' + g3.hp.toFixed(2) + ' dmg x' + g3.dmg.toFixed(2) + ' cerume x' + g3.wax.toFixed(2));
+    } else {
+      ko('infezione applica scaling e sblocco', '-', 'base(hp=' + base.hp + ',wax=' + base.wax + ') g3(hp=' + g3.hp.toFixed(2)
+        + ',dmg=' + g3.dmg.toFixed(2) + ',speed=' + g3.speed.toFixed(2) + ',wax=' + g3.wax.toFixed(2) + ') sblocco=' + sbloccoOk);
+    }
+  }
+
+  // [17] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

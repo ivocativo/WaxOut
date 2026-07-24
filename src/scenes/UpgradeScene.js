@@ -197,9 +197,15 @@ class UpgradeScene extends Phaser.Scene {
     // si va alla VITTORIA invece che al livello successivo.
     const finishedLevel = window.GameState.level;
     if (finishedLevel >= window.CONFIG.RUN_LEVELS) {
+      const infezione = window.GameState.infezione || 0;
+      const primaMax = window.Meta.get().infezioneMax;
       const meta = window.Meta.bankRun(window.GameState.wax, finishedLevel);
-      window.Meta.recordWin();
-      this.scene.start('VictoryScene', { earned: window.GameState.wax, bank: meta.bank, levels: finishedLevel });
+      window.Meta.recordWin(infezione);          // round A, A.5: sblocca il grado successivo
+      const sbloccato = (infezione > primaMax) && (infezione < window.CONFIG.INFEZIONE_MAX);
+      this.scene.start('VictoryScene', {
+        earned: window.GameState.wax, bank: meta.bank, levels: finishedLevel,
+        infezione: infezione, sbloccato: sbloccato ? infezione + 1 : null,
+      });
       return;
     }
 

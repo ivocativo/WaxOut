@@ -68,6 +68,41 @@ class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: [startBtn.panel, startBtn.label], alpha: 0.6, duration: 650, yoyo: true, repeat: -1 });
     mkBtn(W / 2 + 110, 430, T.t('menu_shop'), openShop, 200);
 
+    // SELETTORE INFEZIONE (round A, A.5): compare solo dopo aver vinto almeno una volta (prima
+    // infezioneUnlocked() vale 0 = solo il grado base, niente da scegliere). Frecce ◄ ►, tocco
+    // ampio per il telefono. La scelta vive in window.GameState.infezione e NON viene azzerata da
+    // reset(): begin() la conserva.
+    const unlocked = window.Meta.infezioneUnlocked();
+    if (unlocked >= 1) {
+      // Clamp: se un reset dei progressi ha abbassato lo sblocco sotto il valore memorizzato.
+      window.GameState.infezione = Phaser.Math.Clamp(window.GameState.infezione || 0, 0, unlocked);
+      const iy = 384;
+      const label = this.add.text(W / 2, iy, '', {
+        fontFamily: 'monospace', fontSize: '18px', color: '#ff9a8a',
+        stroke: '#14161f', strokeThickness: 3,
+      }).setOrigin(0.5);
+      const refresh = () => label.setText(T.t('menu_infezione', { n: window.GameState.infezione }));
+      refresh();
+      const arrow = (dx, chr) => {
+        const a = this.add.text(W / 2 + dx, iy, chr, {
+          fontFamily: 'monospace', fontSize: '22px', color: '#14161f',
+          backgroundColor: '#ffd166', padding: { x: 12, y: 6 },
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        a.on('pointerover', () => a.setStyle({ backgroundColor: '#ffe199' }));
+        a.on('pointerout', () => a.setStyle({ backgroundColor: '#ffd166' }));
+        a.on('pointerdown', () => {
+          window.Sfx.unlock();
+          window.GameState.infezione = Phaser.Math.Clamp((window.GameState.infezione || 0) + dx / Math.abs(dx), 0, unlocked);
+          refresh();
+        });
+        return a;
+      };
+      arrow(-96, '<');
+      arrow(96, '>');
+    } else {
+      window.GameState.infezione = 0;   // non ancora sbloccato: sempre base
+    }
+
     // Pannello "?" con comandi/obiettivo, a comparsa (round 2, H.1): prima stava sempre in
     // vista (9 righe fisse), affollando la schermata principale — i comandi touch sono gia'
     // a schermo ed evidenti IN PARTITA, qui basta poterli ricontrollare a richiesta.

@@ -37,6 +37,20 @@ window.CONFIG = {
   // quando si sopravvive, dentro la finestra 20-30 min indicata dalle fonti (vedi HANDOFF.md).
   RUN_LEVELS: 15,
 
+  // DIFFICOLTA' CRESCENTE "Infezione" (round A, A.5): dopo aver vinto la run si sblocca il grado
+  // successivo, opzionale, scelto nel menu prima di partire. Ogni grado rende i nemici piu' duri
+  // E aumenta la ricompensa (rischio<->premio, il meccanismo di ritenzione piu' forte del genere:
+  // "Calore" di Hades, Ascensioni di Slay the Spire). INFEZIONE_MAX = grado massimo raggiungibile.
+  INFEZIONE_MAX: 5,
+  // Fattori per GRADO di infezione (moltiplicati: al grado N valgono ^N... no: 1 + fattore*N).
+  // Tenuti bassi apposta: 5 gradi devono essere DAVVERO difficili ma senza muri improvvisi.
+  INFEZIONE: {
+    enemyHp:   0.15,   // +15% vita nemici per grado
+    enemySpeed: 0.07,  // +7% velocita' per grado
+    enemyDmg:  0.10,   // +10% danno per grado
+    waxReward: 0.20,   // +20% cerume per grado (l'incentivo a salire)
+  },
+
   // Palette a tema "orecchio / cerume / sporco"
   COLORS: {
     bgTop: 0xe9b89a,
@@ -144,6 +158,10 @@ window.GameState = {
   // trascorso, mostrato in VictoryScene). E' l'unico punto del codice di gameplay che tocca
   // l'orologio di sistema.
   runStartAt: 0,
+  // Grado di INFEZIONE scelto per questa run (round A, A.5). NON viene azzerato da reset(): e' una
+  // SCELTA di difficolta' che deve restare quando si fa "Nuova run" dopo morte/vittoria (si cambia
+  // solo dal menu). 0 = base. Lo imposta MenuScene.begin().
+  infezione: 0,
 
   newPlayer() {
     // Applica i potenziamenti permanenti acquistati al negozio.
