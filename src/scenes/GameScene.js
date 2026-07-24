@@ -1230,11 +1230,10 @@ class GameScene extends Phaser.Scene {
     const cy = (H - gh) * 0.5;
     const ah = (H - gh) * 0.92;
 
-    // Timpano: sprite pixel-art (membrana), ingrandito ad altezza condotto, che "respira".
-    const ed = this.add.image(cx, cy, 'eardrum').setDepth(3);
-    const es = (ah * 0.95) / ed.height;
-    ed.setScale(es);
-    this.tweens.add({ targets: ed, scaleX: es * 1.05, scaleY: es * 1.03, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // Timpano: membrana disegnata VIA CODICE (round B, B.1), in tinta col resto — vedi
+    // GameGfx.paintEardrum. Riempie l'altezza del condotto e "respira". Il traguardo (vittoria)
+    // dipende da `goalX`, non da questo: qui c'e' solo l'aspetto.
+    window.GameGfx.paintEardrum(this, cx, cy, ah * 0.72, ah * 0.95);
 
     // Indizio "vai a destra" che fluttua davanti al timpano.
     const arrow = this.add.text(this.goalX - 70, cy, '>>', {
