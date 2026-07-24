@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (56 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (57 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -81,13 +81,19 @@ forma giusta per il genere.
   un solo numero che quasi dimezza gli incassi, molto meglio che ritoccare dodici prezzi.
 - [ ] Rimisurare solo SE dopo il finale il playtest dice che si arriva alla vittoria troppo tardi.
 
-## A.5 — Difficoltà crescente dopo la vittoria 🧠 poi 🤖
-- [ ] Dopo la prima vittoria si sblocca un livello di difficoltà opzionale (nome a tema, es.
-  "Infezione 1, 2, 3…"), scelto nel menu prima di partire. Ogni gradino aggiunge un peggioramento
-  (nemici più duri / meno cerume / comparse più fitte) e aumenta la ricompensa.
-- [ ] `Meta` salva il gradino più alto superato.
-- [ ] Nuovi controlli in `tools/checks.js`: la run finisce a `RUN_LEVELS`; la scelta tra porte
-  produce davvero il livello scelto; la difficoltà scelta viene applicata.
+## A.5 — Difficoltà crescente dopo la vittoria ✅ FATTO (2026-07-22, commit `f59befd`, Opus)
+- [x] Grado **"Infezione"** 0–5, scelto nel menu (selettore `< Infezione: N >`, compare solo dopo
+  la prima vittoria). Ogni grado: nemici hp +15% / velocità +7% / danno +10% e **cerume +20%**
+  (l'incentivo). Fattori in `CONFIG.INFEZIONE`.
+- [x] `GameScene.applyInfezione()` alza le manopole `mut*` esistenti, sopra a mutatore + porta.
+  Aggiunto `mutEnemyDmg` (prima il danno nemici non aveva moltiplicatore).
+- [x] `Meta.infezioneMax` (grado più alto superato) + `infezioneUnlocked()`; `recordWin(tier)`.
+  `GameState.infezione` NON azzerato da `reset()` (resta su "Nuova run", si cambia solo dal menu).
+- [x] HUD "Livello N - Infezione M" (M>0); `VictoryScene` mostra il grado sbloccato.
+- **Verificato:** controllo [16] in `checks.js` (scaling esatto su livello boss + sblocco), 57/57;
+  screenshot di menu/HUD/vittoria.
+- **Da tarare col playtest:** i fattori per grado e il tetto a 5 sono una prima stima. Se 5 gradi
+  risultano troppo pochi/troppi o la curva stona, si girano i numeri in `CONFIG.INFEZIONE`.
 
 ---
 
