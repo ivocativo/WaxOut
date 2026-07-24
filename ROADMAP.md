@@ -114,28 +114,31 @@ forma giusta per il genere.
 codice (`PixelArt.fromGrid` in `BootScene`) e il timpano è uno sprite vecchio. Ora che sfondo,
 terreno, soffitto, pedane e pozze parlano la stessa lingua, stonano loro.
 
-## B.1 — Timpano: VIA CODICE 🧠
-Il timpano è una membrana astratta, quindi **non serve arte nuova**: si disegna come abbiamo fatto
-per terreno e soffitto, ed è coerente per costruzione.
-- [ ] `GameGfx.paintEardrum(scene, x, y, w, h)`: membrana ovale con la tavolozza `CARNE`, anelli
-  concentrici, velature, e il "respiro" già presente (tween di scala).
-- [ ] Sostituire lo sprite `eardrum` in `buildGoal`, tenendo invariati posizione e area del
-  traguardo. **Non toccare la logica di vittoria del livello.**
+## B.1 — Timpano ✅ FATTO (2026-07-24, commit `ae123a9`)
+Prima provato via codice (`paintEardrum`) ma NON convinceva (troppo stilizzato) → **cambio
+approccio deciso con l'utente: immagine AI**, stessa pipeline dei nemici. Timpano realistico
+(manico del martello, cono di luce, vasi) su fondo magenta, scontornato e pixellizzato, caricato
+come `eardrum` e piazzato in `buildGoal` (respira). Vittoria sempre su `goalX`. `paintEardrum`
+rimosso. **Nato qui `tools/bake_sprite.ps1`** (scontorno+pixel per un singolo sprite AI, riusabile).
 
-## B.2 — Nemici: immagini AI 🧠 (poi 🤖 per l'integrazione)
-I nemici sono personaggi: il procedurale non basta, serve arte. **Stessa pipeline degli sfondi**
-(vedi memoria `earwaxwar-background-pipeline`), che ha già funzionato:
-- [ ] Opus scrive i prompt (uno per nemico: cerumino, crosta, gorgogliante, moscerino, pulce,
-  saltatore, boss), con le regole già collaudate: **vista piatta di lato**, **sfondo MAGENTA puro
-  #FF00FF** come colore-chiave, formato più largo possibile, stessa tavolozza tra tutti.
-- [ ] L'utente genera; io scontorno e ridimensiono (lo scontorno stretto esiste già in
-  `tools/bake_background_set.ps1`, va estratto in uno strumento riusabile).
-- [ ] Integrazione in `BootScene` al posto delle texture da codice. **Hitbox e scale NON vanno
-  cambiati** (`cfg.body`, `cfg.scale` in `spawnEnemy`): cambia solo l'immagine.
-- [ ] ⚠️ **Conseguenza voluta:** con nemici disegnati si possono togliere le **aureole élite**
-  (oggi un ripiego): le varianti Corazzato/Esplosivo/Split diventano varianti di colore o dettaglio.
-- [ ] Le ANIMAZIONI restano fuori da questo blocco (servirebbe AutoSprite = abbonamento). Prima le
-  immagini ferme, che già cambiano tutto.
+## B.2 — Nemici: immagini AI ✅ FATTO (2026-07-25, commit `4a135cd`)
+Tutti e 7 (cerumino/crosta/gorgogliante/moscerino/pulce/saltatore/boss) sono immagini AI su fondo
+magenta, stile **organico/parassitario leggermente gore** (scelto dall'utente, non cartoon).
+- [x] Prompt scritti (nella cronologia sessione 25/07); l'utente ha generato.
+- [x] `bake_sprite.ps1`: **chiave allargata** — prende magenta puro E rosa acceso (una generazione
+  usava rosa) senza intaccare l'arte (creature ambra/verde/turchese, mai rosa).
+- [x] `BootScene`: caricati da `assets/sprites/enemies/*_px.png`; rimosse le 5 texture procedurali.
+- [x] `spawnEnemy`: tabella `ART` ricalcola scala/hitbox dalla texture (fisica ~invariata); corpo
+  **ancorato in basso** (le immagini AI sono ritagliate, senza il bordo che centrava i vecchi
+  sprite). Piedi a terra verificati (sprofondamento 0).
+- [x] Sorgenti (16MB) in `art_sources/` FUORI da `assets/` (non entrano nell'APK); in `assets/` solo
+  i baked (8-32KB).
+- **Da fare ancora (rimandati):**
+  - [ ] **Aureole élite:** ancora presenti (cerchio+tint). Ora che i nemici sono disegnati, si
+    possono togliere e rendere Corazzato/Esplosivo/Split varianti di colore/dettaglio.
+  - [ ] **Dimensione nemici:** tenuti ~come prima (tabella `ART` in `spawnEnemy`). L'arte e'
+    dettagliata: valutare col playtest se ingrandirli un filo per mostrarla meglio.
+  - [ ] **ANIMAZIONI:** fuori da questo blocco (servirebbe AutoSprite = abbonamento). Per ora ferme.
 
 ---
 

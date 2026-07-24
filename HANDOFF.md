@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-22 · Ultimo commit pushato: `7eff829`._
+_Ultimo aggiornamento: 2026-07-25 · Ultimo commit pushato: `4a135cd`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -23,9 +23,13 @@ _**✅ BLOCCO A COMPLETO:** la run ha un FINALE (15 livelli → `VictoryScene`, 
 _morire) e una **scelta tra due porte** sicura/rischiosa prima di ogni livello non-boss (`db4c1eb`,_
 _Sonnet); **difficoltà "Infezione"** 0–5 sbloccata dalla vittoria (`f59befd`); **boss FINALE** con_
 _più vita e una terza fase "crollo" — frana di cerume dal soffitto (`7eff829`). Dettaglio in `ROADMAP.md`._
-_**STATO ORA:** Blocco A chiuso. Prossimi: **BLOCCO B** (restyling nemici + timpano) e **BLOCCO C**_
-_(Assedio: la tattica del cumulo-rifugio, decisione di design con l'utente). In attesa del PLAYTEST_
-_dell'utente su tutto il Blocco A + APK aggiornato. L'utente RIMANDA lo store._
+_**✅ BLOCCO B COMPLETO:** timpano (`ae123a9`) e tutti e 7 i **nemici** (`4a135cd`) ora sono immagini_
+_AI su fondo magenta, stile organico/gore, scontornate con `tools/bake_sprite.ps1`. Sorgenti in_
+_`art_sources/` (fuori dall'APK), baked in `assets/`. Restano rimandati: aureole elite da togliere,_
+_taratura dimensione nemici, ANIMAZIONI (servirebbe AutoSprite)._
+_**STATO ORA:** Blocchi A e B chiusi. Prossimo: **BLOCCO C** (Assedio: la tattica del cumulo-rifugio,_
+_decisione di design con l'utente). In attesa del PLAYTEST dell'utente (Blocco A + nemici nuovi) +_
+_APK aggiornato. L'utente RIMANDA lo store._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
