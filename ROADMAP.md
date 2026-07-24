@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (51 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (56 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -23,37 +23,38 @@ difficoltà crescente che il giocatore sceglie DOPO aver vinto). È il buco più
 Inoltre il giocatore non sceglie mai il percorso: il tipo di livello è deciso dal numero
 (`levelNum % 5`), quindi manca del tutto la decisione rischio/ricompensa.
 
-## A.1 — Traguardo e vittoria 🤖
-- [ ] `CONFIG.RUN_LEVELS = 15` in `state.js` (numero da tarare dopo, vedi A.4).
-- [ ] In `UpgradeScene`, dove oggi c'è `level += 1`: se il livello appena finito è `RUN_LEVELS`,
-  andare a una **nuova `VictoryScene`** invece che al livello successivo.
-- [ ] `src/scenes/VictoryScene.js`: titolo, riepilogo (livelli, cerume in banca, tempo totale),
-  pulsanti **Nuova run** / **Menu**. Stesso stile di `MenuScene`.
-- [ ] `Meta` (`src/meta.js`): salvare `vittorie` (contatore) e `miglioreLivello`.
-- [ ] i18n EN+IT per tutte le stringhe nuove.
-- **Fatto quando:** si arriva a fine run e si vede la vittoria; il cerume viene messo in banca come
-  a fine livello normale; `controlla.py` verde.
+## A.1 — Traguardo e vittoria ✅ FATTO (2026-07-22, commit `db4c1eb`, eseguito da Sonnet)
+- [x] `CONFIG.RUN_LEVELS = 15` in `state.js`.
+- [x] `UpgradeScene.choose()`: se il livello appena finito è `RUN_LEVELS`, incassa il cerume
+  (`Meta.bankRun`) + segna la vittoria (nuovo `Meta.recordWin()`, nuovo campo `wins`) e va a
+  `VictoryScene` invece che al livello successivo.
+- [x] `src/scenes/VictoryScene.js`: titolo, riepilogo (livelli, cerume, tempo REALE trascorso via
+  `GameState.runStartAt`), pulsanti Nuova run / Menu. Stesso stile di `MenuScene`.
+- [x] i18n EN+IT.
+- **Verificato:** `controlla.py` 56/56 (2 esecuzioni), screenshot della schermata di vittoria.
 
 ## A.2 — Boss finale 🧠 poi 🤖
 - [ ] Il livello `RUN_LEVELS` è un boss, ma **diverso** dal Tappo di Cerume dei livelli 5/10:
   più vita, una fase in più. Design della fase in più: da decidere con l'utente.
 - [ ] Riusare `levelKind === 'boss'` con un flag `finale: true`.
 
-## A.3 — Scelta tra DUE PORTE 🤖
-Il pezzo con il miglior rapporto impatto/lavoro: **non serve contenuto nuovo**, rende una scelta
-del giocatore quello che oggi è un sorteggio.
-- [ ] Dopo la carta di potenziamento, mostrare **due opzioni per il livello successivo**, ognuna
-  con: tipo di livello (`normale`/`corsa`/`assedio`/`sciame`), eventuale modificatore (`MUTATORS`)
-  e una **anteprima della ricompensa** (es. "cerume ×1,5").
-- [ ] Le due opzioni devono essere DIVERSE tra loro e contrapposte: una più rischiosa e più ricca,
-  una più sicura e più povera.
-- [ ] La scelta scrive `GameState.prossimoLivello = { kind, mutator, waxMult }`; `GameScene.create`
-  legge quello **invece** di decidere da `levelNum % 5`. Se assente (primo livello), comportamento
-  attuale.
-- [ ] I livelli **boss restano fissi** (multipli di 5 e finale): lì niente scelta.
-- [ ] i18n EN+IT.
-- **Fatto quando:** ogni livello non-boss è preceduto da una scelta; il livello generato rispetta
-  ciò che è stato scelto (verificabile con un controllo automatico, vedi A.5).
+## A.3 — Scelta tra DUE PORTE ✅ FATTO (2026-07-22, commit `db4c1eb`, eseguito da Sonnet)
+- [x] Nuova `src/scenes/DoorScene.js`, dopo la carta di potenziamento: due opzioni CONTRAPPOSTE —
+  sicura (normale/corsa, nessun modificatore, ricompensa base) e rischiosa (assedio/sciame,
+  modificatore forzato, cerume ×2). `bonanza` esclusa dal pool rischioso (raddoppierebbe il
+  cerume in silenzio sopra al bonus gia' promesso, rendendo bugiarda l'anteprima).
+- [x] La scelta scrive `GameState.prossimoLivello = { kind, mutator, waxMult }`; `GameScene.create`
+  la legge e la CONSUMA (azzerata subito) invece di decidere da `levelNum % 5`. Assente (livello 1)
+  → comportamento a sorteggio di sempre.
+- [x] I livelli boss restano fissi: mai una porta.
+- [x] i18n EN+IT.
+- **Verificato:** `controlla.py` 56/56 (2 esecuzioni) — porta rispettata (caso rischioso e sicuro),
+  DoorScene genera una scelta consumabile, UpgradeScene instrada bene boss/porta. Screenshot.
+- ⚠️ Durante la verifica sono emersi e risolti **3 bug nel TEST** (non nel gioco), documentati nel
+  commit e in cima a `tools/checks.js`: `this.scene.start()` chiamato da dentro un metodo di scena
+  e' ACCODATO da Phaser (serve un tick prima che la nuova scena compaia); `prossimoLivello` va letto
+  PRIMA del tick che avvia GameScene (la consuma come sua prima azione); `'GameScene'` mancava dalla
+  lista di scene da fermare tra un sotto-test e l'altro.
 
 ## A.4 — Durata: ✅ CONFERMATA dal playtest (2026-07-22)
 L'utente: «se si prendono i potenziamenti giusti, in 20 minuti al 15° ci si arriva». E' dentro la
