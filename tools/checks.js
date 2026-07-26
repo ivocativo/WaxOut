@@ -531,7 +531,50 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [18] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [18] SALTO SUI NEMICI (giro difficolta' 2026-07-25): cadendo sulla testa di un nemico si
+  // RIMBALZA e lo si colpisce, SENZA prendere danno. Delicato perche' il rilevamento deve battere
+  // lo snap al terreno, che risucchia il PG al suolo attraverso il nemico (non solido) azzerando
+  // la velocita' -> se il rilevamento e' troppo stretto lo stomp non parte mai (successo davvero).
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    g.scene.start('GameScene');
+    passaTick();
+    const gs = g.scene.getScene('GameScene');
+    avanza(gs, 20);
+    gs.enemies.getChildren().forEach((e) => { if (e.active) e.destroy(); });
+    // spawn il nemico su terreno piatto lontano da membrane, poi LIBERA la colonna di caduta
+    // (tolgo pedane/cerume vicino): cosi' la prova non dipende dalla generazione del livello.
+    let ex = Math.round(gs.worldW * 0.5);
+    for (let x = Math.round(gs.worldW * 0.45); x < gs.worldW - 700; x += 8) {
+      if (Math.abs(gs.terrainTopAt(x) - 360) < 6 && !(gs.membraneXs || []).some((mx) => Math.abs(mx - x) < 150)) { ex = x; break; }
+    }
+    const e = gs.spawnEnemy('blob', { x: ex });
+    avanza(gs, 40);                                    // fa emergere il nemico (god-mode)
+    gs.platforms.getChildren().forEach((p) => { if (p.active && Math.abs(p.x - e.x) < 100) p.destroy(); });
+    gs.blocks.getChildren().forEach((b) => { if (b.active && Math.abs(b.x - e.x) < 90 && b.y < e.body.top + 10) b.destroy(); });
+    const hpNemicoPrima = e.hp;
+    window.GameState.player.hp = 100; gs.invulnUntil = 0;   // via il god-mode: il danno deve contare
+    gs.player.body.reset(e.x, e.body.top - 50);        // 50px sopra la testa del nemico
+    gs.player.setVelocityY(250);                       // in caduta
+    let rimbalzoMin = 0;
+    for (let i = 0; i < 40; i++) {
+      t += 16.6; g.loop.step(t);                       // frame RAW (niente god-mode: il danno conta)
+      if (gs.player.body.velocity.y < rimbalzoMin) rimbalzoMin = gs.player.body.velocity.y;
+      if (!e.active) break;
+    }
+    const nemicoColpito = !e.active || e.hp < hpNemicoPrima;
+    const haRimbalzato = rimbalzoMin < -50;
+    const senzaDanno = window.GameState.player.hp >= 100;
+    if (nemicoColpito && haRimbalzato && senzaDanno) {
+      ok('salto sui nemici', 2, 'rimbalzo ' + Math.round(rimbalzoMin) + ', nemico colpito, 0 danni');
+    } else {
+      ko('salto sui nemici', 2, 'nemicoColpito=' + nemicoColpito + ' haRimbalzato=' + haRimbalzato + ' senzaDanno=' + senzaDanno);
+    }
+  }
+
+  // [19] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

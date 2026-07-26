@@ -364,24 +364,25 @@ class GameScene extends Phaser.Scene {
       this.showBanner(window.I18n.t(this.isFinale ? 'game_boss_finale_in' : 'game_boss_in'),
         this.isFinale ? '#ff5252' : '#ffb04a');
     } else if (this.levelKind === 'swarm') {
-      this.maxEnemies = Math.min(4 + lvl, 9);
-      spawnDelay = Math.max(800, 1700 - lvl * 110);
-      for (let i = 0; i < Math.min(4, this.maxEnemies); i++) this.spawnEnemy();
+      // Densita' ridotta (giro difficolta' 2026-07-25): l'utente trovava "impossibile fuggire".
+      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.7), 7);
+      spawnDelay = Math.max(1050, 1900 - lvl * 100);
+      for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
     } else if (this.levelKind === 'siege') {
       // ASSEDIO: non serve raggiungere il timpano, bisogna SOPRAVVIVERE a tempo mentre i
       // nemici arrivano fitti. Vince allo scadere del cronometro (vedi update).
-      this.maxEnemies = Math.min(4 + lvl, 9);
-      spawnDelay = Math.max(700, 1500 - lvl * 100);
+      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.6), 7);
+      spawnDelay = Math.max(1000, 1750 - lvl * 90);
       this.siegeEndAt = this.time.now + 30000 + lvl * 2000;
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
     } else {
       // normal / rush: attraversa fino al timpano (la corsa non chiede pulizia).
-      this.maxEnemies = Math.min(2 + lvl, 6);
-      spawnDelay = Math.max(1500, 2800 - lvl * 150);
+      this.maxEnemies = Math.min(2 + Math.floor(lvl / 2), 5);
+      spawnDelay = Math.max(1900, 3200 - lvl * 140);
       if (this.levelKind === 'rush') {
-        this.maxEnemies = Math.min(this.maxEnemies + 2, 8); spawnDelay = Math.round(spawnDelay * 0.7);
+        this.maxEnemies = Math.min(this.maxEnemies + 1, 6); spawnDelay = Math.round(spawnDelay * 0.8);
         // CORSA A TEMPO (round 2, F.1): prima non c'era nessun cronometro, solo "arriva al
         // timpano quando vuoi". Tempo commisurato alla lunghezza del livello: ritmo medio
         // atteso ~130px/s (piu' lento della camminata base: si suppone rallentato dai
@@ -2782,6 +2783,20 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // SALTO SUI NEMICI: rimbalzo + danno al nemico, niente danno al giocatore (vedi il rilevamento
+  // in update, prima dello snap al terreno). Non sul boss (escluso a monte).
+  stompEnemy(e) {
+    const p = window.GameState.player;
+    const now = this.time.now;
+    this.player.setVelocityY(-p.jumpVelocity * 0.72);         // rimbalzo (e blocca lo snap: vy<0)
+    this.jumpsLeft = p.doubleJump ? 2 : 1;                    // puoi risaltare dopo il rimbalzo
+    this.canCutJump = true;
+    this.invulnUntil = Math.max(this.invulnUntil, now + 400); // il rimbalzo ti porta via pulito (niente colpo al ritorno)
+    this.setJuice(1 + window.CONFIG.JUICE_LAND, 1 - window.CONFIG.JUICE_LAND);
+    window.Sfx.jump();
+    this.damageEnemy(e, Math.max(1, Math.round(p.damage * 1.1)), true);
+  }
+
   hurtPlayer(dmg, sourceX) {
     const now = this.time.now;
     if (now < this.invulnUntil || this.locked) return;
@@ -2795,7 +2810,7 @@ class GameScene extends Phaser.Scene {
       if (this.shieldAura) this.shieldAura.setVisible(false);   // ora in ricarica: alone spento
       return;
     }
-    this.invulnUntil = now + 900;
+    this.invulnUntil = now + 1200;   // mercy-invuln allungata (giro difficolta' 2026-07-25): 0,9->1,2s
     window.GameState.player.hp -= dmg;
     if (pl.rage) this.rageReadyUntil = now + 4000;   // Abilità RABBIA: arma il prossimo attacco
     window.Sfx.hurt();
@@ -3133,6 +3148,25 @@ class GameScene extends Phaser.Scene {
     // senza blocchi fisici (niente cuciture che incastrano). NON aggancia mentre SALE in un salto
     // (vy<0), ne' se la superficie e' molto piu' in basso (dirupo/salto) → li' cade. I dislivelli
     // sono limitati a pendenze dolci (vedi buildTerrain), quindi il cap di salita non si vede.
+    // SALTO SUI NEMICI (stile Mario — giro difficolta' 2026-07-25): se stai SCENDENDO e i piedi
+    // arrivano sulla testa di un nemico, rimbalzi e lo colpisci invece di prendere danno. DEVE
+    // stare PRIMA dello snap al terreno qui sotto: i nemici non sono solidi e lo snap "risucchia"
+    // il giocatore al suolo (attraverso il nemico) azzerandogli la velocita', quindi dopo lo snap
+    // non si distinguerebbe una caduta-sulla-testa da un contatto laterale. Il rimbalzo mette
+    // velocita' negativa -> lo snap qui sotto (che aggancia solo con vy >= -1) viene saltato da se'.
+    if (this.player.body.velocity.y > 60) {
+      const pbody = this.player.body;
+      const preda = this.enemies.getChildren().find((e) => {
+        if (!e.active || e.spawning || e.kind === 'boss' || e.fugitive || !e.body) return false;
+        if (Math.abs(pbody.center.x - e.body.center.x) > e.body.halfWidth + pbody.halfWidth) return false;
+        // Piedi SOPRA il centro del nemico (arrivi dall'alto, non un contatto laterale) e entro la
+        // portata dello snap al terreno dalla testa del nemico (48px): con nemici bassi lo snap
+        // aggancerebbe il PG prima che i piedi tocchino davvero la testa, quindi si anticipa.
+        return pbody.bottom <= e.body.center.y && pbody.bottom >= e.body.top - 48;
+      });
+      if (preda) this.stompEnemy(preda);
+    }
+
     let onGround = this.player.body.blocked.down || this.player.body.touching.down;   // backstop/pedane
     const surfaceY = this.terrainTopAt(this.player.x);
     const feetY = this.player.body.bottom;
