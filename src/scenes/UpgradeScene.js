@@ -39,6 +39,9 @@ class UpgradeScene extends Phaser.Scene {
       // Getto Rapido (round 2, G.2): parallelo di Riflessi ma per il getto a distanza (che
       // prima non aveva NESSUN comune a velocizzarlo).
       { id: 'jetspd', rep: true, rarity: 'common', apply: (s) => { s.shotCooldown = Math.max(120, s.shotCooldown - 40); } },
+      // Getto Potente (2026-07-26): mancava un comune che alzasse il DANNO a distanza (c'era solo
+      // 'damage' per il corpo a corpo e 'jetspd' per la cadenza). +5 sul getto (base 16).
+      { id: 'jetdmg', rep: true, rarity: 'common', apply: (s) => { s.jetDamage += 5; } },
       { id: 'doublejump', rep: false, rarity: 'rare', ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
       { id: 'dash', rep: false, rarity: 'rare', ability: 'dash', apply: (s) => { s.dash = true; } },
       { id: 'hammer', rep: false, rarity: 'rare', ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },

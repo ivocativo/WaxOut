@@ -39,7 +39,9 @@ class DoorScene extends Phaser.Scene {
     // missioni a tempo erano troppo frequenti).
     const safeKind = Math.random() < 0.75 ? 'normal' : 'rush';
     const RISKY_KINDS = ['siege', 'swarm'];
-    const RISKY_MUTATORS = ['haste', 'armored', 'horde', 'thickwax', 'quake', 'lowgrav'];
+    // 'ironwax'/'bonanza' NON qui: toccano il moltiplicatore cerume e renderebbero bugiara
+    // l'anteprima "cerume x2" della porta (restano nel pool casuale dei livelli).
+    const RISKY_MUTATORS = ['haste', 'armored', 'horde', 'thickwax', 'quake', 'lowgrav', 'glass', 'frenzy', 'berserk'];
 
     // Salvate su `this` (non solo variabili locali): servono al click handler E ai controlli
     // automatici, che verificano la porta generata chiamando direttamente choose() su una di

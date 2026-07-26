@@ -112,6 +112,11 @@ window.MUTATORS = [
   { id: 'bonanza',  color: '#ffd166', apply(s) { s.mutWaxMult = 2; } },
   { id: 'thickwax', color: '#e0a83a', apply(s) { s.mutWaxHp = 1.7; } },
   { id: 'quake',    color: '#e0a83a', apply(s) { s.mutQuake = true; s.startWaxCollapseEvent(); } },
+  // Nuovi (2026-07-26, richiesta varieta'): riusano i moltiplicatori mut* gia' esistenti.
+  { id: 'glass',    color: '#7fe3ff', apply(s) { s.mutEnemyHp = 0.45; s.mutEnemyDmg = 1.5; } },   // fragili ma tosti
+  { id: 'frenzy',   color: '#ff7bd5', apply(s) { s.mutMaxEnemies = 3; s.mutEnemyWax = 1.5; } },    // tanti + piu' cerume
+  { id: 'berserk',  color: '#ff5a5a', apply(s) { s.mutEnemySpeed = 1.6; s.mutEnemyDmg = 1.4; s.mutMaxEnemies = -1; } },  // pochi ma feroci
+  { id: 'ironwax',  color: '#b0b8c0', apply(s) { s.mutWaxHp = 2.3; s.mutWaxMult = 1.6; } },        // cerume durissimo ma prezioso
 ];
 
 // EVENTI CASUALI di livello (indipendenti dai mutatori, possono capitare insieme): a
