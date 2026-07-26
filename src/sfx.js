@@ -49,8 +49,39 @@ window.Sfx = (function () {
       musicFade.connect(musicBus);
       buildFx();
       applyMix();
+      attachWakeListeners();
     }
     return ctx;
+  }
+
+  // AUDIO IN BACKGROUND (2026-07-25): sul telefono dell'utente l'AudioContext NON si sospende da
+  // solo quando lo schermo si spegne -> la musica continua (indesiderato) E il browser rallenta lo
+  // scheduler in background (throttling di setInterval), che la fa sballare/"crashare". Quindi la
+  // SOSPENDIAMO noi quando la pagina va in background e la riprendiamo al ritorno (in sospensione
+  // l'orologio dell'audio si ferma, quindi non serve risincronizzare). Un tocco/tasto la riprende
+  // comunque, come rete di sicurezza.
+  let wakeAttached = false;
+  function suspendAudio() {
+    const c = ctx; if (!c) return;
+    if (c.state === 'running') c.suspend().catch(function () {});
+  }
+  function resumeAudio() {
+    const c = ctx; if (!c) return;
+    if (c.state === 'suspended') c.resume().then(function () { if (musicOn) startMusic(); }, function () {});
+    else if (c.state === 'running' && musicOn && !schedTimer) startMusic();
+  }
+  function attachWakeListeners() {
+    if (wakeAttached) return;
+    wakeAttached = true;
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) suspendAudio();
+        else resumeAudio();
+      });
+      window.addEventListener('pointerdown', function () { resumeAudio(); }, { passive: true });
+      window.addEventListener('touchstart', function () { resumeAudio(); }, { passive: true });
+      window.addEventListener('keydown', function () { resumeAudio(); });
+    } catch (e) { /* ambienti senza DOM: ignora */ }
   }
 
   // Mandata "spazio" condivisa: un feedback-delay corto + un riverbero a
@@ -116,6 +147,7 @@ window.Sfx = (function () {
       const bus = o.bus || sfxBus;
       const dur = o.dur || 0.2;
       const g = c.createGain();
+      const nodes = [g];                 // nodi da SCOLLEGARE a fine nota (vedi cleanup sotto)
       const dets = o.detune || [0];
       const oscs = dets.map(dt => {
         const osc = c.createOscillator();
@@ -132,7 +164,7 @@ window.Sfx = (function () {
         ws.curve = getDistCurve();
         ws.oversample = '2x';
         ws.connect(g);
-        dest = ws;
+        dest = ws; nodes.push(ws);
       }
       if (o.filter) {
         const f = c.createBiquadFilter();
@@ -140,14 +172,20 @@ window.Sfx = (function () {
         f.frequency.setValueAtTime(o.filter.freq || 1200, t);
         if (o.filter.to) f.frequency.exponentialRampToValueAtTime(Math.max(1, o.filter.to), t + dur);
         if (o.filter.q != null) f.Q.value = o.filter.q;
-        oscs.forEach(osc => osc.connect(f)); f.connect(dest);
+        oscs.forEach(osc => osc.connect(f)); f.connect(dest); nodes.push(f);
       } else {
         oscs.forEach(osc => osc.connect(dest));
       }
       const end = adsr(g, t, dur, o.a, o.d, o.s, o.r, o.peak);
       g.connect(bus);
-      if (o.send && fxBus) { const s = c.createGain(); s.gain.value = o.send; g.connect(s); s.connect(fxBus); }
+      if (o.send && fxBus) { const s = c.createGain(); s.gain.value = o.send; g.connect(s); s.connect(fxBus); nodes.push(s); }
       oscs.forEach(osc => { osc.start(t); osc.stop(end + 0.03); });
+      // CLEANUP (fix crash audio mobile 2026-07-25): a nota finita SCOLLEGA i nodi persistenti
+      // (gain/filtro/distorsione/mandata) — restano attaccati al bus/fx e su alcuni browser mobile
+      // NON vengono raccolti dal GC, accumulandosi finche' l'audio si impianta dopo qualche minuto.
+      // Gli oscillatori si autoscollegano a fine suono. `onended` scatta allo stop dell'ultimo osc.
+      const last = oscs[oscs.length - 1];
+      if (last) last.onended = function () { for (let k = 0; k < nodes.length; k++) { try { nodes[k].disconnect(); } catch (e) {} } };
     } catch (e) { /* audio non disponibile */ }
   }
 
@@ -163,6 +201,7 @@ window.Sfx = (function () {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       const src = c.createBufferSource(); src.buffer = buf;
       const g = c.createGain();
+      const nodes = [g];
       let node = src;
       if (o.freq) {
         const f = c.createBiquadFilter();
@@ -170,13 +209,15 @@ window.Sfx = (function () {
         f.frequency.setValueAtTime(o.freq, t);
         if (o.to) f.frequency.exponentialRampToValueAtTime(Math.max(1, o.to), t + dur);
         if (o.q != null) f.Q.value = o.q;
-        src.connect(f); node = f;
+        src.connect(f); node = f; nodes.push(f);
       }
       node.connect(g);
       adsr(g, t, dur, o.a, o.d, o.s == null ? 0.25 : o.s, o.r, o.peak);
       g.connect(o.bus || sfxBus);
-      if (o.send && fxBus) { const s = c.createGain(); s.gain.value = o.send; g.connect(s); s.connect(fxBus); }
+      if (o.send && fxBus) { const s = c.createGain(); s.gain.value = o.send; g.connect(s); s.connect(fxBus); nodes.push(s); }
       src.start(t); src.stop(t + dur + 0.02);
+      // CLEANUP: scollega i nodi persistenti a fine sbuffo (vedi nota in synth()).
+      src.onended = function () { for (let k = 0; k < nodes.length; k++) { try { nodes[k].disconnect(); } catch (e) {} } };
     } catch (e) { /* ignora */ }
   }
 
@@ -201,6 +242,11 @@ window.Sfx = (function () {
   }
 
   // ---------- Batteria sintetica (per la musica) ----------
+  // NB: la musica gira di CONTINUO, quindi la batteria e' la fonte principale di accumulo di nodi.
+  // `cleanupOnEnd(src, [nodi])` scollega i nodi persistenti quando la sorgente finisce (vedi synth).
+  function cleanupOnEnd(src, nodes) {
+    src.onended = function () { for (let k = 0; k < nodes.length; k++) { try { nodes[k].disconnect(); } catch (e) {} } };
+  }
   function drumKick(t, bus, vol) {
     const c = ctx; const o = c.createOscillator(), g = c.createGain();
     o.type = 'sine';
@@ -210,6 +256,7 @@ window.Sfx = (function () {
     g.gain.linearRampToValueAtTime(vol || 0.16, t + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
     o.connect(g); g.connect(bus); o.start(t); o.stop(t + 0.22);
+    cleanupOnEnd(o, [g]);
   }
   function drumSnare(t, bus, vol) {
     const c = ctx;
@@ -224,6 +271,7 @@ window.Sfx = (function () {
     const o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(200, t);
     const g2 = c.createGain(); g2.gain.setValueAtTime((vol || 0.12) * 0.55, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
     o.connect(g2); g2.connect(bus); o.start(t); o.stop(t + 0.12);
+    cleanupOnEnd(src, [hp, g]); cleanupOnEnd(o, [g2]);
   }
   function drumHat(t, bus, vol, open) {
     const c = ctx; const dur = open ? 0.14 : 0.045;
@@ -234,6 +282,7 @@ window.Sfx = (function () {
     const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7500;
     const g = c.createGain(); g.gain.setValueAtTime(vol || 0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(hp); hp.connect(g); g.connect(bus); src.start(t); src.stop(t + dur + 0.02);
+    cleanupOnEnd(src, [hp, g]);
   }
 
   // ---------- Musica: i 3 brani (dati) ----------
@@ -325,7 +374,7 @@ window.Sfx = (function () {
   let currentTrackName = null;     // cosa sta effettivamente suonando
 
   function schedTick() {
-    const c = ctx; if (!c || c.state !== 'running') return;
+    const c = ctx; if (!c || c.state !== 'running') return;   // sospeso (background): non schedulare
     const track = SONGS[currentTrackName]; if (!track) return;
     const stepDur = 60 / track.bpm / 4;
     if (!(stepDur > 0)) return;                       // sicurezza: mai un passo nullo/negativo
