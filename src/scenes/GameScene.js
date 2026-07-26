@@ -1100,9 +1100,29 @@ class GameScene extends Phaser.Scene {
 
   // Pozza di cerume scivoloso sul pavimento: solo visiva + una fascia x memorizzata in
   // this.slimeZones, letta in update() per rallentare il giocatore mentre e' a terra.
+  // Terreno abbastanza PIATTO su [x, x+w]? La pozza segue il profilo del terreno, ma dove il
+  // terreno e' ripido/spezzato (bordo di collina o cunetta) la patina si accartoccia e viene
+  // brutta (segnalato utente 2026-07-25). Si accetta solo se il dislivello sotto la pozza e'
+  // contenuto.
+  terrainFlatEnough(x, w, maxDislivello) {
+    let mn = Infinity, mx = -Infinity;
+    for (let px = x; px <= x + w; px += 12) {
+      const y = this.terrainTopAt(px);
+      if (y < mn) mn = y; if (y > mx) mx = y;
+    }
+    return (mx - mn) <= maxDislivello;
+  }
+
   addSlimeZone() {
     const w = Phaser.Math.Between(90, 170);
-    const x = this.pickHazardX(w);
+    // Cerca un tratto abbastanza piatto: la pozza su un terreno ripido si deforma male. Fino a
+    // 8 tentativi; se non lo trova, salta (meglio una pozza in meno che una brutta).
+    let x = null;
+    for (let tries = 0; tries < 8; tries++) {
+      const cand = this.pickHazardX(w);
+      if (cand == null) return;
+      if (this.terrainFlatEnough(cand, w, 22)) { x = cand; break; }
+    }
     if (x == null) return;
     // La patina SEGUE il profilo del terreno (prima era una barra dritta: su una pendenza
     // restava staccata dal suolo). Aspetto e luccichii: GameGfx.paintSlick.
@@ -2871,6 +2891,19 @@ class GameScene extends Phaser.Scene {
     this.showBanner(window.I18n.t('game_clean_more', { pct: Math.round(this.cleanGoal * 100) }), '#9be870');
   }
 
+  // Congela i nemici a fine livello/run: NON basta azzerare la velocita'. Quando il livello si
+  // "blocca" (this.locked) update() esce subito, quindi lo snap dei nemici al terreno si ferma, ma
+  // la fisica continua e la GRAVITA' li tira sotto il suolo (c'e' solo il backstop a 408, sotto la
+  // linea visibile) -> si vedevano cadere sotto terra al timpano (segnalato utente 2026-07-25).
+  // `body.moves = false` ferma l'integrazione fisica: restano dove sono.
+  freezeEnemies() {
+    this.enemies.getChildren().forEach((e) => {
+      if (!e.active || !e.body) return;
+      e.setVelocity(0, 0);
+      e.body.moves = false;
+    });
+  }
+
   levelComplete() {
     if (this.locked) return;
     this.locked = true;
@@ -2878,7 +2911,7 @@ class GameScene extends Phaser.Scene {
     if (this.spawnTimer) this.spawnTimer.remove();
     if (this.quakeTimer) { this.quakeTimer.remove(false); this.quakeTimer = null; }
     this.player.setVelocity(0, 0);
-    this.enemies.getChildren().forEach((e) => { if (e.active) e.setVelocity(0, 0); });
+    this.freezeEnemies();
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setDepth(50).setScrollFactor(0);
@@ -2900,6 +2933,7 @@ class GameScene extends Phaser.Scene {
     window.Sfx.lose();
     if (this.spawnTimer) this.spawnTimer.remove();
     if (this.quakeTimer) { this.quakeTimer.remove(false); this.quakeTimer = null; }
+    this.freezeEnemies();
 
     // Fine della run: incassa il cerume raccolto nella banca permanente.
     const lvl = window.GameState.level;
