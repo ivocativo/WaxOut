@@ -539,10 +539,12 @@ window.__earwaxChecks = function (opts) {
     fermaMeta();
     window.GameState.reset();
     window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };   // livello DETERMINISTICO
     g.scene.start('GameScene');
     passaTick();
     const gs = g.scene.getScene('GameScene');
     avanza(gs, 20);
+    if (gs.spawnTimer) gs.spawnTimer.remove();          // niente nuovi nemici durante la prova
     gs.enemies.getChildren().forEach((e) => { if (e.active) e.destroy(); });
     // spawn il nemico su terreno piatto lontano da membrane, poi LIBERA la colonna di caduta
     // (tolgo pedane/cerume vicino): cosi' la prova non dipende dalla generazione del livello.
@@ -552,21 +554,26 @@ window.__earwaxChecks = function (opts) {
     }
     const e = gs.spawnEnemy('blob', { x: ex });
     avanza(gs, 40);                                    // fa emergere il nemico (god-mode)
+    if (gs.spawnTimer) gs.spawnTimer.remove();          // (di nuovo: avanza potrebbe averlo ricreato? no, ma sicuri)
     gs.platforms.getChildren().forEach((p) => { if (p.active && Math.abs(p.x - e.x) < 100) p.destroy(); });
     gs.blocks.getChildren().forEach((b) => { if (b.active && Math.abs(b.x - e.x) < 90 && b.y < e.body.top + 10) b.destroy(); });
     const hpNemicoPrima = e.hp;
     window.GameState.player.hp = 100; gs.invulnUntil = 0;   // via il god-mode: il danno deve contare
     gs.player.body.reset(e.x, e.body.top - 50);        // 50px sopra la testa del nemico
     gs.player.setVelocityY(250);                       // in caduta
-    let rimbalzoMin = 0;
-    for (let i = 0; i < 40; i++) {
+    // Controlla il danno SOLO nella finestra del rimbalzo (fino a poco dopo lo stacco): un
+    // eventuale colpo DOPO, quando il nemico torna e l'invuln e' scaduta, e' un colpo legittimo,
+    // non un fallimento dello stomp.
+    let rimbalzoMin = 0, hpDopoRimbalzo = 100;
+    for (let i = 0; i < 20; i++) {
       t += 16.6; g.loop.step(t);                       // frame RAW (niente god-mode: il danno conta)
       if (gs.player.body.velocity.y < rimbalzoMin) rimbalzoMin = gs.player.body.velocity.y;
-      if (!e.active) break;
+      hpDopoRimbalzo = window.GameState.player.hp;
+      if (rimbalzoMin < -50 && gs.player.body.velocity.y > 0) break;   // rimbalzato e gia' in risalita finita
     }
     const nemicoColpito = !e.active || e.hp < hpNemicoPrima;
     const haRimbalzato = rimbalzoMin < -50;
-    const senzaDanno = window.GameState.player.hp >= 100;
+    const senzaDanno = hpDopoRimbalzo >= 100;
     if (nemicoColpito && haRimbalzato && senzaDanno) {
       ok('salto sui nemici', 2, 'rimbalzo ' + Math.round(rimbalzoMin) + ', nemico colpito, 0 danni');
     } else {

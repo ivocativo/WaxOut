@@ -94,9 +94,10 @@ class GameScene extends Phaser.Scene {
     } else {
       kind = (levelNum % 5 === 3) ? 'swarm' : 'normal';
       if (kind === 'normal' && levelNum >= 2) {
+        // Corsa MENO frequente (playtest utente 2026-07-25: le missioni a tempo erano troppe).
         const r = Math.random();
-        if (r < 0.28) kind = 'rush';
-        else if (r < 0.56) kind = 'siege';
+        if (r < 0.18) kind = 'rush';
+        else if (r < 0.44) kind = 'siege';
       }
     }
     this.levelKind = kind;
@@ -383,16 +384,12 @@ class GameScene extends Phaser.Scene {
       spawnDelay = Math.max(1900, 3200 - lvl * 140);
       if (this.levelKind === 'rush') {
         this.maxEnemies = Math.min(this.maxEnemies + 1, 6); spawnDelay = Math.round(spawnDelay * 0.8);
-        // CORSA A TEMPO (round 2, F.1): prima non c'era nessun cronometro, solo "arriva al
-        // timpano quando vuoi". Tempo commisurato alla lunghezza del livello: ritmo medio
-        // atteso ~130px/s (piu' lento della camminata base: si suppone rallentato dai
-        // combattimenti) + un margine fisso di reazione. Da TARARE col playtest.
-        this.rushEndAt = this.time.now + Math.round(this.worldW / 130) * 1000 + 8000;
+        // CORSA A TEMPO: countdown 3-2-1-VIA (annuncio lampante, il cronometro parte a "VIA") +
+        // tempo piu' generoso. Da tarare col playtest.
+        this.startRushCountdown();
       }
       for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
-      const bkey = this.levelKind === 'rush' ? 'game_rush_in' : 'game_goal';
-      const bcol = this.levelKind === 'rush' ? '#ffd166' : '#ffd9a0';
-      this.showBanner(window.I18n.t(bkey), bcol);
+      if (this.levelKind !== 'rush') this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
 
@@ -3042,6 +3039,37 @@ class GameScene extends Phaser.Scene {
     this.bigTimerText = this.add.text(window.CONFIG.WIDTH / 2, 92, '', {
       fontFamily: 'monospace', fontSize: '38px', color: '#ffd9a0', stroke: '#14161f', strokeThickness: 6,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+  }
+
+  // CORSA A TEMPO — avvio LAMPANTE (playtest utente 2026-07-25: non era evidente che fosse una
+  // corsa a tempo). Countdown "3 · 2 · 1 · VIA!" grande al centro (non blocca i comandi: puoi gia'
+  // muoverti) + etichetta in alto; il cronometro parte a "VIA!", cosi' il countdown regala anche
+  // qualche secondo. Tempo piu' generoso di prima (~115px/s + 11s, era 130px/s + 8s).
+  startRushCountdown() {
+    const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
+    const STEP = 650;
+    const steps = ['3', '2', '1', window.I18n.t('rush_go')];
+    const rushTime = Math.round(this.worldW / 115) * 1000 + 11000;
+    this.rushEndAt = this.time.now + steps.length * STEP + rushTime;   // il cronometro scade DOPO il VIA
+
+    const label = this.add.text(W / 2, H * 0.30, window.I18n.t('rush_countdown_title'), {
+      fontFamily: 'monospace', fontSize: '24px', color: '#ffd166', stroke: '#14161f', strokeThickness: 5,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(130);
+
+    steps.forEach((s, i) => {
+      this.time.delayedCall(i * STEP, () => {
+        if (this.locked) return;
+        const via = (i === steps.length - 1);
+        const big = this.add.text(W / 2, H * 0.46, s, {
+          fontFamily: 'monospace', fontSize: via ? '104px' : '88px',
+          color: via ? '#9be870' : '#ff6b5a', stroke: '#14161f', strokeThickness: 9,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(131).setScale(0.5).setAlpha(0);
+        this.tweens.add({ targets: big, scale: 1.15, alpha: 1, duration: 170, ease: 'Back.out' });
+        this.tweens.add({ targets: big, alpha: 0, duration: 300, delay: STEP - 300, onComplete: () => big.destroy() });
+        window.Sfx.pick();
+        if (via) { this.cameras.main.shake(120, 0.006); label.destroy(); }
+      });
+    });
   }
 
   // `text` = stringa gia' formattata (i18n) da mostrare; `secondsLeft` guida SOLO il lampeggio.

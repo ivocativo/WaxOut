@@ -35,7 +35,9 @@ class DoorScene extends Phaser.Scene {
     // Due porte CONTRAPPOSTE. 'bonanza' e' escluso apposta dal pool dei mutatori della porta
     // rischiosa: raddoppierebbe il cerume IN SILENZIO sopra al bonus gia' promesso dalla porta
     // (waxMult), e l'anteprima ("cerume x2") diventerebbe bugiarda per difetto.
-    const SAFE_KINDS = ['normal', 'rush'];
+    // Lato SICURO per lo piu' Normale, la Corsa solo ogni tanto (playtest utente 2026-07-25: le
+    // missioni a tempo erano troppo frequenti).
+    const safeKind = Math.random() < 0.75 ? 'normal' : 'rush';
     const RISKY_KINDS = ['siege', 'swarm'];
     const RISKY_MUTATORS = ['haste', 'armored', 'horde', 'thickwax', 'quake', 'lowgrav'];
 
@@ -43,7 +45,7 @@ class DoorScene extends Phaser.Scene {
     // automatici, che verificano la porta generata chiamando direttamente choose() su una di
     // queste (vedi tools/checks.js).
     this.doors = [
-      { kind: Phaser.Utils.Array.GetRandom(SAFE_KINDS), mutator: null, waxMult: 1, tag: 'safe' },
+      { kind: safeKind, mutator: null, waxMult: 1, tag: 'safe' },
       { kind: Phaser.Utils.Array.GetRandom(RISKY_KINDS), mutator: Phaser.Utils.Array.GetRandom(RISKY_MUTATORS), waxMult: 2, tag: 'risky' },
     ];
 
