@@ -47,6 +47,9 @@ class MenuScene extends Phaser.Scene {
     const blob = this.add.sprite(W / 2 + 150, 320, 'enemy_blob');
     const bs = 150 / blob.height;
     blob.setScale(bs);
+    // Striscia anche nel menu (l'animazione e' registrata da BootScene ed e' globale). Lo
+    // schiacciamento a tween resta: da solo il ciclo e' volutamente sottile.
+    if (this.anims.exists('blob_crawl')) blob.play('blob_crawl');
     this.tweens.add({ targets: blob, scaleY: bs * 0.9, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // Pulsante: rettangolo con bordo + ombra leggera (stesso linguaggio del negozio, un po'

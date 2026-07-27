@@ -138,9 +138,13 @@ magenta, stile **organico/parassitario leggermente gore** (scelto dall'utente, n
     possono togliere e rendere Corazzato/Esplosivo/Split varianti di colore/dettaglio.
   - [x] **Dimensione nemici:** ✅ APPROVATA dal playtest (2026-07-25): «si distinguono bene, le
     dimensioni vanno bene». Non toccare la tabella `ART`.
-  - [ ] **ANIMAZIONI:** fuori da questo blocco (servirebbe AutoSprite = abbonamento). Per ora ferme.
-    ⚠️ **L'utente le ha CHIESTE esplicitamente al playtest** («servirebbero degli spritesheet»):
-    e' il prossimo passo naturale dell'estetica quando ci sara' l'abbonamento.
+  - [~] **ANIMAZIONI: SBLOCCATE senza AutoSprite (2026-07-27).** L'utente ha animato il **cerumino**
+    con **Claude Design** (claude.ai/design) e consegnato uno sheet di 12 frame 256x256. Integrato:
+    nuovo `tools/bake_sheet.py` (ritaglio UNICO su tutti i frame + ridimensiona + posterizza),
+    sheet in `assets/spritesheets/enemies/`, caricato in `BootScene` **sulla stessa chiave**
+    `enemy_blob` (chi non chiede l'animazione vede il frame 0: menu, tabella ART e hitbox non se ne
+    accorgono), animazione globale `blob_crawl` a 8 fps, ogni nemico parte da un frame a caso.
+    - [ ] Restano da animare gli altri 6 nemici, stessa strada.
   - [ ] **TIMPANO SCOLLEGATO** 🧠 (segnalato dal playtest 2026-07-25): l'immagine AI e' bella ma
     "galleggia", non e' attaccata alle pareti del condotto. Proposta concordata: **cornice di carne**
     intorno allo sprite (disegnata via codice, tavolozza `GameGfx.CARNE`) **+ vasi che continuano**

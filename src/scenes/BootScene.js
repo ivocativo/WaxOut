@@ -18,9 +18,17 @@ class BootScene extends Phaser.Scene {
     // altri 5 erano generati a codice con PixelArt.fromGrid — ora rimosso). Caricate DIRETTAMENTE
     // dal file (non via `img`) per non passare dai vecchi data URI in SPRITE_DATA, che avrebbero
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
-    [['enemy_blob', 'cerumino'], ['enemy_crust', 'crosta'], ['enemy_spit', 'gorgogliante'],
+    [['enemy_crust', 'crosta'], ['enemy_spit', 'gorgogliante'],
      ['enemy_fly', 'moscerino'], ['enemy_flea', 'pulce'], ['enemy_hopper', 'saltatore'],
      ['enemy_boss', 'boss']].forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
+
+    // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE
+    // SHEET (12 frame di strisciata, testa a destra come tutti gli altri sprite del gioco). Usare
+    // la stessa chiave invece di aggiungerne una nuova fa si' che tutto quello che gia' mostra il
+    // cerumino (menu, tabella ART, hitbox) continui a funzionare senza saperne niente: chi non
+    // chiede un'animazione vede il frame 0. Preparato con tools\bake_sheet.py.
+    this.load.spritesheet('enemy_blob', 'assets/spritesheets/enemies/cerumino_crawl_px.png',
+      { frameWidth: 116, frameHeight: 71 });
 
     // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
     // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
@@ -73,6 +81,17 @@ class BootScene extends Phaser.Scene {
     const C = window.CONFIG.COLORS;
     const PA = window.PixelArt;
     const sE = window.CONFIG.PIXEL_SCALE_ENEMY;
+
+    // Strisciata del cerumino. Le animazioni in Phaser sono GLOBALI: registrata qui una volta,
+    // e' disponibile a ogni scena (partita e menu) senza doverla ricreare a ogni livello.
+    // 8 fps: a 6 (il valore del prototipo) si vedeva a scatti sotto ai nemici che corrono.
+    if (!this.anims.exists('blob_crawl')) {
+      this.anims.create({
+        key: 'blob_crawl',
+        frames: this.anims.generateFrameNumbers('enemy_blob', { start: 0, end: 11 }),
+        frameRate: 8, repeat: -1,
+      });
+    }
 
     // player e i 7 NEMICI (round B.2) ora arrivano da PNG (vedi preload): le texture
     // procedurali di moscerino/gorgogliante/pulce/saltatore/boss sono state rimosse. Qui sotto

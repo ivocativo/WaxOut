@@ -1503,11 +1503,14 @@ class GameScene extends Phaser.Scene {
     };
     const art = ART[cfg.tex];
     if (art && this.textures.exists(cfg.tex)) {
-      const src = this.textures.get(cfg.tex).getSourceImage();
-      const sc = art.dispH / src.height;
+      // Frame 0 e non l'immagine sorgente: per uno SPRITE SHEET (il cerumino, dal 2026-07-27)
+      // l'immagine e' larga 12 celle, e prendere la sua larghezza sballerebbe l'ancoraggio della
+      // hitbox. Per uno sprite singolo il frame 0 E' l'immagine intera, quindi non cambia nulla.
+      const fr = this.textures.get(cfg.tex).get(0);
+      const sc = art.dispH / fr.height;
       cfg.scale = sc;
       cfg.body = [Math.max(4, Math.round(art.hbW / sc)), Math.max(4, Math.round(art.hbH / sc))];
-      cfg._artW = src.width; cfg._artH = src.height;
+      cfg._artW = fr.width; cfg._artH = fr.height;
     }
 
     // FIGLIO DELLO SPLIT: piu' piccolo, debole E MENO DANNOSO del genitore (due figli ~= un
@@ -1573,6 +1576,12 @@ class GameScene extends Phaser.Scene {
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
     e.kind = kind;
+    // Cerumino: ciclo di strisciata. Ogni nemico parte da un frame a caso, altrimenti un gruppo
+    // che compare insieme striscia all'unisono e si vede che sono copie della stessa creatura.
+    if (kind === 'blob' && this.anims.exists('blob_crawl')) {
+      e.play('blob_crawl');
+      e.anims.setProgress(Math.random());
+    }
     if (opts.guard !== undefined) { e.guard = true; e.homeX = opts.guard; e.guardRange = 430; }
     e.spawning = true;                            // ancora in fase di comparsa: inerte
     e.setCollideWorldBounds(true);
