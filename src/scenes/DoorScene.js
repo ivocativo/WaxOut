@@ -51,36 +51,74 @@ class DoorScene extends Phaser.Scene {
       { kind: Phaser.Utils.Array.GetRandom(RISKY_KINDS), mutator: Phaser.Utils.Array.GetRandom(RISKY_MUTATORS), waxMult: 2, tag: 'risky' },
     ];
 
-    const cardW = 340, cardH = 260, gap = 50;
+    const cardW = 360, cardH = 340, gap = 40;
     const totalW = this.doors.length * cardW + (this.doors.length - 1) * gap;
     const startX = (W - totalW) / 2 + cardW / 2;
-    const cy = 300;
+    const cy = 320;
 
     const TAG_STYLE = {
       safe:  { fill: 0x16283a, hover: 0x1f3c52, border: 0x4fd1ff, title: '#bfeeff', tag: '#8fe0ff' },
       risky: { fill: 0x3a1618, hover: 0x522024, border: 0xff6b5a, title: '#ffd0c8', tag: '#ff9a8a' },
     };
 
+    // Colore del modificatore: lo stesso del banner a inizio livello, cosi' il giocatore
+    // collega la riga "REGOLA SPECIALE" della porta con la scritta che vedra' in partita.
+    const mutColor = (id) => {
+      const m = (window.MUTATORS || []).find((x) => x.id === id);
+      return (m && m.color) || '#fff7e8';
+    };
+
     this.doors.forEach((d, i) => {
       const cx = startX + i * (cardW + gap);
       const style = TAG_STYLE[d.tag];
+      const top = cy - cardH / 2;
+      const wrap = cardW - 34;
 
       const card = this.add.rectangle(cx, cy, cardW, cardH, style.fill, 1)
         .setStrokeStyle(4, style.border).setInteractive({ useHandCursor: true });
 
-      this.add.text(cx, cy - 100, (i + 1) + '. ' + T.t('door_tag_' + d.tag), {
-        fontFamily: 'monospace', fontSize: '17px', color: style.tag,
-      }).setOrigin(0.5);
-      this.add.text(cx, cy - 58, T.t('door_kind_' + d.kind), {
-        fontFamily: 'monospace', fontSize: '27px', color: style.title,
-      }).setOrigin(0.5);
-      this.add.text(cx, cy - 8, d.mutator ? T.t('mut_' + d.mutator) : T.t('door_mod_none'), {
-        fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8', align: 'center',
-        wordWrap: { width: cardW - 30 }, lineSpacing: 3,
-      }).setOrigin(0.5);
-      this.add.text(cx, cy + 75, d.waxMult > 1 ? T.t('door_reward_bonus', { mult: d.waxMult }) : T.t('door_reward_normal'), {
-        fontFamily: 'monospace', fontSize: '16px', color: '#ffd166',
-      }).setOrigin(0.5);
+      // Linea separatrice fra una sezione e l'altra: senza, le tre voci sembravano
+      // un elenco unico e il giocatore non capiva cosa fosse cosa.
+      const sep = (y) => {
+        const l = this.add.graphics();
+        l.fillStyle(style.border, 0.35);
+        l.fillRect(cx - cardW / 2 + 16, y, cardW - 32, 2);
+      };
+      // Etichetta piccola e spenta + contenuto grande e acceso: si legge "OBIETTIVO: Normale".
+      const label = (y, key) => this.add.text(cx - cardW / 2 + 16, y, T.t(key), {
+        fontFamily: 'monospace', fontSize: '13px', color: style.tag,
+      }).setOrigin(0, 0);
+
+      this.add.text(cx, top + 20, (i + 1) + '. ' + T.t('door_tag_' + d.tag), {
+        fontFamily: 'monospace', fontSize: '18px', color: style.tag,
+      }).setOrigin(0.5, 0);
+
+      // --- OBIETTIVO: che cosa devo fare per superare il livello
+      sep(top + 50);
+      label(top + 60, 'door_lbl_obj');
+      this.add.text(cx, top + 80, T.t('door_kind_' + d.kind), {
+        fontFamily: 'monospace', fontSize: '26px', color: style.title,
+      }).setOrigin(0.5, 0);
+      this.add.text(cx, top + 114, T.t('door_obj_' + d.kind), {
+        fontFamily: 'monospace', fontSize: '14px', color: '#dfe6f0', align: 'center',
+        wordWrap: { width: wrap }, lineSpacing: 3,
+      }).setOrigin(0.5, 0);
+
+      // --- REGOLA SPECIALE: come cambiano le regole del livello (il modificatore)
+      sep(top + 168);
+      label(top + 178, 'door_lbl_rule');
+      this.add.text(cx, top + 200, d.mutator ? T.t('mut_' + d.mutator) : T.t('door_mod_none'), {
+        fontFamily: 'monospace', fontSize: '15px',
+        color: d.mutator ? mutColor(d.mutator) : '#9aa4b2', align: 'center',
+        wordWrap: { width: wrap }, lineSpacing: 3,
+      }).setOrigin(0.5, 0);
+
+      // --- PREMIO
+      sep(top + 262);
+      label(top + 272, 'door_lbl_reward');
+      this.add.text(cx, top + 294, d.waxMult > 1 ? T.t('door_reward_bonus', { mult: d.waxMult }) : T.t('door_reward_normal'), {
+        fontFamily: 'monospace', fontSize: '19px', color: '#ffd166',
+      }).setOrigin(0.5, 0);
 
       card.on('pointerover', () => card.setFillStyle(style.hover, 1));
       card.on('pointerout', () => card.setFillStyle(style.fill, 1));

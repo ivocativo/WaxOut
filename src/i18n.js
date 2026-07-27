@@ -189,7 +189,16 @@ window.I18n = (function () {
       door_kind_rush: 'Rush',
       door_kind_siege: 'Siege',
       door_kind_swarm: 'Swarm',
-      door_mod_none: 'No modifier',
+      // Etichette delle tre sezioni della carta: senza queste il giocatore non capiva
+      // quale riga fosse il TIPO di livello e quale il MODIFICATORE (playtest 2026-07-25).
+      door_lbl_obj: 'OBJECTIVE',
+      door_lbl_rule: 'SPECIAL RULE',
+      door_lbl_reward: 'REWARD',
+      door_obj_normal: 'Clean the wax, then reach the eardrum',
+      door_obj_rush: 'Reach the eardrum before time runs out',
+      door_obj_siege: 'Hold out until the timer ends (no eardrum)',
+      door_obj_swarm: 'Like Normal, but with hordes of enemies',
+      door_mod_none: 'None: enemies as usual',
       door_reward_normal: 'Normal wax reward',
       door_reward_bonus: 'Wax reward: x{mult}',
       // --- Vittoria (fine run, round A) ---
@@ -406,7 +415,14 @@ window.I18n = (function () {
       door_kind_rush: 'Corsa',
       door_kind_siege: 'Assedio',
       door_kind_swarm: 'Sciame',
-      door_mod_none: 'Nessun modificatore',
+      door_lbl_obj: 'OBIETTIVO',
+      door_lbl_rule: 'REGOLA SPECIALE',
+      door_lbl_reward: 'PREMIO',
+      door_obj_normal: 'Pulisci il cerume, poi raggiungi il timpano',
+      door_obj_rush: 'Raggiungi il timpano prima che scada il tempo',
+      door_obj_siege: 'Resisti fino a fine cronometro (niente timpano)',
+      door_obj_swarm: 'Come Normale, ma con orde di nemici',
+      door_mod_none: 'Nessuna: nemici come al solito',
       door_reward_normal: 'Cerume normale',
       door_reward_bonus: 'Cerume: x{mult}',
       // --- Vittoria (fine run, round A) ---
