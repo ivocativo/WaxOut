@@ -188,6 +188,7 @@ class GameScene extends Phaser.Scene {
     // l'atterraggio; _lastFacing per rilevare l'inversione di corsa.
     this.jx = 1; this.jy = 1;
     this._wasOnGround = true; this._prevVelY = 0; this._lastFacing = 1;
+    this._prevBottom = this.player.body.bottom;   // 0 farebbe leggere "arrivo dall'alto" al 1o frame
     // Abilità SCHIANTO: this.slamming = caduta veloce in corso (l'onda scatta all'atterraggio,
     // vedi 'landed' in update()); _slamPrevDown per rilevare la pressione FRESCA di giu' (non
     // tenuta) mentre sei in aria.
@@ -2800,6 +2801,11 @@ class GameScene extends Phaser.Scene {
   stompEnemy(e) {
     const p = window.GameState.player;
     const now = this.time.now;
+    // PIEDI SULLA TESTA prima di rimbalzare. La rilevazione e' predittiva (vedi update): senza
+    // questo appoggio il rimbalzo scatterebbe con il PG ancora staccato dal nemico e non si
+    // "sentirebbe" l'impatto — e' esattamente il difetto segnalato dal playtest.
+    this.player.body.y += (e.body.top - this.player.body.bottom);
+    this.player.y = this.player.body.center.y;                // lo sprite segue subito, non al frame dopo
     this.player.setVelocityY(-p.jumpVelocity * 0.72);         // rimbalzo (e blocca lo snap: vy<0)
     this.jumpsLeft = p.doubleJump ? 2 : 1;                    // puoi risaltare dopo il rimbalzo
     this.canCutJump = true;
@@ -3199,13 +3205,22 @@ class GameScene extends Phaser.Scene {
     // velocita' negativa -> lo snap qui sotto (che aggancia solo con vy >= -1) viene saltato da se'.
     if (this.player.body.velocity.y > 60) {
       const pbody = this.player.body;
+      // Dove finiranno i piedi DOPO lo snap qui sotto. Serve perche' il nemico non e' solido: se il
+      // PG e' gia' entrato nella fascia d'aggancio, lo snap lo porta di colpo alla superficie
+      // ATTRAVERSANDO il nemico, e guardando solo la posizione attuale il momento si perderebbe.
+      // Prima si compensava con una finestra fissa di 48px sopra la testa: funzionava, ma il
+      // rimbalzo partiva mentre il PG era ancora per aria e l'impatto non si vedeva (segnalato
+      // dall'utente 2026-07-27). Ora la finestra e' esatta e ci pensa stompEnemy ad appoggiare
+      // i piedi sulla testa prima di far rimbalzare.
+      const surf0 = this.terrainTopAt(this.player.x);
+      const piediDopo = (pbody.bottom - surf0) >= -44 ? surf0 : pbody.bottom;
       const preda = this.enemies.getChildren().find((e) => {
         if (!e.active || e.spawning || e.kind === 'boss' || e.fugitive || !e.body) return false;
         if (Math.abs(pbody.center.x - e.body.center.x) > e.body.halfWidth + pbody.halfWidth) return false;
-        // Piedi SOPRA il centro del nemico (arrivi dall'alto, non un contatto laterale) e entro la
-        // portata dello snap al terreno dalla testa del nemico (48px): con nemici bassi lo snap
-        // aggancerebbe il PG prima che i piedi tocchino davvero la testa, quindi si anticipa.
-        return pbody.bottom <= e.body.center.y && pbody.bottom >= e.body.top - 48;
+        // Arrivi DALL'ALTO: o i piedi sono ancora sopra la testa, o l'hanno oltrepassata in questo
+        // stesso frame (caduta veloce: fra un frame e l'altro si puo' saltare tutto il nemico).
+        const daSopra = pbody.bottom <= e.body.top + 6 || this._prevBottom <= e.body.top;
+        return daSopra && piediDopo >= e.body.top;
       });
       if (preda) this.stompEnemy(preda);
     }
@@ -3499,6 +3514,9 @@ class GameScene extends Phaser.Scene {
     // JUICE — salva la velocita' verticale di QUESTO frame: al prossimo frame, se si atterra,
     // e' la velocita' di caduta appena prima che il pavimento la azzeri (misura l'impatto).
     this._prevVelY = this.player.body.velocity.y;
+    // Quota dei piedi a fine frame: al prossimo frame dice se la testa di un nemico e' stata
+    // oltrepassata in un colpo solo (salto sui nemici con caduta veloce).
+    this._prevBottom = this.player.body.bottom;
 
     this.updateHud();
   }

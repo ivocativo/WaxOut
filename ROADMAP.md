@@ -145,10 +145,11 @@ magenta, stile **organico/parassitario leggermente gore** (scelto dall'utente, n
     `enemy_blob` (chi non chiede l'animazione vede il frame 0: menu, tabella ART e hitbox non se ne
     accorgono), animazione globale `blob_crawl` a 8 fps, ogni nemico parte da un frame a caso.
     - [ ] Restano da animare gli altri 6 nemici, stessa strada.
-  - [ ] **TIMPANO SCOLLEGATO** 🧠 (segnalato dal playtest 2026-07-25): l'immagine AI e' bella ma
-    "galleggia", non e' attaccata alle pareti del condotto. Proposta concordata: **cornice di carne**
-    intorno allo sprite (disegnata via codice, tavolozza `GameGfx.CARNE`) **+ vasi che continuano**
-    dal timpano verso il terreno/soffitto, cosi' sembra incastonato. → PROSSIMO LAVORO.
+  - [x] ✅ **TIMPANO SCOLLEGATO — FATTO 2026-07-27 (`918725d`).** Segnalato dal playtest: l'immagine
+    "galleggiava". Nuova `GameGfx.paintEardrumSocket` dietro allo sprite: massa che si addensa verso
+    il centro, labbro di tessuto + **ombra di contatto** attaccata al bordo (e' quella che fa leggere
+    "incastonato"), vasi che proseguono nella carne. Timpano spostato a `goalX-10` perche' a
+    `goalX+40` il suo lato destro finiva fuori schermo proprio al momento della vittoria.
 
 ---
 
@@ -225,7 +226,19 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 ---
 
 # APERTI, in ordine di quanto sono pronti
-- [ ] ⭐ **TIMPANO SCOLLEGATO** 🧠: vedi §B.2 — cornice di carne + vasi che continuano. **In corso.**
+- [ ] ⭐ **ARMI DEL PG: ridisegno + armi NUOVE sbloccabili** 🧠 (chiesto dall'utente 2026-07-27).
+  Due cose insieme, da fare in un blocco solo:
+  1. **Ridisegnare le 3 armi attuali** (`swab` coton fioc, `hammer` martello, `sprayer` spruzzino):
+     sono le ultime texture generate a codice (`PixelArt` in `BootScene`), stonano con l'arte AI di
+     personaggio, nemici e fondali. Il meccanismo e' gia' pronto e non va toccato: l'arma e' un
+     LAYER separato (`this.heroWeapon`) e cambiarla significa cambiare una voce nella tabella
+     `WEAPONS` di `GameScene` (tex / origin del perno / scala / offset della mano).
+  2. **Progettarne di nuove, sbloccabili nel NEGOZIO** (accanto a `UNLOCKS`/`BLUEPRINTS` in
+     `state.js`). E' anche il buco n.3 della ricerca sulle best practice (§Principi di design in
+     `HANDOFF.md`): «un solo personaggio, una sola arma» — armi con feel diverso moltiplicano le
+     run senza toccare i livelli. Da decidere con l'utente: quante, che feel (portata/cadenza/area),
+     se si scelgono a inizio run o si sbloccano durante.
+- [x] ✅ **TIMPANO SCOLLEGATO**: fatto 2026-07-27 (`918725d`) — vedi §B.2.
 - [ ] **Sfoltire l'APK** 🤖: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
   Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Il primo pezzo (togliere il caricamento delle
   protuberanze disattivate) vale 1,8 MB e risparmia memoria sul telefono.

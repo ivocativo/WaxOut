@@ -433,6 +433,10 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
 - **ANIMAZIONI dei NEMICI** (immagine AI → AutoSprite → pixelate) — **chieste dall'utente** al
   playtest: farà **sparire le aureole élite** (oggi un ripiego); include strisciamento
   cerumino/gorgogliante, crosta "asciutta" diversa. Bloccate: AutoSprite richiede l'abbonamento.
+- ⭐ **ARMI del PG: ridisegno + armi NUOVE sbloccabili nel negozio** (chiesto dall'utente 2026-07-27).
+  Le 3 attuali (coton fioc, martello, spruzzino) sono le ultime texture generate a codice e stonano.
+  Il layer arma e la tabella `WEAPONS` in `GameScene` sono gia' pronti: cambiare arma = cambiare una
+  voce. Da progettare insieme le armi nuove — vedi anche §Principi di design, buco n.3.
 - **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa seguono la mira): serve AutoSprite →
   **richiede abbonamento**. Oggi solo il layer "arma-in-mano".
 - **Cerume più gooey**; **protuberanze** provvisorie da migliorare; **varianti sfondo** per livello;

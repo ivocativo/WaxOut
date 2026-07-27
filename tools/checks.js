@@ -564,9 +564,16 @@ window.__earwaxChecks = function (opts) {
     // Controlla il danno SOLO nella finestra del rimbalzo (fino a poco dopo lo stacco): un
     // eventuale colpo DOPO, quando il nemico torna e l'invuln e' scaduta, e' un colpo legittimo,
     // non un fallimento dello stomp.
-    let rimbalzoMin = 0, hpDopoRimbalzo = 100;
+    let rimbalzoMin = 0, hpDopoRimbalzo = 100, staccoAlRimbalzo = null;
     for (let i = 0; i < 20; i++) {
       t += 16.6; g.loop.step(t);                       // frame RAW (niente god-mode: il danno conta)
+      // Quanto distavano i piedi dalla testa nel frame in cui e' partito il rimbalzo. Nasce da un
+      // difetto vero (playtest 2026-07-27): la rilevazione anticipava di 48px e il PG rimbalzava
+      // per aria, senza che si vedesse l'impatto. Il PG a fine frame e' gia' risalito di ~vy/60px,
+      // quindi il valore atteso e' una decina di px in negativo, non una cinquantina.
+      if (staccoAlRimbalzo === null && gs.player.body.velocity.y < -50 && e.body) {
+        staccoAlRimbalzo = gs.player.body.bottom - e.body.top;
+      }
       if (gs.player.body.velocity.y < rimbalzoMin) rimbalzoMin = gs.player.body.velocity.y;
       hpDopoRimbalzo = window.GameState.player.hp;
       if (rimbalzoMin < -50 && gs.player.body.velocity.y > 0) break;   // rimbalzato e gia' in risalita finita
@@ -574,10 +581,13 @@ window.__earwaxChecks = function (opts) {
     const nemicoColpito = !e.active || e.hp < hpNemicoPrima;
     const haRimbalzato = rimbalzoMin < -50;
     const senzaDanno = hpDopoRimbalzo >= 100;
-    if (nemicoColpito && haRimbalzato && senzaDanno) {
-      ok('salto sui nemici', 2, 'rimbalzo ' + Math.round(rimbalzoMin) + ', nemico colpito, 0 danni');
+    const aContatto = staccoAlRimbalzo !== null && Math.abs(staccoAlRimbalzo) <= 20;
+    if (nemicoColpito && haRimbalzato && senzaDanno && aContatto) {
+      ok('salto sui nemici', 2, 'rimbalzo ' + Math.round(rimbalzoMin) + ', stacco '
+        + Math.round(staccoAlRimbalzo) + 'px, nemico colpito, 0 danni');
     } else {
-      ko('salto sui nemici', 2, 'nemicoColpito=' + nemicoColpito + ' haRimbalzato=' + haRimbalzato + ' senzaDanno=' + senzaDanno);
+      ko('salto sui nemici', 2, 'nemicoColpito=' + nemicoColpito + ' haRimbalzato=' + haRimbalzato
+        + ' senzaDanno=' + senzaDanno + ' stacco=' + staccoAlRimbalzo);
     }
   }
 

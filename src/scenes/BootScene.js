@@ -27,8 +27,11 @@ class BootScene extends Phaser.Scene {
     // la stessa chiave invece di aggiungerne una nuova fa si' che tutto quello che gia' mostra il
     // cerumino (menu, tabella ART, hitbox) continui a funzionare senza saperne niente: chi non
     // chiede un'animazione vede il frame 0. Preparato con tools\bake_sheet.py.
+    // ⚠️ frameWidth/Height devono combaciare con quello che stampa bake_sheet.py ("12 frame da
+    // WxH"): l'altezza dipende dal riquadro comune dei frame, quindi CAMBIA se si ri-baka una
+    // versione nuova dell'animazione. Sbagliarla non da' errore, taglia gli sprite di traverso.
     this.load.spritesheet('enemy_blob', 'assets/spritesheets/enemies/cerumino_crawl_px.png',
-      { frameWidth: 116, frameHeight: 71 });
+      { frameWidth: 116, frameHeight: 72 });
 
     // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
     // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
