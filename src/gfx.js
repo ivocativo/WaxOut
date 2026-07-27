@@ -206,6 +206,105 @@ window.GameGfx = {
   // (Il timpano non e' piu' disegnato via codice: dal round B.1 e' un'immagine AI scontornata,
   // caricata in BootScene come 'eardrum' e piazzata da GameScene.buildGoal.)
 
+  // ---------- INCASSO DEL TIMPANO (playtest 2026-07-25: «il timpano sembra scollegato») ----------
+  // L'immagine del timpano e' un OVALE ritagliato: appesa in mezzo al condotto sembrava un quadro
+  // appoggiato al fondale, non la fine del condotto. Qui si disegna DIETRO di essa la carne che lo
+  // tiene: (1) una massa che si addensa verso il centro = il condotto che finisce, (2) un labbro
+  // saturo tutt'intorno = il bordo della membrana incastonato nel tessuto, (3) i vasi che partono
+  // dal timpano e proseguono nella carne intorno.
+  // Tutto ASPETTO: nessuna fisica, nessun cambiamento al traguardo (che dipende da `goalX`).
+  // Sta a depth 2.6, cioe' DIETRO al timpano (3) e dietro a soffitto (4) e terreno (4.3): quelli
+  // gli passano sopra e ritagliano da soli l'incasso nell'altezza del condotto.
+  // Il vaso deve STACCARE dalla carne (0xc2455f): un rosso vicino al suo si perdeva del tutto.
+  VASO: { scuro: 0x5c1226, chiaro: 0xe0788f },
+
+  paintEardrumSocket(scene, cx, cy, rx, ry) {
+    const P = this.CARNE, V = this.VASO;
+    const g = scene.add.graphics().setDepth(2.6);
+    const fase = Phaser.Math.FloatBetween(0, 6.28);
+
+    // Ovale MOSSO: le ellissi perfette, sovrapposte, si leggevano come i cerchi di un bersaglio
+    // disegnato col compasso. Il raggio ondeggia con l'angolo (due sinusoidi sfasate) e ogni anello
+    // ha una fase diversa: cosi' i contorni non sono mai concentrici e la carne sembra tessuto.
+    const ovale = (f, wob) => {
+      const pts = [];
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        const m = f * (1 + wob * (Math.sin(a * 3 + f * 5.1 + fase) * 0.6 + Math.sin(a * 5 - f * 2.3) * 0.4));
+        pts.push({ x: cx + Math.cos(a) * rx * m, y: cy + Math.sin(a) * ry * m });
+      }
+      return pts;
+    };
+
+    // 1) MASSA: veli concentrici sempre piu' stretti. Accumulandosi fanno buio verso il centro
+    // (il condotto sprofonda e finisce li') e sfumano verso l'esterno SENZA bordo netto — un
+    // poligono a tinta piena si sarebbe visto come una macchia rettangolare incollata sul fondale.
+    const VELI = 9;
+    for (let k = VELI; k >= 1; k--) {
+      const f = 1.15 + (k / VELI) * 2.35;
+      g.fillStyle(P.profondo, 0.17);
+      g.fillPoints(ovale(f, 0.07), true);
+    }
+    // 2) macchie appena accennate: tolgono l'aria di tinta unita (stesso trucco della massa organica)
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 + fase;
+      const d = 1.2 + Math.abs(Math.sin(i * 2.3)) * 1.7;
+      const r = Phaser.Math.Between(10, 26);
+      g.fillStyle(i % 3 === 0 ? P.crosta : P.profondo, 0.15);
+      g.fillEllipse(cx + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d, r * 2.4, r * 1.2);
+    }
+    // 3) LABBRO: il tessuto si fa piu' saturo avvicinandosi alla membrana. Di nuovo a VELATURE e
+    // non a due tinte piene: con due sole ellissi si vedeva il bordo netto e sembrava un bersaglio.
+    // Sono ellissi PIENE dietro al timpano, non anelli: cosi' quando il timpano "respira" (tween
+    // di scala) non scopre mai il fondale.
+    for (let k = 10; k >= 1; k--) {
+      const f = 1.05 + (k / 10) * 0.45;
+      g.fillStyle(P.crosta, 0.10);
+      g.fillPoints(ovale(f, 0.045), true);
+    }
+    // OMBRA DI CONTATTO: la crepa scura appiccicata al bordo della membrana. E' il pezzo che fa
+    // davvero leggere "incastonato": qualunque cosa posata su un fondo, senza un'ombra che la
+    // tocca, sembra incollata sopra. Va PRIMA del filo di luce, che sta appena piu' fuori.
+    g.lineStyle(10, P.profondo, 0.30); g.strokeEllipse(cx, cy, rx * 2 * 1.03, ry * 2 * 1.03);
+    g.lineStyle(20, P.profondo, 0.16); g.strokeEllipse(cx, cy, rx * 2 * 1.09, ry * 2 * 1.08);
+    // filo di luce sul labbro rialzato, appena fuori dall'ombra (mosso, non un anello perfetto)
+    g.lineStyle(3, P.bordo, 0.45);
+    g.strokePoints(ovale(1.15, 0.035), true);
+
+    // 4) VASI che continuano dal timpano nella carne: partono dal labbro e si allontanano
+    // ramificandosi. Sono la ragione per cui l'occhio legge "attaccato" invece di "appoggiato".
+    // Disegnati a segmenti che si assottigliano e si smorzano: una linea di spessore e opacita'
+    // costanti sembrava un RAGGIO di ruota, non un vaso (primo tentativo, bocciato a schermo).
+    const vaso = (a, lung, spess, col, alpha) => {
+      const PASSI = 9;
+      let px = cx + Math.cos(a) * rx * 1.03, py = cy + Math.sin(a) * ry * 1.02;
+      for (let s = 1; s <= PASSI; s++) {
+        const t = s / PASSI;
+        const curva = Math.sin(t * 3.4 + a * 3.1) * 24 * t;   // serpeggia
+        const nx = cx + Math.cos(a) * rx * (1.03 + lung * t) - Math.sin(a) * curva;
+        const ny = cy + Math.sin(a) * ry * (1.02 + lung * t) + Math.cos(a) * curva;
+        g.lineStyle(Math.max(0.8, spess * (1 - t * 0.85)), col, alpha * (1 - t * 0.85));
+        g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.strokePath();
+        px = nx; py = ny;
+      }
+    };
+    const N = 11;
+    for (let i = 0; i < N; i++) {
+      // angoli IRREGOLARI: a passo fisso tornavano a sembrare i raggi di una ruota
+      const a = (i / N) * Math.PI * 2 + fase * 0.3 + Phaser.Math.FloatBetween(-0.22, 0.22);
+      const lung = Phaser.Math.FloatBetween(0.35, 1.25);
+      vaso(a, lung, Phaser.Math.FloatBetween(5, 8), V.scuro, 0.95);
+      vaso(a + Phaser.Math.FloatBetween(0.1, 0.3), lung * 0.5, 3, V.scuro, 0.7);      // ramo
+      if (i % 5 === 0) vaso(a - 0.12, lung * 0.7, 1.6, V.chiaro, 0.22);               // in luce
+    }
+    // capillari cortissimi tutt'intorno al bordo: cuciono la membrana al tessuto
+    for (let i = 0; i < 40; i++) {
+      const a = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      vaso(a, Phaser.Math.FloatBetween(0.05, 0.15), 2.4, V.scuro, 0.6);
+    }
+    return g;
+  },
+
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
     if (!sets) return null;

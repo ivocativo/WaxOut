@@ -1244,7 +1244,10 @@ class GameScene extends Phaser.Scene {
     const H = window.CONFIG.HEIGHT;
     const gh = window.CONFIG.GROUND_H;
     this.goalX = this.worldW - 150;
-    const cx = this.goalX + 40;
+    // Il timpano stava a goalX+40 = worldW-110: con la telecamera bloccata al bordo del mondo il
+    // suo lato destro finiva FUORI schermo, e proprio nell'istante della vittoria si vedeva
+    // tagliato. Spostato appena a sinistra del traguardo: ci sta tutto, con un po' di margine.
+    const cx = this.goalX - 10;
     const cy = (H - gh) * 0.5;
     const ah = (H - gh) * 0.92;
 
@@ -1253,6 +1256,9 @@ class GameScene extends Phaser.Scene {
     const ed = this.add.image(cx, cy, 'eardrum').setDepth(3);
     const es = (ah * 0.95) / ed.height;
     ed.setScale(es);
+    // Incasso nella carne DIETRO al timpano: senza, l'ovale ritagliato sembrava appeso in mezzo al
+    // condotto (segnalato dal playtest 2026-07-25). Disegnato dopo aver saputo la scala vera.
+    window.GameGfx.paintEardrumSocket(this, cx, cy, ed.displayWidth / 2, ed.displayHeight / 2);
     this.tweens.add({ targets: ed, scaleX: es * 1.04, scaleY: es * 1.03, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // Indizio "vai a destra" che fluttua davanti al timpano.
