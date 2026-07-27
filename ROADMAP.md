@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (58 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (59 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -136,11 +136,65 @@ magenta, stile **organico/parassitario leggermente gore** (scelto dall'utente, n
 - **Da fare ancora (rimandati):**
   - [ ] **Aureole élite:** ancora presenti (cerchio+tint). Ora che i nemici sono disegnati, si
     possono togliere e rendere Corazzato/Esplosivo/Split varianti di colore/dettaglio.
-  - [ ] **Dimensione nemici:** tenuti ~come prima (tabella `ART` in `spawnEnemy`). L'arte e'
-    dettagliata: valutare col playtest se ingrandirli un filo per mostrarla meglio.
+  - [x] **Dimensione nemici:** ✅ APPROVATA dal playtest (2026-07-25): «si distinguono bene, le
+    dimensioni vanno bene». Non toccare la tabella `ART`.
   - [ ] **ANIMAZIONI:** fuori da questo blocco (servirebbe AutoSprite = abbonamento). Per ora ferme.
+    ⚠️ **L'utente le ha CHIESTE esplicitamente al playtest** («servirebbero degli spritesheet»):
+    e' il prossimo passo naturale dell'estetica quando ci sara' l'abbonamento.
+  - [ ] **TIMPANO SCOLLEGATO** 🧠 (segnalato dal playtest 2026-07-25): l'immagine AI e' bella ma
+    "galleggia", non e' attaccata alle pareti del condotto. Proposta concordata: **cornice di carne**
+    intorno allo sprite (disegnata via codice, tavolozza `GameGfx.CARNE`) **+ vasi che continuano**
+    dal timpano verso il terreno/soffitto, cosi' sembra incastonato. → PROSSIMO LAVORO.
 
 ---
+
+# BLOCCO D — Playtest round 3: bug, difficolta', chiarezza ✅ FATTO (2026-07-25/27)
+
+Nasce dalle segnalazioni dell'utente dopo il playtest del Blocco A + nemici nuovi. Ordine deciso
+dall'utente: «prima elimina i bug poi procediamo subito con la difficolta'».
+
+## D.1 — Bug ✅ (`8c397ae`)
+- [x] **Nemici che cadevano sotto il suolo a fine livello** (visibile al timpano): a `levelComplete`
+  e `gameOver` la scena si ferma ma la gravita' no → nuovo `freezeEnemies()` che spegne
+  `body.moves` su tutti i nemici.
+- [x] **Pozze scivolose nei punti angolosi**: `addSlimeZone` ora cerca un tratto abbastanza piatto
+  (`terrainFlatEnough`, fino a 8 tentativi) e se non lo trova NON piazza la pozza.
+
+## D.2 — Difficolta' ✅ (`59dab7e`)
+Diagnosi: i frame di invulnerabilita' **esistevano gia'** (0,9s + rinculo), quindi non era
+"stunlock" ma **DENSITA'**. Tre interventi insieme:
+- [x] **Meno nemici contemporanei** in tutti i tipi (normale max 5, sciame/assedio max 7) e
+  comparse piu' diradate.
+- [x] **SALTO SUI NEMICI (alla Mario)** — richiesto dall'utente: cadendo addosso a un nemico si
+  rimbalza, si ricarica il salto e gli si fanno danni (×1,1). ⚠️ Trappola pagata: l'aggancio al
+  terreno (heightmap-snap) "risucchia" il PG a terra ATTRAVERSANDO il nemico prima del controllo di
+  contatto → la rilevazione dello stomp va fatta **PRIMA dello snap**, con una finestra di 48px
+  sopra al nemico (altrimenti i nemici bassi non si calpestano mai).
+- [x] **Mercy-invuln piu' lunga** dopo un colpo (0,9 → 1,2s) e 400ms di grazia dopo il rimbalzo
+  (a 220ms il nemico tornava addosso e il rimbalzo costava vita).
+
+## D.3 — Corsa a tempo ✅ (`2ff0337`)
+- [x] **Countdown 3-2-1-VIA** a inizio livello (prima partiva di soppiatto).
+- [x] **Piu' tempo** (il cronometro parte dopo il countdown) e **molto meno frequente**
+  (probabilita' 0,28 → 0,18; lato porta sicura resta ~1 volta su 4).
+
+## D.4 — Crash musica sul telefono ✅ (`5527c96`)
+- [x] Causa vera: **accumulo di nodi audio** (oscillatori/filtri mai scollegati). Ora ogni voce si
+  autodistrugge (`cleanupOnEnd` su `onended`). Misurato: ~96% dei nodi liberati contro ~0% prima.
+- [x] Su richiesta dell'utente: **musica sospesa a schermo spento** (`visibilitychange`) e ripresa
+  al ritorno; lo scheduler non lavora mentre e' sospesa.
+- ℹ️ **L'utente vuole comunque RIFARE musica ED effetti** piu' avanti: non investire altro sul
+  synth attuale, e' materiale di passaggio.
+
+## D.5 — Varieta' e chiarezza della porta ✅ (`6a5dc76`, `d48b2f6`)
+- [x] **4 nuovi modificatori** (7 → 11): CRISTALLO (nemici fragili che picchiano forte), FRENESIA
+  (affollato ma redditizio), FURIA (pochi ma feroci), CERUME DI FERRO (durissimo ma prezioso).
+- [x] **Nuova carta "Getto Potente"** (+5 danno a distanza): mancava del tutto un potenziamento del
+  danno dell'arma a distanza.
+- [x] **Porta piu' chiara**: ogni carta ora ha tre sezioni etichettate e separate — **OBIETTIVO**
+  (tipo di livello + una frase che dice cosa fare), **REGOLA SPECIALE** (il modificatore, nel colore
+  del suo banner in partita), **PREMIO**. Risolve la segnalazione «la distinzione tra modificatori e
+  tipi di livello non e' chiara».
 
 ---
 
@@ -167,6 +221,7 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 ---
 
 # APERTI, in ordine di quanto sono pronti
+- [ ] ⭐ **TIMPANO SCOLLEGATO** 🧠: vedi §B.2 — cornice di carne + vasi che continuano. **In corso.**
 - [ ] **Sfoltire l'APK** 🤖: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
   Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Il primo pezzo (togliere il caricamento delle
   protuberanze disattivate) vale 1,8 MB e risparmia memoria sul telefono.
@@ -174,7 +229,10 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
   `GameGfx.drawProtuberances`, basta rimettere la chiamata in `buildLevel`).
 - [ ] **Crouch**: 36 frame già forniti, servono 2 risposte dell'utente (vedi `HANDOFF.md`
   §Asset nuovi): è un ciclo o una posa tenuta? sostituisce lo schiacciamento attuale?
-- [ ] **Tarature col playtest** e verifica dal vivo dell'**Assedio**, mai giocato davvero.
+- [ ] **Tarature col playtest** e verifica dal vivo dell'**Assedio**, mai giocato davvero. In attesa
+  del **round 4** dell'utente per giudicare i numeri del Blocco D (densita', forza del salto sui
+  nemici, durata della Corsa). ⚠️ **L'utente non ha ancora MAI vinto una run** → la terza fase del
+  boss finale (crollo) e' verificata solo dai controlli automatici, mai vista dal vivo.
 - [ ] **Altri set di sfondo**: procedura pronta, basta che l'utente dica "voglio altri sfondi".
 - [ ] **Revisione completa del codice** 🧠: da fare DOPO che l'estetica si è assestata, con i
   controlli a fare da rete. Conviene prima mappare `GameScene.js` (3300 righe) con un subagente.

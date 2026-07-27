@@ -42,10 +42,22 @@ Occhio ai nemici:
 - **Crosta** — sporco lento ma resistente
 - **Gorgogliante** (dal liv. 3) — sta a terra e ti **sputa palline di cerume** a distanza
 - **Moscerino** (dal liv. 4) — **vola** e ti insegue in aria
+- **Pulce** (dal liv. 2) — saltella di continuo verso di te: fastidiosa più che pericolosa
+- **Saltatore** (dal liv. 3) — balzo enorme telegrafato che scarica un'onda d'urto all'atterraggio
 - **Tappo di Cerume** (BOSS, ogni 5 livelli) — gigante, coriaceo, sputa e vale tantissimo cerume
 
-Ogni **5 livelli** arriva un **boss**; altri livelli sono di tipo **Sciame** (più nemici,
-muro più piccolo). Un cartello a schermo annuncia i livelli speciali.
+Ogni **5 livelli** arriva un **boss**. Una partita ("run") dura **15 livelli**: in fondo c'è il
+**GRAN TAPPO**, il boss finale a tre fasi — battilo e hai **vinto**. Dopo la prima vittoria si
+sblocca la difficoltà **Infezione** (gradi 0-5): nemici più duri, ma più cerume.
+
+Prima di ogni livello non-boss scegli tra **due porte**: una più sicura e una più rischiosa che
+raddoppia il cerume. La carta della porta dice sempre tre cose — l'**obiettivo** (che tipo di
+livello è e cosa devi fare), l'eventuale **regola speciale** (un modificatore: nemici più veloci,
+più fragili, cerume più duro…) e il **premio**.
+
+Tipi di livello: **Normale** (pulisci e raggiungi il timpano), **Corsa** (arriva prima che scada il
+tempo, con countdown 3-2-1-VIA), **Assedio** (resisti fino a fine cronometro), **Sciame** (orde di
+nemici), **Boss**. Un cartello a schermo annuncia sempre livello e regola speciale.
 
 ## 🔓 Potenziamenti (fine livello)
 
@@ -72,9 +84,10 @@ earwaxwar/
    ├─ touch.js             # comandi touch (stick + tasti a schermo)
    └─ scenes/
       ├─ BootScene.js      # carica gli sprite e genera le texture mancanti
-      ├─ MenuScene.js      # titolo + istruzioni       ├─ PauseScene.js  # pausa
-      ├─ GameScene.js      # gameplay del livello       ├─ ShopScene.js   # negozio
-      └─ UpgradeScene.js   # scelta potenziamenti (carte a fine livello)
+      ├─ MenuScene.js      # titolo + istruzioni       ├─ PauseScene.js    # pausa
+      ├─ GameScene.js      # gameplay del livello       ├─ ShopScene.js     # negozio
+      ├─ UpgradeScene.js   # scelta potenziamenti      ├─ DoorScene.js     # scelta tra due porte
+      └─ VictoryScene.js   # run vinta (15° livello)
 ```
 
 La grafica è **mista**: parte disegnata via codice (pixel art in `pixelart.js` / `BootScene.js`),
@@ -83,26 +96,32 @@ gira anche aprendo `index.html` da `file://`.
 
 ## 🗺️ Stato del progetto
 
-Roguelike giocabile su PC e su telefono/tablet. _Aggiornato al 2026-07-11._
+Roguelite giocabile su PC e su telefono/tablet, **anche come app Android**. _Aggiornato al 2026-07-27._
 
 **Fatto finora (in sintesi):**
 - Comandi **touch** a schermo per giocare da cellulare, **menu di pausa**, canvas che si ri-adatta
-  alla rotazione.
-- Struttura **roguelike** con **banca permanente** del cerume e **negozio** di potenziamenti e
+  alla rotazione. **App Android** (APK) compilata automaticamente da GitHub.
+- Struttura **roguelite** con **banca permanente** del cerume e **negozio** di potenziamenti e
   progetti permanenti.
-- **Combattimento** con hit-stop, colpi telegrafati, tanti **nemici** (Cerumino, Crosta, Gorgogliante,
-  Moscerino, boss) con **varianti élite** (Corazzato, Esplosivo, che-si-sdoppia).
+- **Run con un finale:** 15 livelli, boss finale a tre fasi, schermata di vittoria e difficoltà
+  **Infezione** crescente che si sceglie dopo aver vinto.
+- **Scelta del percorso:** due porte (sicura / rischiosa) prima di ogni livello non-boss.
+- **Combattimento** con hit-stop, colpi telegrafati, **salto sui nemici** alla Mario, tanti **nemici**
+  (Cerumino, Crosta, Gorgogliante, Moscerino, Pulce, Saltatore, boss) con **varianti élite**
+  (Corazzato, Esplosivo, che-si-sdoppia).
 - **Rigiocabilità:** carte potenziamento con **rarità**, **evoluzioni** (fusioni di abilità),
-  **tipi di livello** (corsa/assedio/boss/sciame), **modificatori** e **eventi casuali** di livello.
+  **tipi di livello** (corsa/assedio/boss/sciame), **11 modificatori** e **eventi casuali**.
 - **Livelli esplorabili** (scrolling): un mondo largo da attraversare verso il **timpano**, con
-  telecamera che segue, membrane di cerume da sfondare, pedane e ostacoli.
+  telecamera che segue, terreno a colline e cunette, membrane di cerume da sfondare, pedane e ostacoli.
+- **Estetica:** sfondi pittorici a 3 strati in parallax, personaggio e **tutti i nemici** da immagini
+  disegnate (stile organico), terreno/soffitto/pedane dipinti come tessuto vivo.
 
 > Lo stato di dettaglio, cosa è già collaudato e cosa no, e il piano dei prossimi passi sono nei
 > file di sviluppo **`HANDOFF.md`** e **`ROADMAP.md`** (per non ripetere le stesse cose in due posti).
 
-**Prossimi grandi traguardi:** rifinire il *game feel* e le **animazioni**, poi impacchettare con
-**Capacitor** per Android. **Obiettivo finale:** pubblicazione su **Google Play Store** (telefoni e
-tablet Android).
+**Prossimi grandi traguardi:** rifinire l'estetica (animazioni dei nemici, timpano incastonato nella
+carne), **rifare musica ed effetti sonori**, poi la pubblicazione su **Google Play Store** (telefoni
+e tablet Android) — l'impacchettamento con **Capacitor** è già funzionante.
 
 > Nota tecnica: il salvataggio (`localStorage`) funziona quando il gioco è servito via HTTP o
 > nell'app Android; aprendo `index.html` da `file://` alcuni browser non lo permettono.

@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-25 · Ultimo commit pushato: `4a135cd`._
+_Ultimo aggiornamento: 2026-07-27 · Ultimo commit: `d48b2f6` (pushato fino a `6a5dc76`)._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 58 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 59 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -26,10 +26,18 @@ _più vita e una terza fase "crollo" — frana di cerume dal soffitto (`7eff829`
 _**✅ BLOCCO B COMPLETO:** timpano (`ae123a9`) e tutti e 7 i **nemici** (`4a135cd`) ora sono immagini_
 _AI su fondo magenta, stile organico/gore, scontornate con `tools/bake_sprite.ps1`. Sorgenti in_
 _`art_sources/` (fuori dall'APK), baked in `assets/`. Restano rimandati: aureole elite da togliere,_
-_taratura dimensione nemici, ANIMAZIONI (servirebbe AutoSprite)._
-_**STATO ORA:** Blocchi A e B chiusi. Prossimo: **BLOCCO C** (Assedio: la tattica del cumulo-rifugio,_
-_decisione di design con l'utente). In attesa del PLAYTEST dell'utente (Blocco A + nemici nuovi) +_
-_APK aggiornato. L'utente RIMANDA lo store._
+_ANIMAZIONI dei nemici (servirebbe AutoSprite — **l'utente le ha chieste al playtest**)._
+_**✅ BLOCCO D COMPLETO — playtest round 3 (2026-07-25/27):** nemici che cadevano sotto il suolo +_
+_pozze nei punti angolosi (`8c397ae`); **giro difficolta'** — meno nemici insieme, **salto sui nemici**_
+_alla Mario, invulnerabilita' dopo il colpo 0,9→1,2s (`59dab7e`); **Corsa** con countdown 3-2-1-VIA,_
+_piu' tempo e molto meno frequente (`2ff0337`); **crash musica sul telefono** — nodi audio mai_
+_liberati, ora si autodistruggono + musica sospesa a schermo spento (`5527c96`); **4 modificatori_
+_nuovi** (11 in tutto) + carta **Getto Potente** (`6a5dc76`); **porta piu' chiara** a tre sezioni_
+_OBIETTIVO / REGOLA SPECIALE / PREMIO (`d48b2f6`). Dettaglio in `ROADMAP.md` §BLOCCO D._
+_**STATO ORA:** Blocchi A, B e D chiusi. **Prossimo lavoro: il TIMPANO SCOLLEGATO** (l'immagine AI_
+_"galleggia": cornice di carne + vasi che continuano — `ROADMAP.md` §B.2). Poi il **BLOCCO C**_
+_(Assedio: la tattica del cumulo-rifugio, decisione di design con l'utente). In attesa del round 4_
+_di playtest per tarare i numeri del Blocco D. L'utente RIMANDA lo store._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -93,7 +101,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-58 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+59 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -151,15 +159,21 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - `src/state.js` — costanti (`CONFIG`), `newPlayer()`, e le TABELLE: `UNLOCKS` (potenziamenti
   shop), `BLUEPRINTS` (progetti/abilità sbloccabili), `EVOLUTIONS` (fusioni), `MUTATORS`
   (modificatori di livello), `EVENTS` (eventi casuali). `Meta` sta in `src/meta.js` (localStorage).
-- `src/scenes/GameScene.js` — cuore del gioco (~2400 righe): build livello, spawn nemici, IA,
+- `src/scenes/GameScene.js` — cuore del gioco (~3500 righe): build livello, spawn nemici, IA,
   combattimento, abilità, mutatori, tipi di livello, gocce, élite, **eventi casuali**, update loop.
   **Personaggio animato:** `this.player` (fisica) reso invisibile + `this.heroVisual` (sprite animato che
   lo segue, scala `HERO_SCALE`, origin `HERO_ORIGIN_Y`, riceve il juice); anim per stato in `update()`.
 - `src/scenes/UpgradeScene.js` — carte di fine livello (pool `ALL` + evoluzioni + **rarità** + filtro).
+  Decide anche dove si va dopo: `VictoryScene` al livello `RUN_LEVELS`, `GameScene` diretta se il
+  prossimo è un boss, altrimenti `DoorScene`.
+- `src/scenes/DoorScene.js` — la **scelta tra due porte** (sicura/rischiosa) prima di ogni livello
+  non-boss; scrive `GameState.prossimoLivello`, che `GameScene.create` legge e consuma.
+- `src/scenes/VictoryScene.js` — fine run vinta (riepilogo + grado Infezione sbloccato).
 - `src/scenes/ShopScene.js` — negozio (2 colonne: Potenziamenti + Progetti) + pulsante reset.
 - `src/scenes/MenuScene.js` / `PauseScene.js` — menu e pausa. `src/scenes/BootScene.js` — carica gli
-  sprite PNG (assets), gli **sprite sheet animati del personaggio** (`hero_walk`/`hero_run`/`hero_idle`/
-  `hero_jump`, frame 84) e genera via codice le texture non ancora ridisegnate.
+  sprite PNG (assets: personaggio, **7 nemici**, timpano), gli **sprite sheet animati del personaggio**
+  (`hero_walk`/`hero_run`/`hero_idle`/`hero_jump`, frame 84) e genera via codice le poche texture non
+  ancora ridisegnate (i nemici procedurali sono stati rimossi con `4a135cd`).
 - `src/gfx.js` (`GameGfx`) — SOLO rendering (sfondo, cerume, splat, `showBanner`, ecc.). Tenere
   grafica separata dal gameplay: sessione "grafica" tocca gfx.js, "gameplay" GameScene.js.
 - `src/i18n.js` — dizionario EN (default) + IT. Ogni stringa passa da `I18n.t('chiave')`.
@@ -172,15 +186,21 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   `assets/spritesheets/hero/`: `hero_walk`/`hero_run`/`hero_idle`/`hero_jump` (sheet AutoSprite 256) +
   `_px` (pixellati, USATI dal gioco). **Gli sheet NON sono ancora incorporati** → si vedono via
   server/LAN, non da `file://`. La sorgente singola `hero_ai.png` resta in `assets/sprites/hero/`.
-  `tools/` — script PowerShell: `cutout_bg.ps1` (sfondo trasparente), `scale_sprite.ps1` (ridimensiona),
-  `bake_sheet_pixel.ps1` (pixelate), + serve LAN / embed assets. (`gen_hero*.ps1` = esperimento
-  procedurale SCARTATO, file non committati, lasciati solo come riferimento.)
+  `tools/` — script PowerShell: **`bake_sprite.ps1`** (LA pipeline di oggi per un singolo sprite AI:
+  ridimensiona + scontorna il magenta + posterizza + rifila; la chiave prende magenta puro E rosa
+  acceso, perché una generazione usava rosa), `bake_background_set.ps1` (i 3 strati di sfondo),
+  `cutout_bg.ps1` (sfondo trasparente), `scale_sprite.ps1`, `bake_sheet_pixel.ps1` (pixelate),
+  + serve LAN / embed assets. (`gen_hero*.ps1` = esperimento procedurale SCARTATO, file non
+  committati, lasciati solo come riferimento.)
 
 ---
 
 ## Cosa c'è già (sistemi principali)
 - **Combattimento:** attacco unico "intelligente" (mazza da vicino / getto da lontano),
-  hit-stop + shake, salto ad altezza variabile + coyote/buffer, accovacciamento, scatto.
+  hit-stop + shake, salto ad altezza variabile + coyote/buffer, accovacciamento, scatto,
+  **salto sui nemici** alla Mario (rimbalzo + ricarica salto + danno; `stompEnemy` in GameScene).
+  ⚠️ Lo stomp va rilevato **PRIMA** dell'aggancio al terreno in `update()`, altrimenti lo snap
+  risucchia il PG a terra attraverso il nemico e il contatto non avviene mai.
 - **Movimento:** accelerazione/decelerazione morbida (a terra `MOVE_ACCEL_GROUND` 0.3, in aria
   `MOVE_ACCEL_AIR` 0.15); lo scatto resta istantaneo. **Juice procedurale**: il PG si schiaccia/
   allunga a salto/atterraggio/inversione/colpo (`JUICE_*` in `state.js`, `jx`/`jy` + `setJuice` in GameScene).
@@ -204,9 +224,14 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - **Evoluzioni** (fusioni di 2 abilità): Lama d'Acqua, Nube Tossica, Buco Nero, Sciame.
 - **Meta/negozio:** cerume in banca → potenziamenti permanenti (UNLOCKS) + progetti (BLUEPRINTS).
   Pulsante "Azzera progressi" (2 tocchi).
-- **Varietà livelli:** tipi (normale / corsa / assedio / boss / sciame) + **modificatori** casuali
-  (`MUTATORS`: fretta, orda, corazza, poca gravità, cuccagna, cerume ostinato) + **eventi casuali**
-  (`EVENTS`, ~25%, indipendenti dai mutatori): Fuggitivo Dorato, Frana di cerume, Sciame improvviso.
+- **Varietà livelli:** tipi (normale / corsa / assedio / boss / sciame) + **11 modificatori**
+  (`MUTATORS`: fretta, orda, corazza, poca gravità, cuccagna, cerume ostinato, terremoto, cristallo,
+  frenesia, furia, cerume di ferro) + **eventi casuali** (`EVENTS`, ~25%, indipendenti dai
+  mutatori): Fuggitivo Dorato, Frana di cerume, Sciame improvviso.
+  La **porta** (`DoorScene`) mostra la scelta in tre sezioni etichettate — OBIETTIVO (tipo di livello
+  + cosa fare), REGOLA SPECIALE (il modificatore, nel colore del suo banner), PREMIO. `bonanza` e
+  `ironwax` sono esclusi dal pool della porta: toccano il moltiplicatore cerume e renderebbero
+  bugiarda l'anteprima "cerume ×2".
 - **Ostacoli:** pozze scivolose + gocce dal soffitto. Membrane di cerume con fisica a celle (collasso).
 - **Terreno, soffitto, pedane, pozze (dal 2026-07-21, VIA CODICE — nessun asset):**
   `GameGfx.paintOrganicMass` disegna terreno e soffitto come sezione di tessuto (massa quasi buia
@@ -245,12 +270,14 @@ Verificato dopo il fix: cunetta piu' profonda possibile (396) → apice **141px*
 rete di sicurezza ok (PG lanciato a y=700 viene ripreso, non sfonda); nemici sprofondati 0px;
 61 fps, zero errori console.
 
-### Correzioni playtest — DUE GIRI CHIUSI E PUSHATI ✅
-Round 1 (21 segnalazioni) e Round 2 (15 segnalazioni) entrambi completati e pushati (fino a
-`75df562`). Il dettaglio di entrambi è nella **cronologia git** (il file `ROADMAP.md` è "usa e
-getta" ed è già stato ripreso dal blocco successivo, vedi sotto). **Prossimo passo su questo
-fronte:** aspettare il round 3 di playtest dell'utente per tarare i numeri e giudicare le parti
-soggettive (look nuovo menu, durata Corsa, altezza salto boss, cadenza terremoto).
+### Correzioni playtest — TRE GIRI CHIUSI ✅
+Round 1 (21 segnalazioni) e Round 2 (15 segnalazioni) completati e pushati (fino a `75df562`); il
+dettaglio è nella **cronologia git**. **Round 3** (2026-07-25, dopo Blocco A + nemici nuovi) chiuso
+come **BLOCCO D** in `ROADMAP.md` — bug, giro difficoltà, Corsa, crash musica, più modificatori,
+porta più chiara. **Prossimo passo su questo fronte:** round 4 di playtest per tarare i numeri
+(densità nemici, forza del salto sui nemici, durata Corsa) e giudicare le parti soggettive.
+Segnalazioni del round 3 **non ancora chiuse**: timpano scollegato (prossimo lavoro) e spritesheet
+animati per i nemici (serve AutoSprite).
 
 ### 🩹 HOTFIX dal playtest utente (2026-07-18) — NON ancora committati
 Emersi giocando SENZA god-mode (che nei test li nascondeva — vedi `earwaxwar-sim-godmode`):
@@ -293,6 +320,13 @@ con frasi diverse, backing a 2 battute (32), batteria con fill, umanizzazione vo
 lieve detune sul lead; (3) BOSS PUNK — power chord + basso a crome + batteria tirata + DISTORSIONE
 (waveshaper, opzione `dist` in synth, attiva solo per i brani `punk:true`). Ancora bozze da
 rigiudicare dall'utente.
+**✅ CRASH SUL TELEFONO RISOLTO (2026-07-26, `5527c96`):** la musica bloccava il gioco dopo qualche
+minuto. Causa: **accumulo di nodi audio** — ogni nota creava oscillatore/filtro/gain che non venivano
+mai scollegati. Ora `cleanupOnEnd` li scollega su `onended` (~96% liberati, prima ~0%). Aggiunta anche
+la **sospensione a schermo spento** (`visibilitychange` → `ctx.suspend`, lo scheduler non lavora
+mentre e' sospesa) e la ripresa al ritorno / al primo tocco.
+**⚠️ L'utente vuole RIFARE musica ED effetti da capo** (detto il 2026-07-26): il synth attuale e'
+materiale di passaggio, **non investirci altro tempo** oltre alle correzioni di stabilita'.
 
 ### ✅ APP ANDROID (Capacitor via GitHub Actions) — FATTA (2026-07-18)
 Il gioco si impacchetta in APK **nel cloud** (nessuno strumento locale): `package.json` +
@@ -391,10 +425,14 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
 - (da VERIFICARE nel codice) il boss dovrebbe droppare cure alla morte — controllare se già fatto.
 
 **3. ESTETICA — uniformare al look di qualità (il fronte più grosso)**
-- **Uniformare TUTTO** allo stile AI/pixel-art: oggi solo **sfondo** e **personaggio** sono di qualità;
-  **nemici, armi, cumuli di cerume, timpano, pavimento, particelle, UI** stonano ancora.
-- **Sprite + animazioni dei NEMICI** (immagine AI → AutoSprite → pixelate): farà **sparire le aureole
-  élite** (oggi un ripiego); include strisciamento cerumino/gorgogliante, crosta "asciutta" diversa.
+- **Uniformare TUTTO** allo stile AI/pixel-art: sfondo, personaggio, terreno/soffitto/pedane,
+  **nemici** e **timpano** sono a posto; stonano ancora **armi, cumuli di cerume, particelle, UI**.
+- ⭐ **TIMPANO SCOLLEGATO** (playtest 2026-07-25): l'immagine c'è ed è bella, ma "galleggia" invece
+  di essere incastonata nella carne. Piano concordato: cornice di carne via codice (tavolozza
+  `GameGfx.CARNE`) + vasi che continuano verso terreno e soffitto. **Prossimo lavoro.**
+- **ANIMAZIONI dei NEMICI** (immagine AI → AutoSprite → pixelate) — **chieste dall'utente** al
+  playtest: farà **sparire le aureole élite** (oggi un ripiego); include strisciamento
+  cerumino/gorgogliante, crosta "asciutta" diversa. Bloccate: AutoSprite richiede l'abbonamento.
 - **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa seguono la mira): serve AutoSprite →
   **richiede abbonamento**. Oggi solo il layer "arma-in-mano".
 - **Cerume più gooey**; **protuberanze** provvisorie da migliorare; **varianti sfondo** per livello;
@@ -421,9 +459,10 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   magenta. Vedi §Cosa c'e' gia' e la memoria `earwaxwar-background-pipeline`.
 
 **4. AUDIO**
-- Musica: migliorata (acustica + boss punk) ma l'utente la trova ancora **un filo ripetitiva/asettica**
-  → continuare a variare/arricchire dopo il suo riascolto.
-- Effetti extra (AU-B.2); **boss infuriato = musica più intensa** (AU-D.3).
+- ⭐ **RIFARE musica ED effetti sonori da capo** (richiesta esplicita dell'utente, 2026-07-26).
+  Il synth procedurale attuale e' materiale di passaggio: non arricchirlo, sostituirlo. Da decidere
+  con l'utente: brani veri (file audio, pesano nell'APK) oppure synth rifatto.
+- Effetti extra (AU-B.2); **boss infuriato = musica più intensa** (AU-D.3) — solo se si tiene il synth.
 
 **5. TECNICO / PIATTAFORMA (per lo più rimandato dall'utente)**
 - **Freeze PC allo Start Run** (aperto, deprioritizzato; NON è l'audio; indagare prima dello store).
