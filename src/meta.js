@@ -70,6 +70,9 @@ window.Meta = (function () {
       return Math.min((state.infezioneMax | 0) + 1, window.CONFIG.INFEZIONE_MAX);
     },
 
+    // Aggiunge cerume alla banca (usato dal pannello di prova).
+    addBank(amount) { state.bank += Math.max(0, amount | 0); save(); return state.bank; },
+
     spend(amount) {
       if (state.bank < amount) return false;
       state.bank -= amount;

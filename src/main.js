@@ -31,7 +31,7 @@ window.addEventListener('load', function () {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [BootScene, MenuScene, GameScene, UpgradeScene, DoorScene, VictoryScene, PauseScene, ShopScene, ArmiScene],
+    scene: [BootScene, MenuScene, GameScene, UpgradeScene, DoorScene, VictoryScene, PauseScene, ShopScene, ArmiScene, TaraturaScene],
   };
 
   window.game = new Phaser.Game(config);

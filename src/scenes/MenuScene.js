@@ -115,6 +115,18 @@ class MenuScene extends Phaser.Scene {
       window.GameState.infezione = 0;   // non ancora sbloccato: sempre base
     }
 
+    // PANNELLO DI PROVA (⚠️ da togliere prima di pubblicare, vedi src/taratura.js): in un angolo,
+    // piccolo. Se una manopola e' stata girata lo dice, se no ci si dimentica di averlo fatto e
+    // si giudica il gioco con numeri finti.
+    const tarLabel = () => T.t('tar_open') + (window.Taratura.modificata() ? ' *' : '');
+    const tarBtn = this.add.text(12, H - 10, tarLabel(), {
+      fontFamily: 'monospace', fontSize: '11px',
+      color: window.Taratura.modificata() ? '#ffffff' : '#ffd9d9',
+      backgroundColor: window.Taratura.modificata() ? '#b03030' : '#6a3030',
+      padding: { x: 8, y: 5 },
+    }).setOrigin(0, 1).setInteractive({ useHandCursor: true });
+    tarBtn.on('pointerdown', () => { window.Sfx.pick(); this.scene.start('TaraturaScene', { from: 'MenuScene' }); });
+
     // Pannello "?" con comandi/obiettivo, a comparsa (round 2, H.1): prima stava sempre in
     // vista (9 righe fisse), affollando la schermata principale — i comandi touch sono gia'
     // a schermo ed evidenti IN PARTITA, qui basta poterli ricontrollare a richiesta.

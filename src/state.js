@@ -231,7 +231,10 @@ window.GameState = {
     const u = window.Meta ? window.Meta.get().unlocks : {};
     const lv = (id) => u[id] || 0;
     const U = window.UNLOCKS;
-    const maxHp = 100 + lv('hp') * U.hp.per;
+    // MANOPOLE DI PROVA (src/taratura.js): a 1 (predefinito) non cambiano niente.
+    const TP = window.Taratura ? window.Taratura.v('vitaPg') : 1;
+    const TD = window.Taratura ? window.Taratura.v('dannoPg') : 1;
+    const maxHp = Math.round((100 + lv('hp') * U.hp.per) * TP);
     // KIT scelto nell'Arsenale (window.ARMI). I moltiplicatori si applicano DOPO i potenziamenti
     // comprati al negozio, cosi' il carattere del kit si sente sempre allo stesso modo.
     const scelta = (window.Meta && window.Meta.get().arma) || 'fioc';
@@ -242,13 +245,13 @@ window.GameState = {
       maxHp: maxHp,
       hp: maxHp,
       arma: arma.id || 'fioc',   // kit in mano: lo leggono meleeSwing/fireJet via armaCorrente()
-      damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno),
+      damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno * TD),
       moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
       attackCooldown: M.cadenza,   // ms tra una bastonata e l'altra (corpo a corpo automatico)
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
-      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno),  // un po' sotto al corpo a corpo
+      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno * TD),  // un po' sotto al corpo a corpo
       shotCooldown: G.cadenza,   // ms tra uno spruzzo e l'altro
       shotLife: G.gittata,       // ms di vita di una pallina = quanto lontano arriva il getto
       doubleJump: lv('djump') > 0,

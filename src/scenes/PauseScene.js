@@ -28,6 +28,19 @@ class PauseScene extends Phaser.Scene {
     this.mkButton(W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel());
     this.mkButton(W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu());
 
+    // PANNELLO DI PROVA (⚠️ da togliere prima di pubblicare, vedi src/taratura.js). Qui e non
+    // solo nel menu perche' i numeri si giudicano mentre si gioca: la pausa DORME sotto e la
+    // partita riprende da dove stava. Piccolo e in un angolo: non e' roba da giocatore.
+    const tar = this.add.text(W - 12, H - 10, T.t('tar_open'), {
+      fontFamily: 'monospace', fontSize: '11px', color: '#ffd9d9',
+      backgroundColor: '#6a3030', padding: { x: 8, y: 5 },
+    }).setOrigin(1, 1).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    tar.on('pointerdown', () => {
+      window.Sfx.pick();
+      this.scene.launch('TaraturaScene', { from: 'PauseScene' });
+      this.scene.sleep();
+    });
+
     // Controlli audio: volume (cicla pieno/basso/muto) e musica on/off.
     window.Sfx.addAudioButton(this, W / 2 - 26, H / 2 + 162);
     window.Sfx.addMusicButton(this, W / 2 + 26, H / 2 + 162);

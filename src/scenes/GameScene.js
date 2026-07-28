@@ -176,6 +176,11 @@ class GameScene extends Phaser.Scene {
     // toccano il cerume — 'bonanza' e' escluso dal pool delle porte apposta per non sovrapporsi).
     if (this._doorWaxMult) this.mutWaxMult = (this.mutWaxMult || 1) * this._doorWaxMult;
     this.applyInfezione();  // difficolta' crescente scelta per la run (round A, A.5): sopra a tutto
+    // Manopola di prova "fpsCerumino": la velocita' della strisciata si giudica solo a schermo.
+    // L'animazione e' globale (registrata da BootScene), quindi basta cambiarle il passo qui.
+    if (window.Taratura && this.anims.exists('blob_crawl')) {
+      this.anims.get('blob_crawl').msPerFrame = 1000 / Math.max(1, window.Taratura.v('fpsCerumino'));
+    }
     this.chooseEvent();     // evento a tempo indipendente (puo' capitare insieme a un mutatore)
     this.buildLevel();
 
@@ -393,6 +398,10 @@ class GameScene extends Phaser.Scene {
       if (this.levelKind !== 'rush') this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
+    // MANOPOLA DI PROVA "densita'" (src/taratura.js): moltiplica il tetto di nemici contemporanei.
+    if (window.Taratura) {
+      this.maxEnemies = Phaser.Math.Clamp(Math.round(this.maxEnemies * window.Taratura.v('densita')), 1, 14);
+    }
 
     // PROTEZIONE ALLO SPAWN: breve invulnerabilita' a inizio livello, cosi' se un nemico
     // nasce vicino al punto di partenza (sezioni strette) non uccide il giocatore prima che
@@ -832,12 +841,23 @@ class GameScene extends Phaser.Scene {
   // sopra a mutatore + porta, quindi va chiamata DOPO chooseMutator() e il waxMult della porta.
   applyInfezione() {
     const g = window.GameState.infezione || 0;
-    if (g <= 0) return;
     const F = window.CONFIG.INFEZIONE;
-    this.mutEnemyHp = (this.mutEnemyHp || 1) * (1 + F.enemyHp * g);
-    this.mutEnemySpeed = (this.mutEnemySpeed || 1) * (1 + F.enemySpeed * g);
-    this.mutEnemyDmg = (this.mutEnemyDmg || 1) * (1 + F.enemyDmg * g);
-    this.mutWaxMult = (this.mutWaxMult || 1) * (1 + F.waxReward * g);
+    if (g > 0) {
+      this.mutEnemyHp = (this.mutEnemyHp || 1) * (1 + F.enemyHp * g);
+      this.mutEnemySpeed = (this.mutEnemySpeed || 1) * (1 + F.enemySpeed * g);
+      this.mutEnemyDmg = (this.mutEnemyDmg || 1) * (1 + F.enemyDmg * g);
+      this.mutWaxMult = (this.mutWaxMult || 1) * (1 + F.waxReward * g);
+    }
+    // MANOPOLE DI PROVA (src/taratura.js): sopra a tutto il resto, cosi' quello che si gira nel
+    // pannello si sente qualunque sia il modificatore, la porta o il grado di infezione. A 1
+    // (predefinito) queste moltiplicazioni non cambiano niente.
+    const T = window.Taratura;
+    if (T) {
+      this.mutEnemyHp = (this.mutEnemyHp || 1) * T.v('vitaNemici');
+      this.mutEnemySpeed = (this.mutEnemySpeed || 1) * T.v('velNemici');
+      this.mutEnemyDmg = (this.mutEnemyDmg || 1) * T.v('dannoNemici');
+      this.mutWaxMult = (this.mutWaxMult || 1) * T.v('cerume');
+    }
   }
 
   // Sceglie un MODIFICATORE per questo livello e lo applica. Niente mutatori nei livelli boss.
@@ -2809,7 +2829,9 @@ class GameScene extends Phaser.Scene {
     // "sentirebbe" l'impatto — e' esattamente il difetto segnalato dal playtest.
     this.player.body.y += (e.body.top - this.player.body.bottom);
     this.player.y = this.player.body.center.y;                // lo sprite segue subito, non al frame dopo
-    this.player.setVelocityY(-p.jumpVelocity * 0.72);         // rimbalzo (e blocca lo snap: vy<0)
+    // Spinta del rimbalzo (manopola di prova "rimbalzo": a 1 e' quella normale).
+    const spinta = 0.72 * (window.Taratura ? window.Taratura.v('rimbalzo') : 1);
+    this.player.setVelocityY(-p.jumpVelocity * spinta);       // rimbalzo (e blocca lo snap: vy<0)
     this.jumpsLeft = p.doubleJump ? 2 : 1;                    // puoi risaltare dopo il rimbalzo
     this.canCutJump = true;
     this.invulnUntil = Math.max(this.invulnUntil, now + 400); // il rimbalzo ti porta via pulito (niente colpo al ritorno)
@@ -2821,6 +2843,7 @@ class GameScene extends Phaser.Scene {
   hurtPlayer(dmg, sourceX) {
     const now = this.time.now;
     if (now < this.invulnUntil || this.locked) return;
+    if (window.Taratura && window.Taratura.godmode()) return;   // manopola di prova: vita infinita
     // Abilità SCUDO: para il colpo se è "carico" (ricarica ogni 6s). Niente danno.
     const pl = window.GameState.player;
     if (pl.shield && now >= (this.shieldReadyAt || 0)) {
@@ -3073,7 +3096,9 @@ class GameScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     const STEP = 650;
     const steps = ['3', '2', '1', window.I18n.t('rush_go')];
-    const rushTime = Math.round(this.worldW / 115) * 1000 + 11000;
+    // MANOPOLA DI PROVA "durataCorsa" (src/taratura.js): a 1 e' il tempo normale.
+    const rushTime = Math.round((Math.round(this.worldW / 115) * 1000 + 11000)
+      * (window.Taratura ? window.Taratura.v('durataCorsa') : 1));
     this.rushEndAt = this.time.now + steps.length * STEP + rushTime;   // il cronometro scade DOPO il VIA
 
     const label = this.add.text(W / 2, H * 0.30, window.I18n.t('rush_countdown_title'), {

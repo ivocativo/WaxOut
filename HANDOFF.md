@@ -147,6 +147,22 @@ memorizzato — il 2026-07-13 era `192.168.1.193`, il 2026-07-18 era `192.168.1.
 quello mostrato dalla finestra. Consentire il firewall su rete PRIVATA. Se "non funziona" da
 telefono, la causa n.1 è l'indirizzo vecchio o la finestra nera non avviata.
 
+## 🎛️ PANNELLO DI TARATURA (dal 2026-07-27) — per far tarare i numeri all'UTENTE
+
+Pulsantino **TARATURA** in basso a sinistra nel MENU e in basso a destra nella PAUSA. Apre un
+pannello con dieci manopole (nemici insieme, velocita'/danno/vita nemici, vita e danno del PG,
+tempo della Corsa, cerume raccolto, spinta del rimbalzo, fps della strisciata del cerumino) piu'
+vita infinita, **sblocca tutte le armi** e +3000 cerume. I valori stanno in `src/taratura.js`
+(moltiplicatori, 1 = gioco normale, salvati in localStorage) e il gioco li legge in `newPlayer`,
+`applyInfezione`, `maxEnemies`, `startRushCountdown`, `stompEnemy`, `hurtPlayer`.
+
+**Perche' esiste:** il giro "l'utente prova → me lo scrive → cambio un numero → ricompilo l'APK →
+riprova" costava mezz'ora per singolo valore. Ora i numeri li gira lui mentre gioca.
+
+⚠️ **DA TOGLIERE PRIMA DI PUBBLICARE** (da' vita infinita e cerume gratis): bastano il pulsante in
+`MenuScene`/`PauseScene` e la scena `TaraturaScene`. Nel menu il pulsante si accende in rosso con
+un `*` se una manopola e' stata girata — se no ci si dimentica e si giudica il gioco coi numeri finti.
+
 **God-mode nei test (OBBLIGATORIO, tranne quando si testa la morte):**
 ```js
 window.GameState.player.hp = 999999; gs.invulnUntil = 1e12;
