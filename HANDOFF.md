@@ -50,6 +50,10 @@ _5 armi (dopo il playtest), animare gli altri 6 nemici, la **MUSICA con brani ve
 _**EASTER EGG** (proposte pronte in `ROADMAP.md` §DA DECIDERE), e il **BLOCCO C** (Assedio: la_
 _tattica del cumulo-rifugio). L'utente RIMANDA lo store._
 
+**NOME:** l'utente ha scelto **WAXOUT** (2026-07-27) al posto di "Earwax War": "earwax" da solo
+porta al party game di Jackbox e a Earwax Clinic gia' su Play. Il nome NON e' ancora stato
+applicato al codice — vedi `ROADMAP.md` §N. Cartella e repository restano `earwaxwar`.
+
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
 telefono + tablet) via Capacitor. Giocabile su PC (tastiera) e telefono (comandi touch).

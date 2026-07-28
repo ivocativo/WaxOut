@@ -274,11 +274,18 @@ In ordine di rapporto tra risata e lavoro:
    fioc nelle orecchie". Costo quasi zero, e fa sorridere chi lo nota.
 8. **Codice Konami** 🤖 — da tastiera, cambia il cappello del personaggio. Vale solo su PC.
 
-## N — NOME DELL'APP (ricerche fatte, vedi il messaggio in chat del 2026-07-27)
-Il nome attuale non e' occupato, ma **"Earwax" da solo e' del party game di Jackbox** e su Play
-c'e' gia' **Earwax Clinic**: cercando "earwax game" si finisce su di loro. Candidati verificati
-liberi: **Waxout**, **Canal Crusher**, **Swab Squad**. Limite dello store: 30 caratteri, niente
-emoji, niente maiuscole tutte tranne il marchio.
+## N — NOME DELL'APP: ✅ SCELTO **WAXOUT** (utente, 2026-07-27)
+Perche' si cambiava: "Earwax War" non e' occupato, ma **"Earwax" da solo e' il party game di
+Jackbox** e su Play c'e' gia' **Earwax Clinic** — cercando "earwax game" si finisce su di loro.
+Verificato che **Waxout** non risulta occupato da nessun gioco o app. Limite dello store: 30
+caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
+- [ ] **Applicare il nome** (lavoro mio, ~1 ora, tutto reversibile finche' non si pubblica):
+  `capacitor.config.json` (appName e **appId**, es. `com.ivocativo.waxout` — ⚠️ l'appId dopo la
+  pubblicazione NON si puo' piu' cambiare), `package.json`, il titolo nel menu (`i18n.js`), i
+  tre `.md`, il nome dell'APK. La cartella e il repository possono restare `earwaxwar`: cambiarli
+  romperebbe percorsi e cronologia senza portare niente al giocatore.
+- [ ] Valutare un sottotitolo tipo "Waxout - la guerra del cerume" per non perdere la parola
+  chiave "earwax" nelle ricerche (la descrizione dello store la indicizza comunque).
 
 ---
 
