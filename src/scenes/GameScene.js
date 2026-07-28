@@ -1645,10 +1645,11 @@ class GameScene extends Phaser.Scene {
 
     const e = this.enemies.create(x, y, cfg.tex).setDepth(cfg.boss ? 9 : 8);
     e.kind = kind;
-    // Cerumino: ciclo di strisciata. Ogni nemico parte da un frame a caso, altrimenti un gruppo
-    // che compare insieme striscia all'unisono e si vede che sono copie della stessa creatura.
-    if (kind === 'blob' && this.anims.exists('blob_crawl')) {
-      e.play('blob_crawl');
+    // Nemici ANIMATI: ognuno parte da un frame a caso, altrimenti un gruppo che compare insieme
+    // si muove all'unisono e si vede che sono copie della stessa creatura.
+    const CICLO = { blob: 'blob_crawl', crust: 'crust_crawl' };
+    if (CICLO[kind] && this.anims.exists(CICLO[kind])) {
+      e.play(CICLO[kind]);
       e.anims.setProgress(Math.random());
     }
     if (opts.guard !== undefined) { e.guard = true; e.homeX = opts.guard; e.guardRange = 430; }

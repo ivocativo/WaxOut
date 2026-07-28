@@ -142,21 +142,42 @@ class MenuScene extends Phaser.Scene {
       window.Sfx.unlock();
       const group = this.add.container(0, 0).setDepth(200);
       const backdrop = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.62).setInteractive();
-      const panelBg = this.add.rectangle(W / 2, H / 2, 600, 340, 0x2b1d12, 0.97).setStrokeStyle(3, 0xffd166);
+      const panelBg = window.GameGfx.panel(this, W / 2, H / 2, 640, 452, { accento: window.GameGfx.UI.ambraScura });
       const lines = [
         T.t('menu_ctrl_title'), '',
         T.t('menu_ctrl_move'), T.t('menu_ctrl_jump'), T.t('menu_ctrl_attack'),
         T.t('menu_ctrl_dash'), T.t('menu_ctrl_touch'), '',
         T.t('menu_goal_1'), T.t('menu_goal_2'),
       ];
-      const body = this.add.text(W / 2, H / 2 - 20, lines.join('\n'), {
-        fontFamily: 'monospace', fontSize: '16px', color: '#fff7e8', align: 'center',
-        stroke: '#14161f', strokeThickness: 3, lineSpacing: 3, wordWrap: { width: 540 },
+      const body = this.add.text(W / 2, H / 2 - 100, lines.join('\n'), {
+        fontFamily: 'monospace', fontSize: '15px', color: '#fff7e8', align: 'center',
+        stroke: '#14161f', strokeThickness: 3, lineSpacing: 3, wordWrap: { width: 560 },
       }).setOrigin(0.5);
-      const hint = this.add.text(W / 2, H / 2 + 150, T.t('menu_help_close'), {
-        fontFamily: 'monospace', fontSize: '13px', color: '#cabfa0',
+
+      // CREDITI (2026-07-28). Tutti i brani sono CC0 e non OBBLIGANO a citare nessuno, ma
+      // l'autore di quello del menu lo chiede esplicitamente sulla sua scheda ("you are committed
+      // to mention Rob Bery"), e chi regala musica merita il suo nome. Gli altri tre sono qui per
+      // correttezza. Testo piccolo e spento: si legge se lo cerchi, non ruba spazio ai comandi.
+      const righe = [
+        T.t('credits_music'),
+        T.t('credits_m1'), T.t('credits_m2'), T.t('credits_m3'), T.t('credits_m4'),
+        '', T.t('credits_engine'),
+      ];
+      const sep = this.add.graphics();
+      sep.fillStyle(window.GameGfx.UI.bordo, 0.6);
+      sep.fillRect(W / 2 - 240, H / 2 + 32, 480, 1);
+      const titoloCr = this.add.text(W / 2, H / 2 + 50, T.t('credits_title'), {
+        fontFamily: 'monospace', fontSize: '12px', color: '#ffd166',
       }).setOrigin(0.5);
-      group.add([backdrop, panelBg, body, hint]);
+      const crediti = this.add.text(W / 2, H / 2 + 116, righe.join('\n'), {
+        fontFamily: 'monospace', fontSize: '11px', color: '#c9a6b2', align: 'center', lineSpacing: 3,
+        wordWrap: { width: 580 },
+      }).setOrigin(0.5);
+
+      const hint = this.add.text(W / 2, H / 2 + 212, T.t('menu_help_close'), {
+        fontFamily: 'monospace', fontSize: '12px', color: '#cabfa0',
+      }).setOrigin(0.5);
+      group.add([backdrop, panelBg, body, sep, titoloCr, crediti, hint]);
       backdrop.on('pointerdown', closeHelp);
       helpOpen = group;
     };

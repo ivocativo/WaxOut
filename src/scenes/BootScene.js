@@ -18,7 +18,7 @@ class BootScene extends Phaser.Scene {
     // altri 5 erano generati a codice con PixelArt.fromGrid — ora rimosso). Caricate DIRETTAMENTE
     // dal file (non via `img`) per non passare dai vecchi data URI in SPRITE_DATA, che avrebbero
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
-    [['enemy_crust', 'crosta'], ['enemy_spit', 'gorgogliante'],
+    [['enemy_spit', 'gorgogliante'],
      ['enemy_fly', 'moscerino'], ['enemy_flea', 'pulce'], ['enemy_hopper', 'saltatore'],
      ['enemy_boss', 'boss'], ['enemy_boss_regina', 'regina']]
       .forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
@@ -33,6 +33,9 @@ class BootScene extends Phaser.Scene {
     // versione nuova dell'animazione. Sbagliarla non da' errore, taglia gli sprite di traverso.
     this.load.spritesheet('enemy_blob', 'assets/spritesheets/enemies/cerumino_crawl_px.png',
       { frameWidth: 116, frameHeight: 72 });
+    // CROSTA ANIMATA (2026-07-28), stessa idea e stessa chiave di prima ('enemy_crust').
+    this.load.spritesheet('enemy_crust', 'assets/spritesheets/enemies/crosta_crawl_px.png',
+      { frameWidth: 118, frameHeight: 70 });
 
     // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
     // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
@@ -99,6 +102,15 @@ class BootScene extends Phaser.Scene {
         key: 'blob_crawl',
         frames: this.anims.generateFrameNumbers('enemy_blob', { start: 0, end: 11 }),
         frameRate: 8, repeat: -1,
+      });
+    }
+    // La CROSTA e' secca e pesante: si trascina piu' lenta del cerumino (5 fps contro 8), come
+    // gia' annotato quando si erano decise le animazioni dei nemici.
+    if (!this.anims.exists('crust_crawl')) {
+      this.anims.create({
+        key: 'crust_crawl',
+        frames: this.anims.generateFrameNumbers('enemy_crust', { start: 0, end: 11 }),
+        frameRate: 5, repeat: -1,
       });
     }
 
