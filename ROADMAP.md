@@ -237,8 +237,15 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
   (il base64 aggiunge un terzo): si caricano come file, e la musica non funzionera' col doppio
   clic da PC — sul telefono e nell'app si'.
 - **Dove prenderli, in ordine di comodita':**
-  1. **CC0** (nessun obbligo, nemmeno i crediti): OpenGameArt filtrato CC0, Kenney, Pixabay,
-     l'etichetta CC0 di itch.io. E' la strada piu' pulita per uno store.
+  1. ✅ **CC0 — SCELTA DALL'UTENTE (2026-07-27)**: nessun obbligo, nemmeno i crediti. Dove
+     ascoltare (verificato il 27/07/2026):
+     - **opengameart.org/content/cc0-music-0** — la raccolta piu' grossa (oltre mille brani), si
+       ascoltano nella pagina. Chiptune, orchestrale, ambient, temi di battaglia.
+     - **pixabay.com/music/search/cc0/** — lettore comodo, catalogo piu' "moderno".
+     - **kenney.nl/assets** — tutto CC0, soprattutto effetti ma con qualche pacchetto musicale.
+     - **itch.io**, sezione risorse per giochi, filtro musica + CC0.
+     - ⚠️ **freepd.com NON esiste piu'** (chiuso nel 2025 dopo 17 anni): era la prima fonte che
+       veniva in mente, non mandarci nessuno.
   2. **CC-BY** (gratis ma vanno citati): Kevin MacLeod / filmmusic.io, catalogo enorme.
      Richiede una schermata CREDITI, che oggi non c'e' — mezz'ora di lavoro.
   3. **A pagamento non esclusivo** (WOW Sound, Epidemic): costa, ma si trova il tono giusto.
