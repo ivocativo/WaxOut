@@ -39,9 +39,16 @@ _nemico con spritesheet, animato dall'utente con Claude Design + nuovo `tools/ba
 _(`6b4886c`); **salto sui nemici che rimbalza al contatto** e non piu' 48px per aria (`519bdb1`)._
 _**✅ ARSENALE (2026-07-27):** 5 **kit** di armi (mischia + getto insieme) che si sbloccano al negozio_
 _e si scelgono a inizio run — nuova `ArmiScene`, terzo pulsante nel menu. Manca solo l'ARTE._
+_**✅ GIRO IN AUTONOMIA (2026-07-27, `3b72dbb`):** aureole elite tolte (ora e' il NEMICO a cambiare_
+_colore); elite dal livello 6 e non piu' dal 3; Fuggitivo Dorato di nuovo riconoscibile (oro quasi_
+_bianco + scia di scintille); **UN BOSS PER TRATTO DI 5 LIVELLI** — nuova **Regina delle Croste**_
+_al 10 (corazzata contro il getto, carica invece di saltare, chiama croste); **restyle di TUTTE le_
+_schermate di contorno** con un linguaggio unico in `GameGfx` (paintSceneBg/panel/sceneTitle/_
+_uiButton); **app da 23 a ~10 MB** (protuberanze non piu' caricate + elenco esplicito nel workflow)._
 _**STATO ORA:** Blocchi A, B e D chiusi, Arsenale fatto nelle meccaniche. **Prossimi:** disegnare le_
-_5 armi (dopo il playtest), animare gli altri 6 nemici, e il **BLOCCO C** (Assedio: la tattica del_
-_cumulo-rifugio, decisione di design con l'utente). L'utente RIMANDA lo store._
+_5 armi (dopo il playtest), animare gli altri 6 nemici, la **MUSICA con brani veri** e gli_
+_**EASTER EGG** (proposte pronte in `ROADMAP.md` §DA DECIDERE), e il **BLOCCO C** (Assedio: la_
+_tattica del cumulo-rifugio). L'utente RIMANDA lo store._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -458,9 +465,9 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
 - ⭐ **TIMPANO SCOLLEGATO** (playtest 2026-07-25): l'immagine c'è ed è bella, ma "galleggia" invece
   di essere incastonata nella carne. Piano concordato: cornice di carne via codice (tavolozza
   `GameGfx.CARNE`) + vasi che continuano verso terreno e soffitto. **Prossimo lavoro.**
-- **ANIMAZIONI dei NEMICI** (immagine AI → AutoSprite → pixelate) — **chieste dall'utente** al
-  playtest: farà **sparire le aureole élite** (oggi un ripiego); include strisciamento
-  cerumino/gorgogliante, crosta "asciutta" diversa. Bloccate: AutoSprite richiede l'abbonamento.
+- **ANIMAZIONI dei NEMICI**: fatto il cerumino (Claude Design + `tools/bake_sheet.py`), mancano
+  gli altri 6. ✅ Le **aureole élite sono gia' sparite** (2026-07-27): ora e' il nemico a cambiare
+  colore (`GameScene.ELITE_TINT`).
 - ⭐ **ARMI del PG — manca solo l'ARTE.** Le meccaniche sono fatte (vedi `ROADMAP.md` §APERTI):
   5 kit nell'ARSENALE. Ma tutti usano ancora le vecchie texture disegnate a codice, ripetute:
   servono i 5 disegni veri (prompt → l'utente genera → `bake_sprite.ps1` → voce nella tabella

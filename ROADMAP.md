@@ -225,6 +225,63 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 
 ---
 
+# DA DECIDERE CON L'UTENTE (proposte pronte, NON implementate)
+
+## M — MUSICA CON BRANI VERI (l'utente ha deciso di lasciare il synth ai soli EFFETTI)
+**Come farlo, in concreto.**
+- **Quanti brani:** 4 — menu, livello, boss/assedio, vittoria. Con meno si sente il vuoto, con
+  piu' cresce il peso senza che il giocatore se ne accorga.
+- **Formato e peso (il punto delicato):** OGG Vorbis, che il webview Android legge da solo.
+  A 96 kbps un minuto pesa ~0,7 MB: quattro anelli da 75-90 secondi fanno **~4 MB**. L'app ora
+  sta a ~10 MB, quindi si tornerebbe sui 14. ⚠️ I brani NON vanno incorporati come data URI
+  (il base64 aggiunge un terzo): si caricano come file, e la musica non funzionera' col doppio
+  clic da PC — sul telefono e nell'app si'.
+- **Dove prenderli, in ordine di comodita':**
+  1. **CC0** (nessun obbligo, nemmeno i crediti): OpenGameArt filtrato CC0, Kenney, Pixabay,
+     l'etichetta CC0 di itch.io. E' la strada piu' pulita per uno store.
+  2. **CC-BY** (gratis ma vanno citati): Kevin MacLeod / filmmusic.io, catalogo enorme.
+     Richiede una schermata CREDITI, che oggi non c'e' — mezz'ora di lavoro.
+  3. **A pagamento non esclusivo** (WOW Sound, Epidemic): costa, ma si trova il tono giusto.
+  4. **Generata con l'IA** (tipo Suno): tentante visto come e' andata con Claude Design per gli
+     sprite, ma ⚠️ le condizioni d'uso commerciale cambiano da servizio a servizio e da piano a
+     piano — da verificare PRIMA di affezionarsi a un brano.
+- **Cosa serve nel codice** (lavoro mio, ~2 ore): `BootScene` carica i 4 file; `Sfx.setMusic()`
+  smette di suonare il synth e fa partire il brano con dissolvenza e anello; restano com'erano
+  il pulsante musica, il volume e la sospensione a schermo spento. Gli EFFETTI non si toccano.
+- **Cosa serve da te:** scegliere i brani. Io non posso ascoltarli, quindi il gusto e' tuo.
+  Proposta operativa: preparo io l'impianto e una cartella `assets/musica/` con quattro nomi
+  fissi; tu ci lasci dentro i quattro file e funziona senza altro lavoro.
+
+## E — EASTER EGG PROPOSTI (l'utente decide quali, NON implementare prima)
+In ordine di rapporto tra risata e lavoro:
+1. **Il coton fioc conficcato** 🤖 — ogni tanto, un coton fioc gigante abbandonato nella parete.
+   Colpendolo 10 volte si stacca e da' un bonus danno temporaneo. E' anche una battuta VERA:
+   i coton fioc nell'orecchio non si usano. Poco lavoro, molto a tema.
+2. **Il cerumino domestico** 🤖 — raramente un cerumino non ti attacca: ti segue per tutto il
+   livello come un cagnolino e a fine livello ti lascia il suo cerume. Riusa l'IA della bolla
+   aiutante, cambia solo chi la esegue.
+3. **Il timpano dorato** 🤖 — una run ogni ~20, il timpano e' d'oro: arrivarci vale un premio
+   grosso e un cartello dedicato. Due righe di codice, e da' qualcosa da raccontare.
+4. **Livello 13** 🤖 — al tredicesimo livello tutto e' un filo piu' scuro e i nemici sono tutti
+   "cristallo" (fragilissimi ma micidiali), con un cartello scaramantico. Riusa un modificatore
+   che c'e' gia'.
+5. **Lo scrigno dietro al timpano** 🧠 — una pedana nascosta sopra al traguardo, raggiungibile
+   solo con doppio salto + scatto. Premia chi esplora invece di correre. Va disegnata a mano
+   nella generazione del livello: piu' lavoro.
+6. **Il moscerino albino** 🤖 — un moscerino bianco che non attacca e scappa: seguirlo porta a
+   un gruzzolo nascosto. Riusa quasi tutto il Fuggitivo Dorato.
+7. **Il cartello del dottore** 🤖 — un cartellino minuscolo sulla parete: "Non infilare i coton
+   fioc nelle orecchie". Costo quasi zero, e fa sorridere chi lo nota.
+8. **Codice Konami** 🤖 — da tastiera, cambia il cappello del personaggio. Vale solo su PC.
+
+## N — NOME DELL'APP (ricerche fatte, vedi il messaggio in chat del 2026-07-27)
+Il nome attuale non e' occupato, ma **"Earwax" da solo e' del party game di Jackbox** e su Play
+c'e' gia' **Earwax Clinic**: cercando "earwax game" si finisce su di loro. Candidati verificati
+liberi: **Waxout**, **Canal Crusher**, **Swab Squad**. Limite dello store: 30 caratteri, niente
+emoji, niente maiuscole tutte tranne il marchio.
+
+---
+
 # APERTI, in ordine di quanto sono pronti
 - [ ] ⭐ **ARMI DEL PG — meta' fatta.** Scelte prese con l'utente il 2026-07-27: **kit completi**
   (ogni arma cambia insieme mischia e getto, perche' il tasto d'attacco e' uno solo e sceglie da
