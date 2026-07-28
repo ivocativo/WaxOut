@@ -99,6 +99,64 @@ window.BLUEPRINTS = {
   slam:      { cost: 450, ability: 'slam'      },
 };
 
+// ARSENALE (2026-07-27, richiesta dell'utente). Ogni "arma" e' in realta' un KIT COMPLETO:
+// cambia INSIEME il colpo ravvicinato e il getto. Il motivo e' che il gioco ha UN SOLO tasto
+// d'attacco, che sceglie da solo in base alla distanza (mazza da vicino, getto da lontano):
+// due mezze armi separate non si sentirebbero, un kit invece cambia davvero come si gioca.
+// Si SBLOCCANO col cerume in banca (ArmiScene) e si SCEGLIE quale portarsi a ogni run — non si
+// sostituiscono a vicenda, altrimenti le vecchie diventerebbero spazzatura e si perderebbe la
+// varieta' (e' il buco n.3 della ricerca sul genere: vedi HANDOFF.md §Principi di design).
+//
+// I numeri di danno sono MOLTIPLICATORI sulle statistiche di base (che gia' comprendono i
+// potenziamenti comprati al negozio): cosi' un kit resta bilanciato a qualunque punto della
+// progressione, invece di diventare inutile appena si compra "Lama Affilata".
+// `blocca` = abilita' che il kit da' gia' di suo: vanno segnate come possedute a inizio run,
+// se no la carta corrispondente continuerebbe a uscire all'UpgradeScene senza dare niente.
+// `tex` sono ancora le texture VECCHIE (disegnate a codice): l'arte nuova e' il passo dopo,
+// si e' deciso di provare prima le meccaniche per non disegnare armi che poi si buttano.
+window.ARMI = [
+  {
+    id: 'fioc', cost: 0,
+    mischia: { tex: 'swab',    portata: 50, altezza: 30, cadenza: 360, danno: 1.00 },
+    getto:   { tex: 'sprayer', danno: 1.00, cadenza: 340, palline: 1, gittata: 850 },
+  },
+  {
+    // Picchia duro da vicino, ma lo spruzzo e' fiacco: premia chi sta addosso ai nemici.
+    id: 'martello', cost: 240,
+    mischia: { tex: 'hammer',  portata: 64, altezza: 46, cadenza: 520, danno: 1.45, fermo: 95 },
+    getto:   { tex: 'sprayer', danno: 0.70, cadenza: 430, palline: 1, gittata: 850 },
+  },
+  {
+    // Colpetti rapidissimi a portata cortissima: piu' danno al secondo del coton fioc, ma devi
+    // stare incollato al nemico — e incollarsi costa vita.
+    id: 'pinzette', cost: 300,
+    mischia: { tex: 'swab',    portata: 36, altezza: 26, cadenza: 165, danno: 0.58, fermo: 45 },
+    getto:   { tex: 'sprayer', danno: 0.80, cadenza: 300, palline: 1, gittata: 850 },
+  },
+  {
+    // Un colpo secco che fa molto male e PERFORA, ma lentissimo: arma da mira, non da panico.
+    id: 'idro', cost: 380,
+    mischia: { tex: 'swab',    portata: 46, altezza: 30, cadenza: 400, danno: 0.65 },
+    getto:   { tex: 'sprayer', danno: 2.20, cadenza: 640, palline: 1, gittata: 950, perfora: true },
+  },
+  {
+    // Sventaglia tre sbuffi deboli a raffica e ARRIVA POCO LONTANO (gittata dimezzata): pulisce
+    // il cerume in fretta e attira i pickup, ma contro i nemici bisogna avvicinarsi.
+    id: 'pompa', cost: 460,
+    mischia: { tex: 'swab',    portata: 50, altezza: 30, cadenza: 330, danno: 0.85 },
+    // 0.32 e non 0.42: a raffica di tre, da vicino le tre palline colpiscono LO STESSO nemico, e a
+    // 0.42 il danno al secondo era piu' del doppio di ogni altro kit (misurato: 111 contro 47).
+    getto:   { tex: 'sprayer', danno: 0.32, cadenza: 230, palline: 3, gittata: 380, calamita: true },
+    blocca: ['magnet'],   // la calamita e' inclusa nel kit
+  },
+];
+
+// Kit attualmente in mano (durante la run). Fuori dalla partita ripiega sul kit base.
+window.armaCorrente = function () {
+  const id = (window.GameState && window.GameState.player && window.GameState.player.arma) || 'fioc';
+  return window.ARMI.find((a) => a.id === id) || window.ARMI[0];
+};
+
 // MODIFICATORI di livello (mutatori, stile Hades/Nuclear Throne): una regola casuale
 // annunciata a inizio livello che cambia le regole di QUELLA partita. Danno varieta'
 // combinatoria a costo minimo: ognuno regola solo parametri gia' esistenti (velocita'/HP/
@@ -174,23 +232,31 @@ window.GameState = {
     const lv = (id) => u[id] || 0;
     const U = window.UNLOCKS;
     const maxHp = 100 + lv('hp') * U.hp.per;
+    // KIT scelto nell'Arsenale (window.ARMI). I moltiplicatori si applicano DOPO i potenziamenti
+    // comprati al negozio, cosi' il carattere del kit si sente sempre allo stesso modo.
+    const scelta = (window.Meta && window.Meta.get().arma) || 'fioc';
+    const arma = (window.ARMI || []).find((a) => a.id === scelta) || (window.ARMI || [{}])[0] || {};
+    const M = arma.mischia || { cadenza: 360, danno: 1 };
+    const G = arma.getto || { cadenza: 340, danno: 1, palline: 1, gittata: 850 };
     return {
       maxHp: maxHp,
       hp: maxHp,
-      damage: 26 + lv('dmg') * U.dmg.per,
+      arma: arma.id || 'fioc',   // kit in mano: lo leggono meleeSwing/fireJet via armaCorrente()
+      damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno),
       moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
-      attackCooldown: 360,  // ms (coton fioc, corpo a corpo automatico)
+      attackCooldown: M.cadenza,   // ms tra una bastonata e l'altra (corpo a corpo automatico)
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
-      jetDamage: 16 + lv('dmg') * U.dmg.per * 0.5,  // un po' sotto al corpo a corpo
-      shotCooldown: 340,     // ms tra uno spruzzo e l'altro (getto base "lento": non spam)
+      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno),  // un po' sotto al corpo a corpo
+      shotCooldown: G.cadenza,   // ms tra uno spruzzo e l'altro
+      shotLife: G.gittata,       // ms di vita di una pallina = quanto lontano arriva il getto
       doubleJump: lv('djump') > 0,
       dash: false,
-      weapon: 'swab',        // 'swab' | 'hammer' (corpo a corpo)
+      weapon: 'swab',        // (storico) resta per compatibilita': la texture ora viene dal kit
       // Abilità di run (scelte all'UpgradeScene) che cambiano lo stile di gioco:
-      jetPellets: 1,         // n. palline sparate dal getto (Ventaglio: +1 a ogni pesca)
-      jetPierce: false,      // palline perforanti
+      jetPellets: G.palline || 1,   // n. palline sparate dal getto (Ventaglio: +1 a ogni pesca)
+      jetPierce: !!G.perfora,       // palline perforanti (alcuni kit ce l'hanno di serie)
       lifesteal: false,      // curi vita uccidendo
       shield: false,         // para un colpo ogni tot
       homing: false,         // Mira Guidata: le palline curvano verso il nemico piu' vicino
@@ -206,7 +272,7 @@ window.GameState = {
       evoMagnet: false,      // Calamita + Cerume Extra  -> Buco Nero (raggio enorme + più cerume)
       evoSwarm: false,       // Bolla + Mira Guidata     -> Sciame (le bolle sparano a ricerca)
       // Abilità sbloccabili dai PROGETTI del negozio (window.BLUEPRINTS):
-      magnet: false,         // attira il cerume/pickup vicino
+      magnet: !!G.calamita,  // attira il cerume/pickup vicino (la Pompa a Vuoto ce l'ha di serie)
       meleeBlast: false,     // la bastonata colpisce anche i nemici in un raggio (area)
       jetSplash: false,      // le palline del getto scoppiano all'impatto (piccola area)
       companions: 0,         // n. bolle-aiutante (+1 a ogni pesca della carta)
@@ -229,5 +295,9 @@ window.GameState = {
     // senza questo, la carta continuerebbe a essere proposta (e presa) inutilmente ogni run,
     // visto che il filtro li' guarda solo ownedAbilities. Segnarla gia' posseduta.
     if (this.player.doubleJump) this.ownedAbilities.push('doublejump');
+    // Stessa ragione per le abilita' incluse nel KIT scelto (es. il Martello, la calamita della
+    // Pompa): senza segnarle possedute, la loro carta continuerebbe a uscire e a non dare nulla.
+    const arma = (window.ARMI || []).find((a) => a.id === this.player.arma);
+    if (arma && arma.blocca) arma.blocca.forEach((id) => this.ownedAbilities.push(id));
   },
 };

@@ -591,7 +591,45 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [19] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [19] ARSENALE (2026-07-27): il KIT scelto deve arrivare davvero in partita — statistiche
+  // di partenza, forma del colpo corpo a corpo e gittata del getto. Nasce dal fatto che i kit
+  // toccano tre punti lontani tra loro (newPlayer, meleeSwing, spawnPellet): se uno dei tre non
+  // legge il kit, l'arma "comprata" sembra identica a quella base e non se ne accorge nessuno.
+  {
+    const armaSalvata = window.Meta.get().arma;
+    const esiti = [];
+    ['fioc', 'martello', 'idro', 'pompa'].forEach((id) => {
+      const kit = window.ARMI.find((a) => a.id === id);
+      window.Meta.setUnlock('arma_' + id, 1);
+      window.Meta.setArma(id);
+      fermaMeta();
+      window.GameState.reset();
+      window.GameState.level = 2;
+      window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+      g.scene.start('GameScene');
+      passaTick();
+      const gs = g.scene.getScene('GameScene');
+      avanza(gs, 12);
+      const p = window.GameState.player;
+      // il colpo corpo a corpo usa davvero la portata del kit?
+      const M = window.armaCorrente().mischia;
+      esiti.push({
+        id: id,
+        arma: p.arma === id,
+        cadenza: p.attackCooldown === kit.mischia.cadenza,
+        gittata: p.shotLife === kit.getto.gittata,
+        palline: p.jetPellets === (kit.getto.palline || 1),
+        portata: M.portata === kit.mischia.portata,
+        extra: (!kit.getto.calamita || p.magnet === true) && (!kit.getto.perfora || p.jetPierce === true),
+      });
+    });
+    window.Meta.setArma(armaSalvata || 'fioc');
+    const rotti = esiti.filter((e) => !(e.arma && e.cadenza && e.gittata && e.palline && e.portata && e.extra));
+    if (rotti.length === 0) ok('arsenale: il kit scelto arriva in partita', '-', esiti.map((e) => e.id).join(' '));
+    else ko('arsenale: il kit scelto arriva in partita', '-', JSON.stringify(rotti));
+  }
+
+  // [20] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

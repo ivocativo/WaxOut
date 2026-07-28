@@ -9,7 +9,9 @@ window.Meta = (function () {
   function defaults() {
     // infezioneMax = grado di infezione PIU' ALTO superato (round A, A.5). -1 = mai vinto: si puo'
     // giocare solo al grado 0; vincere al grado N lo porta a max(N, attuale), sbloccando N+1.
-    return { bank: 0, bestLevel: 1, runs: 0, wins: 0, infezioneMax: -1, unlocks: {} };
+    // arma = kit dell'ARSENALE scelto per la prossima run (window.ARMI). Gli sblocchi delle armi
+    // stanno dentro `unlocks` con la chiave 'arma_<id>', cosi' riusano spend/setUnlock esistenti.
+    return { bank: 0, bestLevel: 1, runs: 0, wins: 0, infezioneMax: -1, arma: 'fioc', unlocks: {} };
   }
 
   function load() {
@@ -24,6 +26,7 @@ window.Meta = (function () {
         runs: data.runs || 0,
         wins: data.wins || 0,   // round A, A.1: run PORTATE A TERMINE (non solo giocate)
         infezioneMax: (typeof data.infezioneMax === 'number') ? data.infezioneMax : -1,
+        arma: data.arma || 'fioc',
         unlocks: Object.assign({}, data.unlocks || {}),
       };
     } catch (e) { return defaults(); }
@@ -75,6 +78,16 @@ window.Meta = (function () {
     },
 
     setUnlock(id, level) { state.unlocks[id] = level; save(); },
+
+    // ARSENALE: un'arma e' "in mano" se scelta, "posseduta" se gratis o sbloccata al negozio.
+    armaPosseduta(id) {
+      const a = (window.ARMI || []).find((x) => x.id === id);
+      return !!a && (!a.cost || state.unlocks['arma_' + id] > 0);
+    },
+    setArma(id) {
+      if (!this.armaPosseduta(id)) return false;
+      state.arma = id; save(); return true;
+    },
 
     // Solo per test/debug: azzera tutto.
     resetAll() { state = defaults(); save(); return state; },

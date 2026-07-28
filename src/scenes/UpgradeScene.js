@@ -44,7 +44,11 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'jetdmg', rep: true, rarity: 'common', apply: (s) => { s.jetDamage += 5; } },
       { id: 'doublejump', rep: false, rarity: 'rare', ability: 'doublejump', apply: (s) => { s.doubleJump = true; } },
       { id: 'dash', rep: false, rarity: 'rare', ability: 'dash', apply: (s) => { s.dash = true; } },
-      { id: 'hammer', rep: false, rarity: 'rare', ability: 'hammer', apply: (s) => { s.weapon = 'hammer'; s.damage += 6; } },
+      // TESTA PESANTE (2026-07-27) — ha preso il posto della vecchia carta "Martello di Cerume".
+      // Il Martello e' diventato un'arma dell'ARSENALE (si compra e si sceglie a inizio run), quindi
+      // una carta che "ti da' il martello" non avrebbe piu' senso: cambierebbe l'arma che hai
+      // scelto tu. Questa invece potenzia il corpo a corpo QUALUNQUE kit tu stia usando.
+      { id: 'heavyhead', rep: false, rarity: 'rare', ability: 'heavyhead', apply: (s) => { s.damage = Math.round(s.damage * 1.3); s.attackRange += 0.15; } },
       // Abilità che cambiano lo stile di gioco (una volta sola ciascuna):
       // Ventaglio: ora IMPILABILE — ogni pesca aggiunge una pallina al getto.
       { id: 'spread', rep: false, stack: true, rarity: 'rare', ability: 'spread', apply: (s) => { s.jetPellets += 1; } },
@@ -174,7 +178,7 @@ class UpgradeScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-THREE', () => { if (choices[2]) this.choose(choices[2]); });
 
     // Riepilogo statistiche
-    const weaponName = T.t(p.weapon === 'hammer' ? 'weapon_hammer' : 'weapon_swab');
+    const weaponName = T.t('arma_' + (p.arma || 'fioc') + '_name');
     const stats = [
       T.t('up_stat_wax', { wax: window.GameState.wax }),
       T.t('up_stat_line', { dmg: p.damage, hp: p.maxHp, spd: p.moveSpeed }),

@@ -1902,7 +1902,9 @@ class GameScene extends Phaser.Scene {
     if (p.corrosive) s.setTint(0x9be86b);  // pallina verde = corrosiva
     const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
-    this.time.delayedCall(850 + (p.bounce | 0) * 300, () => { if (s.active) s.destroy(); });   // vive di più se rimbalza
+    // Quanto vive la pallina = quanto LONTANO arriva il getto: e' una manopola del kit (la Pompa
+    // a Vuoto ha gittata corta apposta). Vive di piu' se rimbalza.
+    this.time.delayedCall((p.shotLife || 850) + (p.bounce | 0) * 300, () => { if (s.active) s.destroy(); });
   }
 
   popShot(s) {
@@ -2183,11 +2185,12 @@ class GameScene extends Phaser.Scene {
   meleeSwing() {
     const p = window.GameState.player;
     window.Sfx.hit();
-    const isHammer = p.weapon === 'hammer';
-    this.showMeleeWeapon(isHammer);         // arma in mano che rotea col colpo
-    const baseRange = isHammer ? 64 : 50;
-    const range = baseRange * p.attackRange;
-    const halfH = isHammer ? 46 : 30;
+    // Forma del colpo dal KIT scelto nell'Arsenale (window.ARMI): portata, altezza dell'arco e
+    // fermo-immagine sono il carattere dell'arma (martello largo e lento, pinzette corte e rapide).
+    const M = window.armaCorrente().mischia;
+    this.showMeleeWeapon(M.tex);            // arma in mano che rotea col colpo
+    const range = M.portata * p.attackRange;
+    const halfH = M.altezza;
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
     const rect = new Phaser.Geom.Rectangle(ax, this.player.y - halfH + cy, range, halfH * 2);
@@ -2217,7 +2220,7 @@ class GameScene extends Phaser.Scene {
     // Piu' forte sui nemici e col martello; leggero sul solo cerume.
     if (hitAny) {
       this.cameras.main.shake(hitEnemy ? 130 : 60, hitEnemy ? 0.010 : 0.004);
-      this.hitStop(isHammer ? 95 : (hitEnemy ? 78 : 40));
+      this.hitStop(M.fermo || (hitEnemy ? 78 : 40));
     }
   }
 
@@ -2240,7 +2243,7 @@ class GameScene extends Phaser.Scene {
   // A distanza: la punta verso la direzione di mira (nx,ny). Resta visibile un attimo dopo
   // lo sparo (rinnovato a ogni colpo mentre spari).
   showRangedWeapon(nx, ny) {
-    const cfg = this.WEAPONS.sprayer;
+    const cfg = this.WEAPONS[window.armaCorrente().getto.tex] || this.WEAPONS.sprayer;
     const w = this.heroWeapon;
     this.tweens.killTweensOf(w);
     w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
@@ -2250,9 +2253,9 @@ class GameScene extends Phaser.Scene {
     this.positionWeapon();
   }
 
-  // Corpo a corpo: arma in mano che ROTEA nell'arco del colpo (swab o hammer).
-  showMeleeWeapon(isHammer) {
-    const cfg = isHammer ? this.WEAPONS.hammer : this.WEAPONS.swab;
+  // Corpo a corpo: arma in mano che ROTEA nell'arco del colpo (texture dal kit scelto).
+  showMeleeWeapon(tex) {
+    const cfg = this.WEAPONS[tex] || this.WEAPONS.swab;
     const w = this.heroWeapon;
     this.tweens.killTweensOf(w);
     // Abilità BRACCIO LUNGO (round 2, G.1): prima la portata extra era invisibile (allungava

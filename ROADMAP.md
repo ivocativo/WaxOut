@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (59 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (60 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -226,18 +226,28 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 ---
 
 # APERTI, in ordine di quanto sono pronti
-- [ ] ⭐ **ARMI DEL PG: ridisegno + armi NUOVE sbloccabili** 🧠 (chiesto dall'utente 2026-07-27).
-  Due cose insieme, da fare in un blocco solo:
-  1. **Ridisegnare le 3 armi attuali** (`swab` coton fioc, `hammer` martello, `sprayer` spruzzino):
-     sono le ultime texture generate a codice (`PixelArt` in `BootScene`), stonano con l'arte AI di
-     personaggio, nemici e fondali. Il meccanismo e' gia' pronto e non va toccato: l'arma e' un
-     LAYER separato (`this.heroWeapon`) e cambiarla significa cambiare una voce nella tabella
-     `WEAPONS` di `GameScene` (tex / origin del perno / scala / offset della mano).
-  2. **Progettarne di nuove, sbloccabili nel NEGOZIO** (accanto a `UNLOCKS`/`BLUEPRINTS` in
-     `state.js`). E' anche il buco n.3 della ricerca sulle best practice (§Principi di design in
-     `HANDOFF.md`): «un solo personaggio, una sola arma» — armi con feel diverso moltiplicano le
-     run senza toccare i livelli. Da decidere con l'utente: quante, che feel (portata/cadenza/area),
-     se si scelgono a inizio run o si sbloccano durante.
+- [ ] ⭐ **ARMI DEL PG — meta' fatta.** Scelte prese con l'utente il 2026-07-27: **kit completi**
+  (ogni arma cambia insieme mischia e getto, perche' il tasto d'attacco e' uno solo e sceglie da
+  se' in base alla distanza), **si sbloccano al negozio e si sceglie a inizio run**, **prima le
+  meccaniche poi l'arte** (per non disegnare armi che poi si buttano).
+  - [x] **MECCANICHE FATTE**: `window.ARMI` in `state.js` (5 kit), `ArmiScene` (Arsenale: sblocca +
+    equipaggia), terzo pulsante nel menu, `Meta.arma`/`armaPosseduta`/`setArma`, mischia e getto
+    che leggono il kit, controllo automatico [19]. La carta "Martello di Cerume" e' stata sostituita
+    da **Testa Pesante** (+30% danno mischia): dare il martello con una carta non ha piu' senso ora
+    che l'arma la scegli tu, e Testa Pesante funziona con qualunque kit.
+  - [ ] **ARTE**: le 5 armi usano ancora le vecchie texture disegnate a codice (coton fioc /
+    martello / spruzzino, ripetute). Servono i disegni veri — prompt da scrivere, l'utente genera,
+    poi `tools/bake_sprite.ps1` e una voce nella tabella `WEAPONS` di `GameScene` (tex, perno,
+    scala, mano). **Solo dopo il playtest**, cosi' si disegnano solo i kit che restano.
+  - [ ] **TARATURA**: i numeri sono una prima stima (profilo misurato sotto). Da giudicare in mano.
+
+| kit | mischia | getto |
+|---|---|---|
+| Coton Fioc (base) | 72 dps, portata 50 | 47 dps, 493px |
+| Martello, 240 | 73 dps ma **38 a botta**, portata 64 e arco largo | 26 dps (dimezzato) |
+| Pinzette, 300 | **91 dps** ma portata 36 (devi stare incollato) | 43 dps |
+| Idropulsore, 380 | 43 dps (fiacco) | 55 dps, **35 a colpo, perfora 3**, 551px |
+| Pompa a Vuoto, 460 | 67 dps | 65 dps ma **solo 220px** + calamita inclusa |
 - [x] ✅ **TIMPANO SCOLLEGATO**: fatto 2026-07-27 (`918725d`) — vedi §B.2.
 - [ ] **Sfoltire l'APK** 🤖: ~8 MB su 22 sono materiale di lavorazione impacchettato per sbaglio.
   Dettaglio in `HANDOFF.md` §APK da SFOLTIRE. Il primo pezzo (togliere il caricamento delle

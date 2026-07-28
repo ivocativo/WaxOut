@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-27 · Ultimo commit: `d48b2f6` (pushato fino a `6a5dc76`)._
+_Ultimo aggiornamento: 2026-07-27 · Ultimo commit pushato: `519bdb1`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 59 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 60 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -34,10 +34,14 @@ _piu' tempo e molto meno frequente (`2ff0337`); **crash musica sul telefono** �
 _liberati, ora si autodistruggono + musica sospesa a schermo spento (`5527c96`); **4 modificatori_
 _nuovi** (11 in tutto) + carta **Getto Potente** (`6a5dc76`); **porta piu' chiara** a tre sezioni_
 _OBIETTIVO / REGOLA SPECIALE / PREMIO (`d48b2f6`). Dettaglio in `ROADMAP.md` §BLOCCO D._
-_**STATO ORA:** Blocchi A, B e D chiusi. **Prossimo lavoro: il TIMPANO SCOLLEGATO** (l'immagine AI_
-_"galleggia": cornice di carne + vasi che continuano — `ROADMAP.md` §B.2). Poi il **BLOCCO C**_
-_(Assedio: la tattica del cumulo-rifugio, decisione di design con l'utente). In attesa del round 4_
-_di playtest per tarare i numeri del Blocco D. L'utente RIMANDA lo store._
+_**✅ Dopo il round 3:** **timpano incastonato** nella carne (`918725d`); **cerumino ANIMATO**, primo_
+_nemico con spritesheet, animato dall'utente con Claude Design + nuovo `tools/bake_sheet.py`_
+_(`6b4886c`); **salto sui nemici che rimbalza al contatto** e non piu' 48px per aria (`519bdb1`)._
+_**✅ ARSENALE (2026-07-27):** 5 **kit** di armi (mischia + getto insieme) che si sbloccano al negozio_
+_e si scelgono a inizio run — nuova `ArmiScene`, terzo pulsante nel menu. Manca solo l'ARTE._
+_**STATO ORA:** Blocchi A, B e D chiusi, Arsenale fatto nelle meccaniche. **Prossimi:** disegnare le_
+_5 armi (dopo il playtest), animare gli altri 6 nemici, e il **BLOCCO C** (Assedio: la tattica del_
+_cumulo-rifugio, decisione di design con l'utente). L'utente RIMANDA lo store._
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,
@@ -101,7 +105,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-59 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+60 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -224,6 +228,14 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - **Evoluzioni** (fusioni di 2 abilità): Lama d'Acqua, Nube Tossica, Buco Nero, Sciame.
 - **Meta/negozio:** cerume in banca → potenziamenti permanenti (UNLOCKS) + progetti (BLUEPRINTS).
   Pulsante "Azzera progressi" (2 tocchi).
+- **ARSENALE (dal 2026-07-27):** 5 **kit** di armi (`window.ARMI` in `state.js`) che cambiano INSIEME
+  il corpo a corpo e il getto — il tasto d'attacco e' uno solo e sceglie da se' in base alla distanza,
+  quindi due mezze armi separate non si sentirebbero. Si sbloccano col cerume in banca e si sceglie
+  quale portarsi a ogni run (`ArmiScene`, terzo pulsante del menu). Lo sblocco vive in
+  `Meta.unlocks['arma_<id>']`, la scelta in `Meta.arma`. I danni nei kit sono MOLTIPLICATORI applicati
+  dopo i potenziamenti del negozio, cosi' il carattere dell'arma si sente a ogni punto della
+  progressione. ⚠️ Un kit tocca TRE punti lontani (`newPlayer`, `meleeSwing`, `spawnPellet`): il
+  controllo automatico [19] verifica che il kit scelto arrivi davvero in tutti e tre.
 - **Varietà livelli:** tipi (normale / corsa / assedio / boss / sciame) + **11 modificatori**
   (`MUTATORS`: fretta, orda, corazza, poca gravità, cuccagna, cerume ostinato, terremoto, cristallo,
   frenesia, furia, cerume di ferro) + **eventi casuali** (`EVENTS`, ~25%, indipendenti dai
@@ -433,10 +445,10 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
 - **ANIMAZIONI dei NEMICI** (immagine AI → AutoSprite → pixelate) — **chieste dall'utente** al
   playtest: farà **sparire le aureole élite** (oggi un ripiego); include strisciamento
   cerumino/gorgogliante, crosta "asciutta" diversa. Bloccate: AutoSprite richiede l'abbonamento.
-- ⭐ **ARMI del PG: ridisegno + armi NUOVE sbloccabili nel negozio** (chiesto dall'utente 2026-07-27).
-  Le 3 attuali (coton fioc, martello, spruzzino) sono le ultime texture generate a codice e stonano.
-  Il layer arma e la tabella `WEAPONS` in `GameScene` sono gia' pronti: cambiare arma = cambiare una
-  voce. Da progettare insieme le armi nuove — vedi anche §Principi di design, buco n.3.
+- ⭐ **ARMI del PG — manca solo l'ARTE.** Le meccaniche sono fatte (vedi `ROADMAP.md` §APERTI):
+  5 kit nell'ARSENALE. Ma tutti usano ancora le vecchie texture disegnate a codice, ripetute:
+  servono i 5 disegni veri (prompt → l'utente genera → `bake_sprite.ps1` → voce nella tabella
+  `WEAPONS` di `GameScene`). Da fare DOPO il playtest, per disegnare solo i kit che restano.
 - **Posa d'attacco coordinata corpo+arma** del PG (braccio/testa seguono la mira): serve AutoSprite →
   **richiede abbonamento**. Oggi solo il layer "arma-in-mano".
 - **Cerume più gooey**; **protuberanze** provvisorie da migliorare; **varianti sfondo** per livello;

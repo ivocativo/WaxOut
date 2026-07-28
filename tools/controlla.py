@@ -20,9 +20,18 @@ CHECKS = RADICE / "tools" / "checks.js"
 
 
 def porta_libera():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    # Sopra la 2048 e sotto la 32000: Chromium RIFIUTA di aprire una lunga lista di porte
+    # "pericolose" (ERR_UNSAFE_PORT) — quasi tutte sotto la 1024 piu' parecchie sparse fino alla
+    # 1900 circa. Lasciando scegliere al sistema (porta 0) prima o poi ne esce una bloccata e i
+    # controlli falliscono senza motivo: successo due volte di fila il 2026-07-27.
+    for _ in range(50):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            porta = s.getsockname()[1]
+        if 8000 <= porta <= 32000:
+            return porta
+    # Ripiego: una porta fissa alta, se il sistema continua a dare numeri fuori intervallo.
+    return 8321
 
 
 def avvia_server(porta):
