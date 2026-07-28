@@ -297,10 +297,12 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
 ---
 
 # APERTI, in ordine di quanto sono pronti
-- [ ] ⚠️ **LICENZA DEL BRANO DEL MENU da confermare** (prima dello store): vedi
-  `assets/musica/FONTI.md`. Gli altri tre sono CC0 verificati sulla scheda; per quello del menu la
-  scheda non si e' ritrovata e OpenGameArt ospita anche licenze che obbligano a citare l'autore.
-  Si chiude ritrovando la pagina nella cronologia del browser, o sostituendo il brano.
+- [ ] **CREDITI** (prima dello store) 🤖: tutti e quattro i brani sono **CC0 verificati** sulla
+  scheda (vedi `assets/musica/FONTI.md`), quindi nessun obbligo. Ma l'autore del brano del MENU
+  (R0B B3RY) CHIEDE esplicitamente di essere citato: «By using this file you are committed to
+  mention "Rob Bery" and "Rob Bery Art"». Costa una riga e toglie ogni dubbio. Proposta: una
+  sezione CREDITI dentro il pannello "?" del menu (che c'e' gia'), con i quattro autori della
+  musica + Phaser, e la stessa lista nella descrizione dello store.
 - [ ] ⭐ **ARMI DEL PG — meta' fatta.** Scelte prese con l'utente il 2026-07-27: **kit completi**
   (ogni arma cambia insieme mischia e getto, perche' il tasto d'attacco e' uno solo e sceglie da
   se' in base alla distanza), **si sbloccano al negozio e si sceglie a inizio run**, **prima le

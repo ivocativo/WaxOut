@@ -6,7 +6,7 @@ su tutti e quattro, quindi l'abbinamento qui sotto e' certo.
 
 | file | usato per | brano | autore | pagina | licenza |
 |---|---|---|---|---|---|
-| `menu.ogg` | schermata iniziale | *New Age* (album "BullHit", 2009) | Rabbit´n Foxes | ⚠️ non trovata (vedi sotto) | ⚠️ **da confermare** |
+| `menu.ogg` | schermata iniziale | *Menu / Running Title* (file `New age.mp3`) | **R0B B3RY** (Rob Bery) | [menu-running-title](https://opengameart.org/content/menu-running-title) | **CC0** ✅ ma vedi sotto |
 | `livello.ogg` | livelli normali | *Race of the Wasp* | OwlishMedia | [race-of-the-wasp](https://opengameart.org/content/race-of-the-wasp) | **CC0** ✅ |
 | `boss.ogg` | boss e assedio | *Boss Battle Theme* | CleytonKauffman (CleytonRX) | [boss-battle-theme](https://opengameart.org/content/boss-battle-theme) | **CC0** ✅ |
 | `vittoria.ogg` | run vinta | *Midnight Explosion* | iamoneabe | [midnight-explosion](https://opengameart.org/content/midnight-explosion) | **CC0** ✅ |
@@ -14,18 +14,22 @@ su tutti e quattro, quindi l'abbinamento qui sotto e' certo.
 Scartato, NON nel gioco: *Crate Punks OST* di Shuhei Yasuda (9:13, punk) — il file
 `cratePunksOST_5.mp3`, sostituito da *Boss Battle Theme*.
 
-## ⚠️ UN CONTROLLO ANCORA DA FARE (prima di pubblicare)
+## ⚠️ L'AUTORE DEL BRANO DEL MENU CHIEDE DI ESSERE CITATO
 
-La pagina di origine di **`menu.ogg`** non si e' riusciti a ritrovarla: la ricerca di OpenGameArt
-non trova ne' il titolo ("New Age") ne' l'autore ("Rabbit´n Foxes") ne' l'album ("BullHit"), e il
-link diretto al file (`.../sites/default/files/New%20age_1.mp3`) non porta alla scheda.
+Scheda ritrovata (2026-07-28, link dell'utente): **licenza CC0 confermata**, con il collegamento
+alla dedica di pubblico dominio. Nessun obbligo legale, quindi.
 
-**Perche' conta:** OpenGameArt **non e' un sito di solo CC0**. Ospita anche CC-BY (che obbliga a
-citare l'autore), GPL e altre licenze. Gli altri tre brani hanno la scheda con scritto CC0 nero su
-bianco; questo no. Se fosse CC-BY servirebbe una schermata CREDITI, che il gioco non ha.
+**Pero'** nella stessa scheda l'autore scrive:
 
-**Cosa fare:** ritrovare la scheda da cui e' stato scaricato (dovrebbe essere nella cronologia del
-browser) e scriverla qui. In alternativa, sostituirlo con un altro brano di cui si e' certi.
+> "By using this file you are committed to mention 'Rob Bery' and 'Rob Bery Art'"
+
+Cioe': la licenza dice "fanne quel che vuoi", il testo accanto chiede di citarlo. Le due cose si
+contraddicono — il CC0 esiste apposta per NON poter aggiungere condizioni — e in una disputa la
+licenza vale piu' della frase. Ma la richiesta e' esplicita, e citare qualcuno costa una riga.
+
+**Decisione da prendere:** aggiungere una schermata (o una riga) di CREDITI. Non serve solo per
+lui: gli altri tre autori non lo pretendono, ma citarli e' corretto, e sullo store una sezione
+crediti fa buona impressione. Il posto piu' economico e' il pannello "?" gia' presente nel menu.
 
 ## Come sono stati preparati
 
