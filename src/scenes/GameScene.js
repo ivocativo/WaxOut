@@ -1519,6 +1519,7 @@ class GameScene extends Phaser.Scene {
       // niente da imparare. Ora ognuno chiede una cosa diversa al giocatore.
       cfg.bossKind = (lvl >= window.CONFIG.RUN_LEVELS) ? 'gran' : (lvl >= 10 ? 'regina' : 'tappo');
       if (cfg.bossKind === 'regina') {
+        cfg.tex = 'enemy_boss_regina';          // disegno dedicato (2026-07-28)
         // REGINA DELLE CROSTE: corazzata contro il GETTO, va affrontata da vicino. Non salta:
         // CARICA in orizzontale. Piu' veloce e meno grossa, cosi' la carica si legge come tale.
         cfg.hp = Math.round(cfg.hp * 0.85);      // meno vita: il corpo a corpo fa meno danno al secondo
@@ -1562,6 +1563,9 @@ class GameScene extends Phaser.Scene {
       enemy_flea:   { dispH: 34, hbW: 20, hbH: 16 },
       enemy_hopper: { dispH: 48, hbW: 40, hbH: 30 },
       enemy_boss:   { dispH: 96, hbW: 64, hbH: 56 },
+      // La Regina e' larga e bassa (carica in orizzontale): stessa altezza a schermo del Tappo
+      // ma corpo piu' largo e piu' schiacciato, come dice la sua silhouette.
+      enemy_boss_regina: { dispH: 96, hbW: 78, hbH: 50 },
     };
     const art = ART[cfg.tex];
     if (art && this.textures.exists(cfg.tex)) {
@@ -1690,7 +1694,8 @@ class GameScene extends Phaser.Scene {
       e.bossKind = cfg.bossKind || 'tappo';
       e._dannoBase = cfg.dmg;                                   // la carica lo alza e poi lo rimette
       e.bossArmor = !!cfg.bossArmor;                            // corazzata contro il getto (Regina)
-      if (e.bossArmor) { e.eliteTint = 0xa8c8dd; e.setTint(e.eliteTint); }   // guscio freddo, si legge da lontano
+      // (la Regina aveva una tinta azzurra come SEGNAPOSTO finche' condivideva il disegno del
+      // Tappo: ora ha il suo, corazzato e scuro di suo, e la tinta non serve piu')
       e.once('destroy', () => { if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; } });
     }
 

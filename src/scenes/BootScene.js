@@ -20,7 +20,8 @@ class BootScene extends Phaser.Scene {
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
     [['enemy_crust', 'crosta'], ['enemy_spit', 'gorgogliante'],
      ['enemy_fly', 'moscerino'], ['enemy_flea', 'pulce'], ['enemy_hopper', 'saltatore'],
-     ['enemy_boss', 'boss']].forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
+     ['enemy_boss', 'boss'], ['enemy_boss_regina', 'regina']]
+      .forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
 
     // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE
     // SHEET (12 frame di strisciata, testa a destra come tutti gli altri sprite del gioco). Usare
@@ -85,6 +86,10 @@ class BootScene extends Phaser.Scene {
     const C = window.CONFIG.COLORS;
     const PA = window.PixelArt;
     const sE = window.CONFIG.PIXEL_SCALE_ENEMY;
+
+    // MUSICA a brani veri (2026-07-28): scarica e decodifica in sottofondo, senza bloccare il
+    // caricamento del gioco. Finche' non sono pronti (o se mancano) suona il synth di sempre.
+    if (window.Sfx && window.Sfx.loadTracks) window.Sfx.loadTracks();
 
     // Strisciata del cerumino. Le animazioni in Phaser sono GLOBALI: registrata qui una volta,
     // e' disponibile a ogni scena (partita e menu) senza doverla ricreare a ogni livello.

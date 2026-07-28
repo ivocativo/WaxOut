@@ -398,10 +398,75 @@ window.Sfx = (function () {
     }
   }
 
+  // ---------- MUSICA A BRANI VERI (2026-07-28) ----------
+  // L'utente ha scelto di sostituire il synth con brani veri (CC0), tenendo il synth per i soli
+  // EFFETTI. I brani NON passano dal gestore audio di Phaser ma da QUESTO stesso AudioContext:
+  // cosi' ereditano gratis tutto quello che c'e' gia' — cursore del volume, pulsante musica,
+  // dissolvenza fra un brano e l'altro e soprattutto la sospensione a schermo spento (che e'
+  // costata un bug vero: vedi il commento in cima al file).
+  // Se un file manca o il telefono non sa leggerlo, resta il synth: il gioco non resta muto.
+  const TRACK_FILES = {
+    menu: 'assets/musica/menu.ogg',
+    level: 'assets/musica/livello.ogg',
+    boss: 'assets/musica/boss.ogg',
+    victory: 'assets/musica/vittoria.ogg',
+  };
+  const buffers = {};          // nome -> AudioBuffer decodificato
+  let musicSource = null;      // sorgente del brano in riproduzione
+  let tracksAsked = false;
+
+  // Scarica e decodifica i brani. Si puo' chiamare subito: decodeAudioData funziona anche con
+  // l'audio ancora "bloccato" (contesto sospeso), che e' lo stato prima del primo tocco.
+  function loadTracks() {
+    if (tracksAsked) return;
+    tracksAsked = true;
+    const c = ensure(); if (!c) return;
+    Object.keys(TRACK_FILES).forEach(function (nome) {
+      fetch(TRACK_FILES[nome])
+        .then(function (r) { return r.ok ? r.arrayBuffer() : Promise.reject(r.status); })
+        .then(function (dati) { return c.decodeAudioData(dati); })
+        .then(function (audio) {
+          buffers[nome] = audio;
+          // Se e' proprio il brano che serve adesso, subentra al synth senza aspettare.
+          if (nome === (desiredTrack || currentTrackName) && musicOn && c.state === 'running') playBuffer(nome);
+        })
+        .catch(function () { /* file assente o formato non letto: resta il synth */ });
+    });
+  }
+
+  function stopBuffer() {
+    if (!musicSource) return;
+    try { musicSource.stop(); } catch (e) { /* gia' fermo */ }
+    try { musicSource.disconnect(); } catch (e) { /* niente */ }
+    musicSource = null;
+  }
+
+  function playBuffer(nome) {
+    const c = ctx; if (!c || !buffers[nome]) return;
+    if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }   // spegne il synth
+    stopBuffer();
+    const s = c.createBufferSource();
+    s.buffer = buffers[nome];
+    s.loop = true;
+    s.connect(musicFade);
+    const t = c.currentTime;
+    musicFade.gain.cancelScheduledValues(t);
+    musicFade.gain.setValueAtTime(0.0001, t);
+    musicFade.gain.linearRampToValueAtTime(1, t + 0.6);
+    s.start();
+    musicSource = s;
+    currentTrackName = nome;
+  }
+
   function startMusic() {
     const c = ensure();
     if (!c || !musicOn || c.state !== 'running') return;   // si avvia solo ad audio sbloccato
     if (!currentTrackName) currentTrackName = desiredTrack || 'menu';
+    if (buffers[currentTrackName]) {                       // c'e' il brano vero: usa quello
+      if (musicSource) return;                             // gia' in riproduzione
+      playBuffer(currentTrackName);
+      return;
+    }
     if (schedTimer) return;                                // gia' in esecuzione
     curStep = 0; nextStepTime = c.currentTime + 0.08;
     musicFade.gain.cancelScheduledValues(c.currentTime);
@@ -412,15 +477,27 @@ window.Sfx = (function () {
   function stopMusic() {
     if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
     if (swapTimer) { clearTimeout(swapTimer); swapTimer = null; }
+    stopBuffer();
   }
 
   // Cambia atmosfera con una dissolvenza (fade-out → cambio → fade-in).
   function setMusic(name) {
-    if (!name || !SONGS[name]) return;
+    if (!name || (!SONGS[name] && !TRACK_FILES[name])) return;
     desiredTrack = name;
     const c = ensure(); if (!c) return;
-    if (!musicOn || c.state !== 'running' || !schedTimer) { currentTrackName = name; startMusic(); return; }
-    if (name === currentTrackName) return;
+    if (!musicOn || c.state !== 'running') { currentTrackName = name; startMusic(); return; }
+    if (name === currentTrackName && (musicSource || schedTimer)) return;
+    // Brano vero: dissolvenza in uscita, poi parte il nuovo (playBuffer fa la dissolvenza in entrata).
+    if (buffers[name]) {
+      const tf = c.currentTime;
+      musicFade.gain.cancelScheduledValues(tf);
+      musicFade.gain.setValueAtTime(Math.max(0.0001, musicFade.gain.value), tf);
+      musicFade.gain.linearRampToValueAtTime(0.0001, tf + 0.45);
+      if (swapTimer) clearTimeout(swapTimer);
+      swapTimer = setTimeout(function () { swapTimer = null; playBuffer(name); }, 480);
+      return;
+    }
+    if (!schedTimer) { currentTrackName = name; startMusic(); return; }
     const t = c.currentTime;
     musicFade.gain.cancelScheduledValues(t);
     musicFade.gain.setValueAtTime(Math.max(0.0001, musicFade.gain.value), t);
@@ -526,7 +603,7 @@ window.Sfx = (function () {
     unlock,
     // volume / musica
     cycleVolume, volLevel, setVolume, getVolume,
-    toggleMusic, musicEnabled, startMusic, stopMusic, setMusic,
+    toggleMusic, musicEnabled, startMusic, stopMusic, setMusic, loadTracks,
     addAudioButton, addMusicButton,
 
     // colpo dello swab: un "whiff" leggero e arioso

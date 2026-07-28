@@ -227,7 +227,7 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 
 # DA DECIDERE CON L'UTENTE (proposte pronte, NON implementate)
 
-## M — MUSICA CON BRANI VERI (l'utente ha deciso di lasciare il synth ai soli EFFETTI)
+## M — MUSICA CON BRANI VERI ✅ FATTA (2026-07-28) — restava solo la scelta dei brani, arrivata
 **Come farlo, in concreto.**
 - **Quanti brani:** 4 — menu, livello, boss/assedio, vittoria. Con meno si sente il vuoto, con
   piu' cresce il peso senza che il giocatore se ne accorga.

@@ -502,9 +502,13 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   magenta. Vedi §Cosa c'e' gia' e la memoria `earwaxwar-background-pipeline`.
 
 **4. AUDIO**
-- ⭐ **RIFARE musica ED effetti sonori da capo** (richiesta esplicita dell'utente, 2026-07-26).
-  Il synth procedurale attuale e' materiale di passaggio: non arricchirlo, sostituirlo. Da decidere
-  con l'utente: brani veri (file audio, pesano nell'APK) oppure synth rifatto.
+- ✅ **MUSICA: FATTA (2026-07-28).** Quattro brani **CC0** scelti dall'utente, in `assets/musica/`
+  (menu/livello/boss/vittoria, 4,4 MB in tutto). Preparati con `tools/bake_musica.py` (OGG +
+  normalizzazione del volume + tagli). Suonano dallo STESSO AudioContext degli effetti, non dal
+  gestore audio di Phaser: cosi' ereditano volume, pulsante musica, dissolvenze e sospensione a
+  schermo spento senza codice nuovo. Se un file manca, riparte il synth di prima.
+  ⚠️ `assets/musica/FONTI.md` va compilato con i link prima di pubblicare.
+- **EFFETTI sonori:** restano il synth procedurale, da rivedere insieme all'utente.
 - Effetti extra (AU-B.2); **boss infuriato = musica più intensa** (AU-D.3) — solo se si tiene il synth.
 
 **5. TECNICO / PIATTAFORMA (per lo più rimandato dall'utente)**

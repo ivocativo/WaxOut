@@ -57,7 +57,7 @@ jobs:
           # assets/wax e bg_flesh_01_px NON si copiano: sono gia' INCORPORATI come data URI in
           # src/assets_data.js (serve per far girare il gioco col doppio clic) e BootScene usa
           # sempre la copia incorporata quando c'e' — i file su disco sarebbero peso doppio.
-          cp -r assets/sprites www/assets/
+          cp -r assets/sprites assets/musica www/assets/
           cp assets/backgrounds/2/bg2_far.jpg assets/backgrounds/2/bg2_mid.png assets/backgrounds/2/bg2_near.png www/assets/backgrounds/2/
           cp assets/spritesheets/hero/*_px.png www/assets/spritesheets/hero/
           cp assets/spritesheets/enemies/*.png www/assets/spritesheets/enemies/

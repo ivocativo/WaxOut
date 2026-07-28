@@ -84,7 +84,9 @@ class VictoryScene extends Phaser.Scene {
     this.input.keyboard.once('keydown-SPACE', newRun);
 
     window.Sfx.win();
-    window.Sfx.setMusic('menu');
+    // Brano dedicato alla run vinta (2026-07-28): prima tornava quello del menu, che dopo 15
+    // livelli suonava come "e' finita" invece che "hai vinto".
+    window.Sfx.setMusic('victory');
   }
 }
 window.VictoryScene = VictoryScene;
