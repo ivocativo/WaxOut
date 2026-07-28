@@ -305,6 +305,117 @@ window.GameGfx = {
     return g;
   },
 
+  // ---------- SCHERMATE DI CONTORNO (negozio, potenziamenti, arsenale, pausa, game over) ----------
+  // Erano rettangoli marroni piatti con bordo giallo: la vecchia palette, rimasta indietro mentre
+  // tutto il resto diventava carne e cerume. Qui c'e' UN linguaggio solo, usato da tutte, cosi'
+  // passare dal gioco al negozio non sembra cambiare gioco.
+  // Regole: fondo = tessuto profondo con bolle di carne appena accennate (lo stesso fondale visto
+  // "da dentro", non un colore inventato); pannelli = plum scuro con un filo di luce in alto;
+  // accento = l'AMBRA del cerume, che nel gioco vuol dire "questa e' la risorsa".
+  UI: {
+    fondo:     0x1c0a12,
+    fondo2:    0x3a1424,
+    pannello:  0x2a1220,
+    pannelloIn:0x3a1a2c,
+    bordo:     0x8a4258,
+    ambra:     0xffd166,
+    ambraScura:0xc98a12,
+    verde:     0x9fe6a0,
+    testo:     '#fff2e6',
+    testoSoft: '#c9a6b2',
+  },
+
+  // Fondo comune a tutte le schermate: sfumatura + bolle di tessuto + vignettatura.
+  // `scene` deve chiamarlo per PRIMO (sta a depth -50, sotto a tutto il resto).
+  paintSceneBg(scene) {
+    const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, U = this.UI;
+    const g = scene.add.graphics().setDepth(-50).setScrollFactor(0);
+    // Sfumatura verticale a fasce (Graphics non ha gradienti veri): 40 bande = transizione liscia.
+    const BANDE = 40;
+    const c1 = Phaser.Display.Color.IntegerToColor(U.fondo2);
+    const c2 = Phaser.Display.Color.IntegerToColor(U.fondo);
+    for (let i = 0; i < BANDE; i++) {
+      const t = i / (BANDE - 1);
+      const c = Phaser.Display.Color.Interpolate.ColorWithColor(c1, c2, 1, t);
+      g.fillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b), 1);
+      g.fillRect(0, Math.floor(H * i / BANDE), W, Math.ceil(H / BANDE) + 1);
+    }
+    // Bolle di tessuto: grandi, molto smorzate. Deterministiche (stesso disegno a ogni apertura:
+    // se saltellassero a ogni ridisegno della scena si noterebbe, il negozio si ricarica spesso).
+    const h = (n) => { const x = Math.abs(Math.sin(n) * 43758.5453); return x - Math.floor(x); };
+    for (let i = 0; i < 16; i++) {
+      const x = h(i * 1.7) * W, y = h(i * 3.1 + 5) * H;
+      const r = 40 + h(i * 5.3) * 130;
+      g.fillStyle(U.fondo2, 0.30);
+      g.fillEllipse(x, y, r * 2.3, r * 1.5);
+    }
+    // Vignettatura: bordi piu' scuri, cosi' l'occhio va al centro dove stanno i pannelli.
+    for (let i = 0; i < 9; i++) {
+      g.fillStyle(0x000000, 0.055);
+      g.fillRect(0, 0, W, 12 + i * 9);
+      g.fillRect(0, H - (12 + i * 9), W, 12 + i * 9);
+      g.fillRect(0, 0, 12 + i * 9, H);
+      g.fillRect(W - (12 + i * 9), 0, 12 + i * 9, H);
+    }
+    return g;
+  },
+
+  // Pannello/riga: rettangolo arrotondato con filo di luce in alto (da' volume senza immagini).
+  // opts: { accento (colore del bordo), soft (piu' scuro, per le righe di elenco), depth }
+  panel(scene, x, y, w, h, opts) {
+    const U = this.UI;
+    const o = opts || {};
+    const r = Math.min(10, h / 3);
+    const g = scene.add.graphics().setDepth(o.depth === undefined ? 0 : o.depth);
+    g.fillStyle(o.soft ? U.pannello : U.pannelloIn, o.alpha === undefined ? 1 : o.alpha);
+    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, r);
+    g.lineStyle(2, o.accento === undefined ? U.bordo : o.accento, 0.9);
+    g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, r);
+    // filo di luce lungo il bordo alto
+    g.fillStyle(0xffffff, 0.07);
+    g.fillRoundedRect(x - w / 2 + 3, y - h / 2 + 2, w - 6, Math.min(10, h / 2), { tl: r, tr: r, bl: 0, br: 0 });
+    return g;
+  },
+
+  // Titolo di schermata: scritta ambra con una riga sottile sotto (stessa in tutte le schermate).
+  sceneTitle(scene, testo, y) {
+    const W = window.CONFIG.WIDTH, U = this.UI;
+    const t = scene.add.text(W / 2, y, testo, {
+      fontFamily: 'monospace', fontSize: '30px', color: '#ffd166',
+      stroke: '#1c0a12', strokeThickness: 6,
+    }).setOrigin(0.5);
+    const g = scene.add.graphics();
+    g.fillStyle(U.ambraScura, 0.75);
+    g.fillRect(W / 2 - t.width / 2 - 10, y + 20, t.width + 20, 2);
+    return t;
+  },
+
+  // Pulsante comune: pannello + scritta, con stati sopra/premuto. Ritorna { zona, label }.
+  uiButton(scene, x, y, testo, onTap, opts) {
+    const U = this.UI;
+    const o = opts || {};
+    const w = o.w || 190, h = o.h || 44;
+    const acc = o.accento === undefined ? U.ambra : o.accento;
+    const sfondo = scene.add.graphics();
+    const disegna = (dentro) => {
+      sfondo.clear();
+      sfondo.fillStyle(dentro ? U.ambra : U.pannelloIn, 1);
+      sfondo.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+      sfondo.lineStyle(2, acc, dentro ? 1 : 0.85);
+      sfondo.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+      if (!dentro) { sfondo.fillStyle(0xffffff, 0.06); sfondo.fillRoundedRect(x - w / 2 + 3, y - h / 2 + 2, w - 6, 9, { tl: 8, tr: 8, bl: 0, br: 0 }); }
+    };
+    disegna(false);
+    const label = scene.add.text(x, y, testo, {
+      fontFamily: 'monospace', fontSize: (o.size || 17) + 'px', color: U.testo, align: 'center',
+    }).setOrigin(0.5);
+    const zona = scene.add.rectangle(x, y, w, h, 0xffffff, 0).setInteractive({ useHandCursor: true });
+    zona.on('pointerover', () => { disegna(true); label.setColor('#1c0a12'); });
+    zona.on('pointerout', () => { disegna(false); label.setColor(U.testo); });
+    zona.on('pointerdown', () => { window.Sfx.pick(); onTap(); });
+    return { zona: zona, label: label, sfondo: sfondo };
+  },
+
   bgSetFor(level) {
     const sets = (window.BG_SETS && window.BG_SETS.length) ? window.BG_SETS : null;
     if (!sets) return null;

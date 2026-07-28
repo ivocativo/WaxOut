@@ -15,14 +15,8 @@ class TaraturaScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const T = window.I18n, TA = window.Taratura;
 
-    const g = this.add.graphics();
-    g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
-    g.fillStyle(0x000000, 0.55); g.fillRect(0, 0, W, H);
-
-    this.add.text(W / 2, 26, T.t('tar_title'), {
-      fontFamily: 'monospace', fontSize: '26px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 5,
-    }).setOrigin(0.5);
+    window.GameGfx.paintSceneBg(this);
+    window.GameGfx.sceneTitle(this, T.t('tar_title'), 26);
     this.add.text(W / 2, 50, T.t('tar_hint'), {
       fontFamily: 'monospace', fontSize: '11px', color: '#cdeccb',
     }).setOrigin(0.5);
@@ -58,11 +52,7 @@ class TaraturaScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '13px', color: '#9fe6a0',
     }).setOrigin(0.5);
 
-    const back = this.add.text(W / 2, H - 22, T.t('shop_back'), {
-      fontFamily: 'monospace', fontSize: '17px', color: '#14161f',
-      backgroundColor: '#ffd166', padding: { x: 18, y: 7 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerdown', () => this.esci());
+    window.GameGfx.uiButton(this, W / 2, H - 22, T.t('shop_back'), () => this.esci(), { w: 200, h: 34, size: 15 });
     this.input.keyboard.on('keydown-ESC', () => this.esci());
   }
 
@@ -70,7 +60,7 @@ class TaraturaScene extends Phaser.Scene {
   manopola(cx, cy, id) {
     const T = window.I18n, TA = window.Taratura;
     const w = 452;
-    this.add.rectangle(cx, cy, w, 38, 0x2b1d12, 1).setStrokeStyle(2, 0x6a5a3a);
+    window.GameGfx.panel(this, cx, cy, w, 38, { soft: true });
     this.add.text(cx - w / 2 + 12, cy, T.t('tar_' + id), {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffe2b0',
     }).setOrigin(0, 0.5);

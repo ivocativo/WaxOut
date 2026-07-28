@@ -58,11 +58,12 @@ class BootScene extends Phaser.Scene {
       aimg('bg' + s + '_mid', dir + 'bg' + s + '_mid.png');
       aimg('bg' + s + '_near', dir + 'bg' + s + '_near.png');
     });
-    // PROTUBERANZE (immagini AI vere, provvisorie ma in stile). Pavimento e soffitto.
-    aimg('prot_coral_stalk', 'assets/protuberances/prot_coral_stalk.png');   // colonna (pavimento)
-    aimg('prot_coral_branch', 'assets/protuberances/prot_coral_branch.png'); // rovi ramificati (pavimento)
-    aimg('prot_drip', 'assets/protuberances/prot_drip.png');                 // colata che gocciola (soffitto)
-    aimg('prot_web', 'assets/protuberances/prot_web.png');                   // fascia di muco (soffitto)
+    // PROTUBERANZE: NON piu' caricate (2026-07-27). Il disegno non ha mai convinto l'utente, che
+    // ha deciso di lasciarle ferme: sono gli sfondi a fare l'ambiente. Restavano caricate anche
+    // se spente — 1,8 MB nell'app piu' 2,3 MB di copia incorporata in assets_data.js, sprecati.
+    // I file sorgente restano in assets/protuberances/ per un'eventuale ripresa; per riaccenderle
+    // servono: queste righe, la voce in tools/embed_assets.ps1 e la chiamata a
+    // GameGfx.drawProtuberances in buildLevel.
     // CERUME (sprite AI): pezzi/chunk per il muro + gocce/colate. Ricolorati per tipo in gioco.
     ['wax_a', 'wax_b', 'wax_c', 'wax_d', 'wax_drip_a', 'wax_drip_b']
       .forEach((k) => aimg(k, 'assets/wax/' + k + '.png'));

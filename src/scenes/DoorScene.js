@@ -19,17 +19,10 @@ class DoorScene extends Phaser.Scene {
     // motivo di UpgradeScene: altrimenti dal 2o livello in poi i click verrebbero ignorati).
     this._chosen = false;
 
-    const g = this.add.graphics();
-    g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
-    g.fillStyle(0x000000, 0.35); g.fillRect(0, 0, W, H);
-
-    this.add.text(W / 2, 60, T.t('door_title'), {
-      fontFamily: 'monospace', fontSize: '40px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 7,
-    }).setOrigin(0.5);
-    this.add.text(W / 2, 106, T.t('door_hint'), {
-      fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
-      stroke: '#14161f', strokeThickness: 3,
+    window.GameGfx.paintSceneBg(this);
+    window.GameGfx.sceneTitle(this, T.t('door_title'), 56);
+    this.add.text(W / 2, 100, T.t('door_hint'), {
+      fontFamily: 'monospace', fontSize: '15px', color: '#c9a6b2',
     }).setOrigin(0.5);
 
     // Due porte CONTRAPPOSTE. 'bonanza' e' escluso apposta dal pool dei mutatori della porta

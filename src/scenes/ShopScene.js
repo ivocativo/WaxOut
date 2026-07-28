@@ -9,34 +9,28 @@ class ShopScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const T = window.I18n;
 
-    // Sfondo
-    const g = this.add.graphics();
-    g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
-    g.fillStyle(0x000000, 0.4); g.fillRect(0, 0, W, H);
-
-    this.add.text(W / 2, 36, T.t('shop_title'), {
-      fontFamily: 'monospace', fontSize: '34px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 6,
-    }).setOrigin(0.5);
+    // Sfondo e titolo comuni a tutte le schermate di contorno (GameGfx.paintSceneBg/sceneTitle):
+    // prima era un rettangolo marrone piatto della vecchia palette.
+    window.GameGfx.paintSceneBg(this);
+    window.GameGfx.sceneTitle(this, T.t('shop_title'), 34);
 
     this.bankText = this.add.text(W / 2, 72, '', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
-      stroke: '#14161f', strokeThickness: 4,
+      fontFamily: 'monospace', fontSize: '17px', color: '#ffe2b0',
     }).setOrigin(0.5);
 
     // Due colonne
     const colW = 440;
     const leftX = W / 2 - 232, rightX = W / 2 + 232;
 
-    // Intestazioni di colonna
-    this.add.text(leftX, 106, T.t('shop_stats_title'), {
-      fontFamily: 'monospace', fontSize: '20px', color: '#ffe2b0', stroke: '#14161f', strokeThickness: 4,
+    // Intestazioni di colonna: etichette piccole e spaziate, non titoli grossi — il titolo della
+    // schermata e' uno solo, queste sono divisioni interne.
+    const intestazione = (x, y, testo, colore) => this.add.text(x, y, testo, {
+      fontFamily: 'monospace', fontSize: '13px', color: colore,
     }).setOrigin(0.5);
-    this.add.text(rightX, 106, T.t('shop_bp_title'), {
-      fontFamily: 'monospace', fontSize: '20px', color: '#9fe6a0', stroke: '#14161f', strokeThickness: 4,
-    }).setOrigin(0.5);
-    this.add.text(rightX, 126, T.t('shop_bp_hint'), {
-      fontFamily: 'monospace', fontSize: '12px', color: '#cdeccb',
+    intestazione(leftX, 108, T.t('shop_stats_title'), '#ffd166');
+    intestazione(rightX, 108, T.t('shop_bp_title'), '#9fe6a0');
+    this.add.text(rightX, 127, T.t('shop_bp_hint'), {
+      fontFamily: 'monospace', fontSize: '11px', color: '#c9a6b2',
     }).setOrigin(0.5);
 
     const startY = 168, rowH = 72;
@@ -67,7 +61,7 @@ class ShopScene extends Phaser.Scene {
     // sinistra (solo 4) per starci tutte senza scorrimento, che qui non esiste.
     const bpIds = ['magnet', 'blast', 'splash', 'companion', 'backshot', 'rage', 'stunshot', 'slam'];
     const BP = window.BLUEPRINTS;
-    const bpStartY = 152, bpRowH = 44;
+    const bpStartY = 160, bpRowH = 44;   // 160 e non 152: sotto la riga di spiegazione, senza toccarla
     bpIds.forEach((id, i) => {
       const item = BP[id];
       const owned = window.Meta.unlockLevel(id) > 0;
@@ -85,13 +79,7 @@ class ShopScene extends Phaser.Scene {
     });
 
     // Pulsante indietro
-    const back = this.add.text(W / 2, H - 30, T.t('shop_back'), {
-      fontFamily: 'monospace', fontSize: '20px', color: '#14161f',
-      backgroundColor: '#ffd166', padding: { x: 20, y: 9 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerover', () => back.setStyle({ backgroundColor: '#ffe199' }));
-    back.on('pointerout', () => back.setStyle({ backgroundColor: '#ffd166' }));
-    back.on('pointerdown', () => this.toMenu());
+    window.GameGfx.uiButton(this, W / 2, H - 28, T.t('shop_back'), () => this.toMenu(), { w: 210, h: 40 });
 
     // Pulsante AZZERA PROGRESSI (in basso a destra) con conferma a DUE tocchi, cosi' non si
     // cancella per sbaglio: 1o tocco arma ("Sicuro?"), 2o tocco entro 3s azzera davvero.
@@ -130,19 +118,26 @@ class ShopScene extends Phaser.Scene {
   // panelH/nameSize/subSize opzionali (default = colonna POTENZIAMENTI): la colonna PROGETTI,
   // che ha piu' voci, passa valori piu' compatti per starci senza scorrimento.
   makeRow(x, y, w, o) {
-    const T = window.I18n;
+    const T = window.I18n, U = window.GameGfx.UI;
     const panelW = w - 16, panelH = o.panelH || 58;
     const nameSize = o.nameSize || 18, subSize = o.subSize || 12;
     const lineGap = Math.min(13, panelH * 0.22);
-    this.add.rectangle(x, y, panelW, panelH, 0x2b1d12, 1).setStrokeStyle(3, o.accent === '#9fe6a0' ? 0x6fbf6f : 0xffd166);
+    const verde = o.accent === '#9fe6a0';
+    // Riga GIA' PRESA = spenta e senza bordo acceso: si distingue a colpo d'occhio da quelle
+    // ancora da comprare, che e' l'unica cosa che si cerca scorrendo l'elenco.
+    window.GameGfx.panel(this, x, y, panelW, panelH, {
+      soft: true,
+      accento: o.done ? U.bordo : (verde ? 0x6fbf6f : U.ambraScura),
+    });
 
     const textX = x - panelW / 2 + 14;
     this.add.text(textX, y - lineGap, o.name, {
-      fontFamily: 'monospace', fontSize: nameSize + 'px', color: o.accent || '#ffe2b0',
+      fontFamily: 'monospace', fontSize: nameSize + 'px',
+      color: o.done ? '#a58b96' : (o.accent || '#ffe2b0'),
       wordWrap: { width: panelW - 130 },
     }).setOrigin(0, 0.5);
     this.add.text(textX, y + lineGap, o.sub, {
-      fontFamily: 'monospace', fontSize: subSize + 'px', color: '#fff7e8',
+      fontFamily: 'monospace', fontSize: subSize + 'px', color: o.done ? '#8d7280' : U.testo,
       wordWrap: { width: panelW - 130 },
     }).setOrigin(0, 0.5);
 
@@ -150,9 +145,9 @@ class ShopScene extends Phaser.Scene {
     const bx = x + panelW / 2 - 62;
     const enough = window.Meta.get().bank >= o.cost;
     let label, bg, fg, clickable = false;
-    if (o.done) { label = o.doneLabel; bg = '#5a4a2a'; fg = '#cabfa0'; }
-    else if (enough) { label = o.buyLabel; bg = '#ffd166'; fg = '#14161f'; clickable = true; }
-    else { label = T.t('shop_need', { cost: o.cost }); bg = '#6a3030'; fg = '#ffd9d9'; }
+    if (o.done) { label = o.doneLabel; bg = '#3a2430'; fg = '#a58b96'; }
+    else if (enough) { label = o.buyLabel; bg = '#ffd166'; fg = '#1c0a12'; clickable = true; }
+    else { label = T.t('shop_need', { cost: o.cost }); bg = '#4a1f2a'; fg = '#d9a3b0'; }
 
     const btn = this.add.text(bx, y, label, {
       fontFamily: 'monospace', fontSize: (o.panelH ? 11 : 14) + 'px', color: fg, align: 'center',

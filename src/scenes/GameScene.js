@@ -368,8 +368,12 @@ class GameScene extends Phaser.Scene {
       spawnDelay = Math.max(2000, 3200 - lvl * 120);
       this.spawnEnemy('boss');
       this.spawnEnemy();
-      this.showBanner(window.I18n.t(this.isFinale ? 'game_boss_finale_in' : 'game_boss_in'),
-        this.isFinale ? '#ff5252' : '#ffb04a');
+      // Un banner per ogni boss: e' il primo segnale che questo non e' quello di prima.
+      const chiave = this.isFinale ? 'game_boss_finale_in' : (lvl >= 10 ? 'game_boss_regina_in' : 'game_boss_in');
+      const colore = this.isFinale ? '#ff5252' : (lvl >= 10 ? '#8fd0ff' : '#ffb04a');
+      // Il banner della Regina e' su DUE righe (nome + come si batte): piu' in basso, o la
+      // seconda riga finirebbe sotto la barra della vita del boss.
+      this.showBanner(window.I18n.t(chiave), colore, (!this.isFinale && lvl >= 10) ? 140 : undefined);
     } else if (this.levelKind === 'swarm') {
       // Densita' ridotta (giro difficolta' 2026-07-25): l'utente trovava "impossibile fuggire".
       this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.7), 7);
@@ -912,9 +916,29 @@ class GameScene extends Phaser.Scene {
     e.contactDamage = 0;                          // e' preda, non minaccia: non fa danno da contatto
     e.speed = Math.round(e.speed * 1.7);
     e.waxValue = Math.round(45 + lvl * 4);
-    e.setTint(0xffd700);                          // firma visiva: dorato
+    // FIRMA VISIVA. Il vecchio oro (0xffd700) non si distingueva piu': da quando i nemici sono
+    // immagini vere, il cerumino e' GIA' ambra-dorato e una tinta dorata su ambra non cambia
+    // niente (segnalato dall'utente 2026-07-27). Ora e' oro QUASI BIANCO — cioe' molto piu'
+    // luminoso di qualunque altra cosa a schermo — e soprattutto lascia una SCIA di scintille:
+    // il movimento e' la cosa che si nota davvero con la coda dell'occhio.
+    e.setTint(0xfff0a8);
     this.fugitiveEscapeAt = this.time.now + 14000; // tempo limite per catturarlo
     this.showBanner(window.I18n.t('event_goldfugitive_in'), '#ffd700');
+  }
+
+  // Scintilla della scia del Fuggitivo: puntino dorato che resta indietro e svanisce.
+  fugitiveSparkle(e) {
+    const s = this.add.circle(
+      e.x + Phaser.Math.Between(-10, 10),
+      e.y + Phaser.Math.Between(-12, 10),
+      Phaser.Math.Between(2, 4), 0xffe98a, 0.95,
+    ).setDepth(7);
+    this.tweens.add({
+      targets: s, alpha: 0, scale: 0.2,
+      x: s.x - Phaser.Math.Between(14, 30), y: s.y - Phaser.Math.Between(2, 14),
+      duration: Phaser.Math.Between(320, 520), ease: 'Quad.out',
+      onComplete: () => s.destroy(),
+    });
   }
 
   // IA del Fuggitivo Dorato: ignora del tutto il giocatore, corre sempre verso il timpano.
@@ -927,6 +951,11 @@ class GameScene extends Phaser.Scene {
     }
     e.setVelocityX(e.speed);
     e.setFlipX(false);
+    // Scia di scintille: e' quello che lo fa notare mentre scappa, molto piu' della tinta.
+    if (now >= (e._scintillaAt || 0)) {
+      e._scintillaAt = now + 70;
+      this.fugitiveSparkle(e);
+    }
   }
 
   // MUTATORE "Terremoto" (`this.mutQuake`), RIDISEGNATO nel round 2 (E.1): il cerume PENDE
@@ -1485,6 +1514,18 @@ class GameScene extends Phaser.Scene {
       cfg = { tex: 'enemy_spit', hp: 45 + lvl * 5, speed: 28, dmg: 12 + lvl, wax: 9, bit: 'bit_dirt', body: [26, 24], spit: true, projDmg: 9 + lvl * 2, spitEvery: 2200 };
     } else if (kind === 'boss') {
       cfg = { tex: 'enemy_boss', hp: 420 + lvl * 40, speed: 34, dmg: 20 + lvl * 2, wax: 60 + lvl * 6, bit: 'bit_hard', body: [60, 54], spit: true, projDmg: 12 + lvl * 2, spitEvery: 1500, boss: true };
+      // UN BOSS DIVERSO PER OGNI TRATTO DI 5 LIVELLI (richiesta dell'utente 2026-07-27). Prima
+      // era sempre lo stesso Tappo con piu' vita: dal secondo incontro in poi non c'era piu'
+      // niente da imparare. Ora ognuno chiede una cosa diversa al giocatore.
+      cfg.bossKind = (lvl >= window.CONFIG.RUN_LEVELS) ? 'gran' : (lvl >= 10 ? 'regina' : 'tappo');
+      if (cfg.bossKind === 'regina') {
+        // REGINA DELLE CROSTE: corazzata contro il GETTO, va affrontata da vicino. Non salta:
+        // CARICA in orizzontale. Piu' veloce e meno grossa, cosi' la carica si legge come tale.
+        cfg.hp = Math.round(cfg.hp * 0.85);      // meno vita: il corpo a corpo fa meno danno al secondo
+        cfg.speed = 46;
+        cfg.spitEvery = 2100;
+        cfg.bossArmor = true;
+      }
       if (this.isFinale) { cfg.hp = Math.round(cfg.hp * 1.7); cfg.wax = Math.round(cfg.wax * 1.5); }   // A.2: il GRAN TAPPO
     } else if (kind === 'flea') {
       // Pulce: piccola, debole, salta di CONTINUO verso il giocatore (non un singolo affondo
@@ -1549,8 +1590,11 @@ class GameScene extends Phaser.Scene {
     // del calcolo scala/posizione; l'aura e i comportamenti di morte si agganciano dopo (sotto).
     // I volanti restano fuori dallo SPLIT (la comparsa "sul posto" dei figli non si presta al
     // calo dal soffitto).
+    // Dal livello 6 e non piu' dal 3 (richiesta dell'utente 2026-07-27): i nemici potenziati
+    // entrano in scena nel SECONDO tratto della run, dopo il primo boss. Il primo tratto resta
+    // pulito e serve a imparare i nemici base.
     let elite = null;
-    if (!cfg.boss && !opts.splitChild && !opts.fugitive && !opts.swarmling && lvl >= 3 &&
+    if (!cfg.boss && !opts.splitChild && !opts.fugitive && !opts.swarmling && lvl >= 6 &&
         Math.random() < Phaser.Math.Clamp(0.08 + lvl * 0.02, 0, 0.34)) {
       const pool = (kind === 'fly') ? ['tank', 'boom'] : ['tank', 'boom', 'split'];
       elite = Phaser.Utils.Array.GetRandom(pool);
@@ -1643,17 +1687,23 @@ class GameScene extends Phaser.Scene {
       e.slamReadyAt = this.time.now + Phaser.Math.Between(2500, 4000);   // niente slam nei primissimi istanti
       e.slamShadow = null;                                      // ombra a terra durante il balzo (round 2, D.1)
       e.finale = !!this.isFinale;                               // A.2: il GRAN TAPPO ha una terza fase (vedi bossAI)
+      e.bossKind = cfg.bossKind || 'tappo';
+      e._dannoBase = cfg.dmg;                                   // la carica lo alza e poi lo rimette
+      e.bossArmor = !!cfg.bossArmor;                            // corazzata contro il getto (Regina)
+      if (e.bossArmor) { e.eliteTint = 0xa8c8dd; e.setTint(e.eliteTint); }   // guscio freddo, si legge da lontano
       e.once('destroy', () => { if (e.slamShadow) { e.slamShadow.destroy(); e.slamShadow = null; } });
     }
 
-    // ELITE: aura colorata dietro il nemico (segnale visivo, niente tint per non confliggere
-    // coi lampi dei colpi). L'aura viene sincronizzata in update() e distrutta con il nemico.
+    // ELITE: il nemico CAMBIA COLORE. Prima era un cerchio colorato dietro di lui — un ripiego di
+    // quando tutti i nemici erano identici, e a schermo sembrava un'interfaccia appiccicata sopra
+    // al gioco (tolto su richiesta dell'utente, 2026-07-27). La tinta si moltiplica sull'immagine,
+    // quindi la creatura resta riconoscibile ma vira: il Corazzato diventa freddo e metallico,
+    // l'Esplosivo rosso acceso, quello che si sdoppia violaceo.
+    // ⚠️ La tinta va anche RIMESSA dopo ogni lampo da colpo: vedi restoreTint in damageEnemy.
     if (elite) {
       e.elite = elite;
-      const col = { tank: 0x8fd0ff, boom: 0xff6b3d, split: 0x9b7bff }[elite];
-      const auraR = Math.max(cfg.body[0], cfg.body[1]) * (cfg.scale || 1) * 0.7;
-      e.eliteAura = this.add.circle(e.x, e.y, auraR, col, 0.16).setDepth(7).setStrokeStyle(2.5, col, 0.85);
-      e.once('destroy', () => { if (e.eliteAura) { e.eliteAura.destroy(); e.eliteAura = null; } });
+      e.eliteTint = window.GameScene.ELITE_TINT[elite];
+      e.setTint(e.eliteTint);
     }
 
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
@@ -2342,14 +2392,21 @@ class GameScene extends Phaser.Scene {
     // CROSTA = corazzata anti-getto: il GETTO (non heavy) la scalfisce appena e rimbalza
     // con un "clang"; solo il CORPO A CORPO (heavy) la abbatte come si deve. Il CORROSIVO (dot)
     // ignora l'armatura (il sapone la mangia) e non fa rinculo/pop (e' un danno "silenzioso").
-    const armored = (e.kind === 'crust' && !heavy && !dot);
-    if (armored) dmg = Math.max(2, Math.round(dmg * 0.3));   // il getto la scalfisce: poco ma visibile
+    // Corazzati contro il GETTO: la crosta e la Regina delle Croste (boss del 2o tratto). Il
+    // corpo a corpo fa danno pieno: e' il modo in cui il gioco insegna a cambiare arma.
+    const armored = ((e.kind === 'crust' || e.bossArmor) && !heavy && !dot);
+    if (armored) dmg = Math.max(2, Math.round(dmg * (e.bossArmor ? 0.35 : 0.3)));   // lo scalfisce: poco ma visibile
     e.hp -= dmg;
 
-    // Il FUGGITIVO DORATO ha una tinta permanente (firma visiva): il lampo del colpo la
-    // sovrascrive, va ripristinata quando il lampo finisce, altrimenti tornerebbe del
-    // colore normale per il resto dell'inseguimento.
-    const restoreTint = () => { if (e.active) { e.clearTint(); if (e.fugitive) e.setTint(0xffd700); } };
+    // Fuggitivo Dorato ed ELITE hanno una tinta permanente (e' la loro firma visiva): il lampo
+    // del colpo la sovrascrive, va rimessa quando il lampo finisce, altrimenti resterebbero del
+    // colore normale per il resto della vita. Il fuggitivo ha la precedenza (e' un evento).
+    const restoreTint = () => {
+      if (!e.active) return;
+      e.clearTint();
+      if (e.fugitive) e.setTint(0xfff0a8);
+      else if (e.eliteTint) e.setTint(e.eliteTint);
+    };
     if (dot) {
       e.setTintFill(0x9be86b);   // lampo verde = corrosione
       this.time.delayedCall(70, restoreTint);
@@ -2563,6 +2620,41 @@ class GameScene extends Phaser.Scene {
   bossAI(e, now) {
     const dir = Math.sign(this.player.x - e.x) || 1;
 
+    // --- REGINA DELLE CROSTE (boss del 2o tratto): non salta, CARICA in orizzontale. Il balzo
+    // e' la firma del Tappo; dare alla Regina lo stesso attacco avrebbe reso i due boss la
+    // stessa cosa con un colore diverso. La carica si schiva saltandola, non scappando.
+    if (e.bossAtk === 'caricawind') {
+      e.setVelocityX(0);
+      e.setTint((Math.floor(now / 80) % 2) ? 0xff6b5a : (e.eliteTint || 0xffffff));
+      if (now >= e.caricaWindupUntil) {
+        if (e.eliteTint) e.setTint(e.eliteTint); else e.clearTint();
+        e.bossAtk = 'carica';
+        e.caricaDir = dir;
+        e.caricaFineAt = now + 1100;
+        e.contactDamage = Math.round(e._dannoBase * 1.6);   // travolge: fa piu' male del contatto normale
+        window.Sfx.emerge && window.Sfx.emerge(true);
+      }
+      return;
+    }
+    if (e.bossAtk === 'carica') {
+      e.setVelocityX(e.caricaDir * e.speed * 4.2);
+      e.setFlipX(e.caricaDir < 0);
+      // polvere sotto: fa capire che sta arrivando lanciata
+      if (now >= (e._polvereAt || 0)) {
+        e._polvereAt = now + 60;
+        this.groundPuff(e.x - e.caricaDir * 30, this.terrainTopAt(e.x));
+      }
+      const alMuro = e.body.blocked.left || e.body.blocked.right;
+      if (now >= e.caricaFineAt || alMuro) {
+        e.bossAtk = null;
+        e.setVelocityX(0);
+        e.contactDamage = e._dannoBase;
+        if (alMuro) { this.cameras.main.shake(220, 0.012); this.bossSlamFx(e, e.x, e.y); }
+        e.slamReadyAt = now + (e._enraged ? 2200 : 3400);
+      }
+      return;
+    }
+
     // Balzo+schiacciata IN CORSO: fermo/immobile durante il telegrafo, poi balza verso il
     // giocatore; niente avanzata "normale" ne' sputo finche' non e' finito (gate e.bossAtk).
     if (e.bossAtk === 'slamwind') {
@@ -2662,6 +2754,14 @@ class GameScene extends Phaser.Scene {
     // poter agganciare lo slam anche quando il giocatore lo tiene a distanza col getto.
     if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
         e._grounded) {
+      if (e.bossKind === 'regina') {
+        // La Regina carica invece di saltare: telegrafo piu' corto ma la corsa e' lunga, si
+        // schiva col salto. Raggio piu' largo (arriva da lontano).
+        e.bossAtk = 'caricawind';
+        e.caricaWindupUntil = now + 520;
+        e.setVelocityX(0);
+        return;
+      }
       e.bossAtk = 'slamwind';
       e.slamWindupUntil = now + 600;   // telegrafo lungo: e' pesante, si vede arrivare
       e.setVelocityX(0);
@@ -2674,9 +2774,10 @@ class GameScene extends Phaser.Scene {
     // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
     if (now >= (e.nextSpit || 0)) {
       if (!e.spitWindupAt) e.spitWindupAt = now;
-      e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : 0xffffff);
+      e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
       if (now - e.spitWindupAt >= 320) {
-        e.clearTint(); e.spitWindupAt = 0;
+        if (e.eliteTint) e.setTint(e.eliteTint); else e.clearTint();
+        e.spitWindupAt = 0;
         if (e._collapse) { this.spitAt(e, -240); this.spitAt(e, -120); this.spitAt(e, 0); this.spitAt(e, 120); this.spitAt(e, 240); }  // 5 vie (finale)
         else if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
         else this.spitAt(e, 0);
@@ -2686,7 +2787,9 @@ class GameScene extends Phaser.Scene {
 
     // In furia: evoca uno sgherro ogni tanto (se non ce ne sono già troppi).
     if (enraged && now >= (e._summonAt || Number.MAX_SAFE_INTEGER)) {
-      if (this.enemies.countActive(true) < 4) this.spawnEnemy('blob');
+      // La Regina chiama CROSTE (corazzate come lei): coerente con chi e', e costringe a tenere
+      // la mazza in mano anche sugli sgherri invece di ripulirli col getto da lontano.
+      if (this.enemies.countActive(true) < 4) this.spawnEnemy(e.bossKind === 'regina' ? 'crust' : 'blob');
       e._summonAt = now + 5000;
     }
   }
@@ -3000,10 +3103,11 @@ class GameScene extends Phaser.Scene {
     const meta = window.Meta.bankRun(earned, lvl);
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(50).setScrollFactor(0);
+    this.add.rectangle(W / 2, H / 2, W, H, 0x1c0a12, 0.78).setDepth(50).setScrollFactor(0);
+    window.GameGfx.panel(this, W / 2, H / 2 + 10, 620, 260, { accento: 0xb3374f, depth: 50 });
     this.add.text(W / 2, H / 2 - 56, window.I18n.t('over_title'), {
-      fontFamily: 'monospace', fontSize: '30px', color: '#e74c3c',
-      stroke: '#14161f', strokeThickness: 6,
+      fontFamily: 'monospace', fontSize: '30px', color: '#ff8a8a',
+      stroke: '#1c0a12', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
     this.add.text(W / 2, H / 2 - 14, window.I18n.t('over_level', { n: lvl }), {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
@@ -3016,15 +3120,11 @@ class GameScene extends Phaser.Scene {
 
     // Pulsanti toccabili (indispensabili su telefono/tablet)
     const mkButton = (x, label, onTap) => {
-      const t = this.add.text(x, H / 2 + 80, label, {
-        fontFamily: 'monospace', fontSize: '18px', color: '#14161f',
-        backgroundColor: '#ffd166', padding: { x: 16, y: 10 }, align: 'center',
-      }).setOrigin(0.5).setDepth(52).setScrollFactor(0)
-        .setInteractive({ useHandCursor: true });
-      t.on('pointerover', () => t.setStyle({ backgroundColor: '#ffe199' }));
-      t.on('pointerout', () => t.setStyle({ backgroundColor: '#ffd166' }));
-      t.on('pointerdown', onTap);
-      return t;
+      const b = window.GameGfx.uiButton(this, x, H / 2 + 80, label, onTap, { w: 170, h: 42 });
+      b.sfondo.setDepth(51).setScrollFactor(0);
+      b.label.setDepth(52).setScrollFactor(0);
+      b.zona.setDepth(53).setScrollFactor(0);
+      return b;
     };
     mkButton(W / 2 - 175, window.I18n.t('over_newrun'), () => { window.GameState.reset(); this.scene.start('GameScene'); });
     mkButton(W / 2, window.I18n.t('over_shop'), () => { window.GameState.reset(); this.scene.start('ShopScene'); });
@@ -3432,7 +3532,6 @@ class GameScene extends Phaser.Scene {
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
-      if (e.eliteAura) { e.eliteAura.x = e.x; e.eliteAura.y = e.y; }   // l'aura élite segue il nemico
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
 
       // TERRENO (round 4): i nemici A TERRA camminano sul profilo `terrainTopAt` come il PG
@@ -3549,4 +3648,8 @@ class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 }
+// Tinte delle varianti ELITE. Fuori dalla classe cosi' le leggono anche i controlli automatici.
+// Scelte per MOLTIPLICAZIONE sull'arte ambra dei nemici: il blu-acciaio la raffredda (corazza),
+// il rosso la accende (esplosivo), il viola la sposta di tono senza spegnerla (si sdoppia).
+GameScene.ELITE_TINT = { tank: 0x9fc7e8, boom: 0xff7a4a, split: 0xb79bff };
 window.GameScene = GameScene;

@@ -41,12 +41,28 @@ jobs:
 
       # Raccoglie SOLO i file web del gioco nella cartella "www" (quella che Capacitor
       # impacchetta), senza trascinarsi dietro node_modules, i .md, gli strumenti, ecc.
+      # ⚠️ ELENCO ESPLICITO, non "copia tutta assets/". Prima si faceva `cp -r assets www/` e
+      # finivano nell'APK anche le IMMAGINI SORGENTE degli sfondi (35 MB!), i fotogrammi grezzi
+      # dell'accovacciamento e le protuberanze spente: 23 MB di app di cui ~14 di materiale di
+      # lavorazione. Un elenco esplicito e' anche piu' sicuro di una lista di esclusioni: se un
+      # file che serve manca, `cp` fallisce e la compilazione si ferma, invece di sfornare
+      # un'app rotta in silenzio.
+      # ⚠️ QUANDO SI AGGIUNGE UN SET DI SFONDO (window.BG_SETS in BootScene) VA AGGIUNTO ANCHE QUI.
       - name: Assembla la cartella web (www)
         run: |
           rm -rf www
-          mkdir -p www
+          mkdir -p www/assets/backgrounds/2 www/assets/spritesheets/hero www/assets/spritesheets/enemies
           cp index.html www/
-          cp -r vendor src assets www/
+          cp -r vendor src www/
+          # assets/wax e bg_flesh_01_px NON si copiano: sono gia' INCORPORATI come data URI in
+          # src/assets_data.js (serve per far girare il gioco col doppio clic) e BootScene usa
+          # sempre la copia incorporata quando c'e' — i file su disco sarebbero peso doppio.
+          cp -r assets/sprites www/assets/
+          cp assets/backgrounds/2/bg2_far.jpg assets/backgrounds/2/bg2_mid.png assets/backgrounds/2/bg2_near.png www/assets/backgrounds/2/
+          cp assets/spritesheets/hero/*_px.png www/assets/spritesheets/hero/
+          cp assets/spritesheets/enemies/*.png www/assets/spritesheets/enemies/
+          echo "--- peso della cartella www ---"
+          du -sh www www/src www/assets/* | sort -h
 
       - name: Crea il progetto Android
         run: npx cap add android

@@ -10,20 +10,12 @@ class UpgradeScene extends Phaser.Scene {
     // altrimenti dal 2o potenziamento in poi i click verrebbero ignorati.
     this._chosen = false;
 
-    // sfondo
-    const g = this.add.graphics();
-    g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
-    g.fillStyle(0x000000, 0.35); g.fillRect(0, 0, W, H);
-
+    // sfondo e titolo comuni alle schermate di contorno (vedi GameGfx.paintSceneBg)
     const T = window.I18n;
-
-    this.add.text(W / 2, 60, T.t('up_title'), {
-      fontFamily: 'monospace', fontSize: '44px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 7,
-    }).setOrigin(0.5);
-    this.add.text(W / 2, 108, T.t('up_hint'), {
-      fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
-      stroke: '#14161f', strokeThickness: 3,
+    window.GameGfx.paintSceneBg(this);
+    window.GameGfx.sceneTitle(this, T.t('up_title'), 58);
+    this.add.text(W / 2, 100, T.t('up_hint'), {
+      fontFamily: 'monospace', fontSize: '15px', color: '#c9a6b2',
     }).setOrigin(0.5);
 
     // Pool di potenziamenti. Nome/descrizione vengono dal dizionario (up_<id>_name
@@ -146,8 +138,21 @@ class UpgradeScene extends Phaser.Scene {
       const borderColor = u.evo ? 0xff9ff3 : style.border;
       const titleColor = u.evo ? '#ffd6ff' : style.title;
 
-      const card = this.add.rectangle(cx, cy, cardW, cardH, baseFill, 1)
-        .setStrokeStyle(4, borderColor).setInteractive({ useHandCursor: true });
+      // La carta e' un pannello ridisegnabile (serve per lo stato "sopra"): stesso linguaggio
+      // delle altre schermate, ma il colore lo detta la RARITA' — e' l'informazione principale.
+      const sfondo = this.add.graphics();
+      const disegnaCarta = (dentro) => {
+        sfondo.clear();
+        sfondo.fillStyle(dentro ? hoverFill : baseFill, 1);
+        sfondo.fillRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 12);
+        sfondo.lineStyle(3, borderColor, dentro ? 1 : 0.85);
+        sfondo.strokeRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 12);
+        sfondo.fillStyle(0xffffff, dentro ? 0.10 : 0.06);
+        sfondo.fillRoundedRect(cx - cardW / 2 + 4, cy - cardH / 2 + 3, cardW - 8, 14, { tl: 12, tr: 12, bl: 0, br: 0 });
+      };
+      disegnaCarta(false);
+      const card = this.add.rectangle(cx, cy, cardW, cardH, 0xffffff, 0)
+        .setInteractive({ useHandCursor: true });
 
       this.add.text(cx, cy - 55, (i + 1) + '. ' + T.t('up_' + u.id + '_name'), {
         fontFamily: 'monospace', fontSize: '20px', color: titleColor,
@@ -167,8 +172,8 @@ class UpgradeScene extends Phaser.Scene {
         }).setOrigin(0.5);
       }
 
-      card.on('pointerover', () => card.setFillStyle(hoverFill, 1));
-      card.on('pointerout', () => card.setFillStyle(baseFill, 1));
+      card.on('pointerover', () => disegnaCarta(true));
+      card.on('pointerout', () => disegnaCarta(false));
       card.on('pointerdown', () => this.choose(u));
     });
 

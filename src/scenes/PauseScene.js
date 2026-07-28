@@ -10,7 +10,10 @@ class PauseScene extends Phaser.Scene {
 
     // Velo scuro sopra il gioco congelato (non troppo: altrimenti il pavimento,
     // color sabbia, si confonde con le pareti e sembra sparito).
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setScrollFactor(0);
+    // Velo + pannello centrale: la pausa sta SOPRA il gioco, quindi non usa il fondo pieno
+    // delle altre schermate — ma il pannello e i pulsanti sono gli stessi (GameGfx).
+    this.add.rectangle(W / 2, H / 2, W, H, 0x1c0a12, 0.72).setScrollFactor(0);
+    window.GameGfx.panel(this, W / 2, H / 2 + 4, 360, 400, { accento: window.GameGfx.UI.ambraScura });
 
     const T = window.I18n;
 
@@ -24,9 +27,9 @@ class PauseScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    this.mkButton(W / 2, H / 2 - 18, T.t('pause_resume'), () => this.resumeGame());
-    this.mkButton(W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel());
-    this.mkButton(W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu());
+    window.GameGfx.uiButton(this, W / 2, H / 2 - 18, T.t('pause_resume'), () => this.resumeGame(), { w: 250, h: 46, size: 18 });
+    window.GameGfx.uiButton(this, W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel(), { w: 250, h: 46, size: 18 });
+    window.GameGfx.uiButton(this, W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu(), { w: 250, h: 46, size: 18 });
 
     // PANNELLO DI PROVA (⚠️ da togliere prima di pubblicare, vedi src/taratura.js). Qui e non
     // solo nel menu perche' i numeri si giudicano mentre si gioca: la pausa DORME sotto e la

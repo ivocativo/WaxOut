@@ -13,14 +13,8 @@ class ArmiScene extends Phaser.Scene {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const T = window.I18n;
 
-    const g = this.add.graphics();
-    g.fillStyle(C.bgBottom, 1); g.fillRect(0, 0, W, H);
-    g.fillStyle(0x000000, 0.4); g.fillRect(0, 0, W, H);
-
-    this.add.text(W / 2, 34, T.t('armi_title'), {
-      fontFamily: 'monospace', fontSize: '32px', color: '#ffd166',
-      stroke: '#14161f', strokeThickness: 6,
-    }).setOrigin(0.5);
+    window.GameGfx.paintSceneBg(this);
+    window.GameGfx.sceneTitle(this, T.t('armi_title'), 32);
     this.add.text(W / 2, 66, T.t('armi_hint'), {
       fontFamily: 'monospace', fontSize: '13px', color: '#cdeccb',
     }).setOrigin(0.5);
@@ -33,13 +27,7 @@ class ArmiScene extends Phaser.Scene {
     const startY = 132, rowH = 78;
     window.ARMI.forEach((a, i) => this.riga(W / 2, startY + i * rowH, a, a.id === inUso));
 
-    const back = this.add.text(W / 2, H - 26, T.t('shop_back'), {
-      fontFamily: 'monospace', fontSize: '19px', color: '#14161f',
-      backgroundColor: '#ffd166', padding: { x: 20, y: 8 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerover', () => back.setStyle({ backgroundColor: '#ffe199' }));
-    back.on('pointerout', () => back.setStyle({ backgroundColor: '#ffd166' }));
-    back.on('pointerdown', () => this.toMenu());
+    window.GameGfx.uiButton(this, W / 2, H - 26, T.t('shop_back'), () => this.toMenu(), { w: 210, h: 38 });
     this.input.keyboard.on('keydown-ESC', () => this.toMenu());
 
     this.refreshBank();
@@ -50,8 +38,8 @@ class ArmiScene extends Phaser.Scene {
     const T = window.I18n;
     const w = 800, h = 68;
     const posseduta = window.Meta.armaPosseduta(arma.id);
-    const bordo = inUso ? 0x9fe6a0 : (posseduta ? 0xffd166 : 0x6a5a3a);
-    this.add.rectangle(cx, cy, w, h, 0x2b1d12, 1).setStrokeStyle(3, bordo);
+    const bordo = inUso ? 0x9fe6a0 : (posseduta ? window.GameGfx.UI.ambraScura : window.GameGfx.UI.bordo);
+    window.GameGfx.panel(this, cx, cy, w, h, { soft: !inUso, accento: bordo });
 
     // Anteprima: la texture del corpo a corpo del kit (l'arte definitiva arrivera' dopo, oggi
     // sono ancora le vecchie texture disegnate a codice).
