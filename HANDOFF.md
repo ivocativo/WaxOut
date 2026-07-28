@@ -507,7 +507,11 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   normalizzazione del volume + tagli). Suonano dallo STESSO AudioContext degli effetti, non dal
   gestore audio di Phaser: cosi' ereditano volume, pulsante musica, dissolvenze e sospensione a
   schermo spento senza codice nuovo. Se un file manca, riparte il synth di prima.
-  ⚠️ `assets/musica/FONTI.md` va compilato con i link prima di pubblicare.
+  **Fonti tracciate** in `assets/musica/FONTI.md` (tutte da OpenGameArt, abbinate confrontando le
+  durate: corrispondenza al centesimo di secondo). ⚠️ **RESTA UN CONTROLLO:** la scheda di origine
+  del brano del MENU non si e' ritrovata, quindi la sua licenza non e' confermata — e OpenGameArt
+  NON e' un sito di solo CC0 (ospita anche CC-BY, che obbligherebbe a una schermata crediti).
+  Da chiudere prima di pubblicare.
 - **EFFETTI sonori:** restano il synth procedurale, da rivedere insieme all'utente.
 - Effetti extra (AU-B.2); **boss infuriato = musica più intensa** (AU-D.3) — solo se si tiene il synth.
 

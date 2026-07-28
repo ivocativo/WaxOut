@@ -297,6 +297,10 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
 ---
 
 # APERTI, in ordine di quanto sono pronti
+- [ ] ⚠️ **LICENZA DEL BRANO DEL MENU da confermare** (prima dello store): vedi
+  `assets/musica/FONTI.md`. Gli altri tre sono CC0 verificati sulla scheda; per quello del menu la
+  scheda non si e' ritrovata e OpenGameArt ospita anche licenze che obbligano a citare l'autore.
+  Si chiude ritrovando la pagina nella cronologia del browser, o sostituendo il brano.
 - [ ] ⭐ **ARMI DEL PG — meta' fatta.** Scelte prese con l'utente il 2026-07-27: **kit completi**
   (ogni arma cambia insieme mischia e getto, perche' il tasto d'attacco e' uno solo e sceglie da
   se' in base alla distanza), **si sbloccano al negozio e si sceglie a inizio run**, **prima le
