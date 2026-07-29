@@ -71,14 +71,14 @@ class MenuScene extends Phaser.Scene {
     const begin = () => { window.Sfx.unlock(); window.GameState.reset(); this.scene.start('GameScene'); };
     const openShop = () => { window.Sfx.unlock(); this.scene.start('ShopScene'); };
 
-    const openArmi = () => { window.Sfx.unlock(); this.scene.start('ArmiScene'); };
-
-    // Tre pulsanti invece di due (ARSENALE aggiunto il 2026-07-27): larghi 190 e distanziati 200
-    // per restare comodi da toccare sul telefono senza uscire dai 960px.
-    const startBtn = mkBtn(W / 2 - 200, 430, T.t('menu_start'), begin, 190);
+    // ARSENALE TOLTO DAL MENU (2026-07-29, dopo il playtest): "si colpisce prevalentemente da
+    // lontano, quindi variare le armi corpo a corpo ha poco senso" — si pubblica col kit unico
+    // (coton fioc + spruzzino) e semmai si riapre se qualche giocatore lo chiede. Il meccanismo
+    // resta tutto al suo posto (window.ARMI, ArmiScene, Meta.arma): per riaccenderlo basta
+    // rimettere questo pulsante.
+    const startBtn = mkBtn(W / 2 - 110, 430, T.t('menu_start'), begin, 200);
     this.tweens.add({ targets: [startBtn.panel, startBtn.label], alpha: 0.6, duration: 650, yoyo: true, repeat: -1 });
-    mkBtn(W / 2, 430, T.t('menu_armi'), openArmi, 190);
-    mkBtn(W / 2 + 200, 430, T.t('menu_shop'), openShop, 190);
+    mkBtn(W / 2 + 110, 430, T.t('menu_shop'), openShop, 200);
 
     // SELETTORE INFEZIONE (round A, A.5): compare solo dopo aver vinto almeno una volta (prima
     // infezioneUnlocked() vale 0 = solo il grado base, niente da scegliere). Frecce ◄ ►, tocco

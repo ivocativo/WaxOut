@@ -112,8 +112,14 @@ class GameScene extends Phaser.Scene {
     // Soglia di pulizia per completare: default 0.8; la CORSA non chiede pulizia (basta
     // arrivare al timpano). L'ASSEDIO non usa il timpano (vince a tempo).
     if (this.levelKind === 'rush') this.cleanGoal = 0;
-    this.siegeEndAt = 0;   // istante (ms) in cui l'assedio e' superato (0 = non assedio)
-    this.rushEndAt = 0;    // istante (ms) in cui scade la corsa a tempo (0 = non corsa)
+    // CRONOMETRI (assedio e corsa): si tiene il tempo che MANCA e lo si scala di `delta` a ogni
+    // frame, invece di una scadenza assoluta. Prima erano scadenze calcolate su `this.time.now`
+    // (orologio della SCENA, che si ferma in pausa) mentre update() confronta con `time`
+    // (orologio del GIOCO, che non si ferma): mettendo in pausa i due si sfasavano e alla ripresa
+    // il conto alla rovescia faceva un salto in avanti pari alla pausa (segnalato 2026-07-29).
+    // Contando il tempo residuo il problema non puo' ripresentarsi, con qualunque orologio.
+    this.siegeLeftMs = 0;  // ms mancanti alla fine dell'assedio (0 = non assedio)
+    this.rushLeftMs = 0;   // ms mancanti alla fine della corsa (0 = non corsa)
     this.bigTimerText = null;
 
     // Mondo LARGO da attraversare (cresce un po' col livello): la telecamera segue
@@ -263,7 +269,12 @@ class GameScene extends Phaser.Scene {
     // Gocce dal soffitto: fanno danno da contatto col giocatore (come un nemico).
     this.physics.add.overlap(this.player, this.movers, (pl, mv) => this.hurtPlayer(12 + Math.floor(window.GameState.level / 2), mv.x));
     // e SCHIZZANO quando incontrano il cerume O una pedana nella caduta (niente attraversamenti).
-    const dripSplash = (mv) => { if (mv && mv.active) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); } };
+    // Le gocce dal soffitto si spappolano su cerume e pedane. Le SCHEGGE della Regina no: corrono
+    // rasoterra e devono arrivare fino al giocatore, se no un ciuffo di cerume qualsiasi
+    // annullerebbe l'attacco del boss.
+    const dripSplash = (mv) => {
+      if (mv && mv.active && !mv.scheggia) { this.splat(mv.x, mv.y, 'soft'); mv.destroy(); }
+    };
     this.physics.add.overlap(this.movers, this.blocks, dripSplash);
     this.physics.add.overlap(this.movers, this.platforms, dripSplash);
 
@@ -376,24 +387,24 @@ class GameScene extends Phaser.Scene {
       this.showBanner(window.I18n.t(chiave), colore, (!this.isFinale && lvl >= 10) ? 140 : undefined);
     } else if (this.levelKind === 'swarm') {
       // Densita' ridotta (giro difficolta' 2026-07-25): l'utente trovava "impossibile fuggire".
-      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.7), 7);
+      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.5), 6);
       spawnDelay = Math.max(1050, 1900 - lvl * 100);
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
     } else if (this.levelKind === 'siege') {
       // ASSEDIO: non serve raggiungere il timpano, bisogna SOPRAVVIVERE a tempo mentre i
       // nemici arrivano fitti. Vince allo scadere del cronometro (vedi update).
-      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.6), 7);
+      this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.45), 6);
       spawnDelay = Math.max(1000, 1750 - lvl * 90);
-      this.siegeEndAt = this.time.now + 30000 + lvl * 2000;
+      this.siegeLeftMs = 30000 + lvl * 2000;
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
     } else {
       // normal / rush: attraversa fino al timpano (la corsa non chiede pulizia).
-      this.maxEnemies = Math.min(2 + Math.floor(lvl / 2), 5);
+      this.maxEnemies = Math.min(2 + Math.floor(lvl / 3), 4);
       spawnDelay = Math.max(1900, 3200 - lvl * 140);
       if (this.levelKind === 'rush') {
-        this.maxEnemies = Math.min(this.maxEnemies + 1, 6); spawnDelay = Math.round(spawnDelay * 0.8);
+        this.maxEnemies = Math.min(this.maxEnemies + 1, 5); spawnDelay = Math.round(spawnDelay * 0.8);
         // CORSA A TEMPO: countdown 3-2-1-VIA (annuncio lampante, il cronometro parte a "VIA") +
         // tempo piu' generoso. Da tarare col playtest.
         this.startRushCountdown();
@@ -415,7 +426,7 @@ class GameScene extends Phaser.Scene {
 
     this.spawnTimer = this.time.addEvent({
       delay: spawnDelay, loop: true,
-      callback: () => { if (!this.locked && this.enemies.countActive(true) < this.maxEnemies) this.spawnEnemy(); },
+      callback: () => { if (!this.locked && this.nemiciVicini() < this.maxEnemies) this.spawnEnemy(); },
     });
 
     // Annuncio del MODIFICATORE di livello (piu' in basso del banner del tipo, cosi' si vedono
@@ -490,6 +501,10 @@ class GameScene extends Phaser.Scene {
     // Quante membrane lungo il corridoio: cresce col livello.
     let count = Phaser.Math.Clamp(2 + Math.floor(lvl / 2), 2, 6);
     if (this.levelKind === 'swarm') count = Math.max(2, count - 1);
+    // MENO CERUME AI LIVELLI ALTI (playtest 2026-07-29): i livelli crescono in lunghezza e con
+    // essi le membrane da sfondare — pulire diventava una corvee invece che una sfida.
+    const scalaCerume = Math.max(0.6, 1 - Math.max(0, lvl - window.CONFIG.MENO_CERUME_DA) * window.CONFIG.MENO_CERUME_PASSO);
+    count = Math.max(2, Math.round(count * scalaCerume));
 
     const firstX = 620;
     const lastX = this.worldW - 520;              // ultima membrana prima del timpano
@@ -547,6 +562,8 @@ class GameScene extends Phaser.Scene {
       if (bt === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
       else if (bt === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
       else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
+      hp = Math.max(1, Math.round(hp * window.CONFIG.VITA_CERUME));   // giro difficolta' 2026-07-29
+      if (y < this.ceilingYAt(x) + B * 0.5) return;   // oltre il soffitto: non si piazza
       const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
       b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
       b.col = col; b.row = row; b.waxType = bt;
@@ -563,7 +580,9 @@ class GameScene extends Phaser.Scene {
     } else {
       // PROFILO ORGANICO: colonna centrale piena (barriera) + contrafforti laterali più
       // bassi -> base larga che si assottiglia verso l'alto (accumulo di cerume, non stecco).
-      const fullRows = Math.floor((groundTop - 16) / B);
+      // Altezza calcolata sullo spazio VERO fra terreno e soffitto in QUESTO punto.
+      const spazio = this.terrainTopAt(mx) - this.ceilingYAt(mx) - 12;
+      const fullRows = Math.max(3, Math.floor(spazio / B));
       const topGap = Math.random() < 0.4 ? Phaser.Math.Between(1, 2) : 0;
       rows = Math.max(3, fullRows - topGap);
       const profile = {};
@@ -592,7 +611,11 @@ class GameScene extends Phaser.Scene {
     if (type === 'hard') { key = 'block_hard'; hp = 60 + lvl * 10; bitKey = 'bit_hard'; wax = 6; }
     else if (type === 'dirt') { key = 'block_dirt'; hp = 40 + lvl * 7; bitKey = 'bit_dirt'; wax = 4; }
     else { key = 'block_soft'; hp = 26 + lvl * 5; bitKey = 'bit_wax'; wax = 3; }
-    hp = Math.max(1, Math.round(hp * (this.mutWaxHp || 1)));   // MODIFICATORE "cerume ostinato"
+    hp = Math.max(1, Math.round(hp * (this.mutWaxHp || 1) * window.CONFIG.VITA_CERUME));   // MODIFICATORE "cerume ostinato" + giro difficolta'
+    // Rete di sicurezza contro il cerume che sbuca oltre il soffitto: vale SOLO per le pile che
+    // partono dal pavimento (quelle che passano `baseY`). I cumuli APPESI al soffitto stanno li'
+    // apposta — applicare il controllo anche a loro li cancellava tutti.
+    if (baseY != null && y < this.ceilingYAt(x) + B * 0.5) return null;
     const b = this.blocks.create(x, y, key).setDepth(5).setVisible(false);
     b.hp = hp; b.maxHp = hp; b.bitKey = bitKey; b.waxValue = wax;
     b.col = col; b.row = row; b.waxType = type;
@@ -643,7 +666,7 @@ class GameScene extends Phaser.Scene {
       const span = w - d;
       if (span <= 0) break;
       // ceiling = true: questi blocchi sono "appesi al soffitto" -> NON cadono con la gravità.
-      for (let c = 0; c < span; c++) { const b = this.addWaxBlock(baseCol + c, topRow - d, lvl, 'soft'); b.ceiling = true; }
+      for (let c = 0; c < span; c++) { const b = this.addWaxBlock(baseCol + c, topRow - d, lvl, 'soft'); if (b) b.ceiling = true; }
     }
   }
 
@@ -772,7 +795,11 @@ class GameScene extends Phaser.Scene {
     // SOFFITTO LOCALE (round 4: ondulato) o da non lasciare spazio a testa+salto sotto di esso —
     // altrimenti e' irraggiungibile / in conflitto col soffitto. Usa `ceilingYAt(px)` al posto del
     // vecchio `CEIL_Y` fisso. Corpo del PG ~40px + margine 16px. `px` = x della pedana.
-    const clampAbove = (refY, rawY, px) => Math.max(rawY, refY - MAXUP, (px != null ? this.ceilingYAt(px) : this.CEIL_Y) + 56);
+    // 104 e non 56: il margine deve bastare al SOFFITTO PIU' IL PERSONAGGIO IN PIEDI SOPRA la
+    // pedana. Con 56 restava lo spazio per la pedana ma non per starci sopra, e in un tratto
+    // stretto (livello 10, vicino alla Regina) la pedana alta era irraggiungibile perche' il
+    // soffitto bloccava il PG a mezz'aria — segnalato dall'utente 2026-07-29.
+    const clampAbove = (refY, rawY, px) => Math.max(rawY, refY - MAXUP, (px != null ? this.ceilingYAt(px) : this.CEIL_Y) + 104);
     // ⚠️ L'appoggio da cui si salta e' la superficie LOCALE del terreno, non la vecchia linea
     // piatta 360 (bug trovato dai controlli automatici il 2026-07-20): usando 360 su una collina
     // la pedana finiva DENTRO il terreno, e dentro una cunetta restava troppo in alto per essere
@@ -922,6 +949,13 @@ class GameScene extends Phaser.Scene {
     // luminoso di qualunque altra cosa a schermo — e soprattutto lascia una SCIA di scintille:
     // il movimento e' la cosa che si nota davvero con la coda dell'occhio.
     e.setTint(0xfff0a8);
+    e.setScale((e.scaleX || 1) * 1.3);            // piu' grosso del cerumino normale: si nota
+    // Alone dorato pulsante. Sulle varianti elite gli aloni sono stati tolti apposta, ma qui e'
+    // un EVENTO che dura pochi secondi e deve saltare all'occhio: la sola tinta non bastava
+    // (segnalato due volte dall'utente).
+    e.aloneOro = this.add.circle(e.x, e.y, 30, 0xffe98a, 0.22).setStrokeStyle(3, 0xfff3b0, 0.95).setDepth(7);
+    this.tweens.add({ targets: e.aloneOro, scale: 1.35, alpha: 0.5, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    e.once('destroy', () => { if (e.aloneOro) { e.aloneOro.destroy(); e.aloneOro = null; } });
     this.fugitiveEscapeAt = this.time.now + 14000; // tempo limite per catturarlo
     this.showBanner(window.I18n.t('event_goldfugitive_in'), '#ffd700');
   }
@@ -949,8 +983,15 @@ class GameScene extends Phaser.Scene {
       e.destroy();
       return;
     }
-    e.setVelocityX(e.speed);
+    // ATTRAVERSA il cerume, ma RALLENTATO: cosi' una membrana intatta non e' un muro che lo
+    // ferma (ci si incastrava) ne' un'autostrada — chiesto dall'utente 2026-07-29.
+    let v = e.speed;
+    const dentroCerume = this.blocks.getChildren().some((b) => b.active
+      && Math.abs(b.x - e.x) < 22 && Math.abs(b.y - e.y) < 26);
+    if (dentroCerume) v = Math.round(v * 0.45);
+    e.setVelocityX(v);
     e.setFlipX(false);
+    if (e.aloneOro) { e.aloneOro.x = e.x; e.aloneOro.y = e.y; }
     // Scia di scintille: e' quello che lo fa notare mentre scappa, molto piu' della tinta.
     if (now >= (e._scintillaAt || 0)) {
       e._scintillaAt = now + 70;
@@ -1279,6 +1320,10 @@ class GameScene extends Phaser.Scene {
     pk.destroy();
   }
 
+  // Vero se in `x` c'e' abbastanza spazio libero fra il soffitto e la quota `y` perche' il
+  // giocatore ci stia IN PIEDI. Usata per non piazzare pedane che si possono solo sfiorare.
+  spazioSopra(x, y) { return (y - this.ceilingYAt(x)) >= 96; }
+
   addPlatform(x, y, w) {
     const h = 16;
     // Il rettangolo resta il CORPO FISICO (quota d'appoggio e collisione invariate) ma non si
@@ -1543,7 +1588,7 @@ class GameScene extends Phaser.Scene {
     // MODIFICATORE di livello (+ INFEZIONE, round A A.5): adatta le statistiche del nemico appena
     // create. mutEnemyDmg tocca sia il contatto sia il proiettile (di norma 1: lo alza l'infezione).
     cfg.speed = Math.round(cfg.speed * (this.mutEnemySpeed || 1));
-    cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1)));
+    cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1) * window.CONFIG.VITA_NEMICI));
     cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
     cfg.dmg = Math.max(1, Math.round(cfg.dmg * (this.mutEnemyDmg || 1)));
     if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * (this.mutEnemyDmg || 1)));
@@ -1559,7 +1604,10 @@ class GameScene extends Phaser.Scene {
       enemy_blob:   { dispH: 40, hbW: 40, hbH: 34 },
       enemy_crust:  { dispH: 40, hbW: 40, hbH: 34 },
       enemy_spit:   { dispH: 40, hbW: 30, hbH: 26 },
-      enemy_fly:    { dispH: 40, hbW: 26, hbH: 20 },
+      // Moscerino: hitbox allargata (26x20 -> 34x28) e sagoma un filo piu' grande. Erano
+      // "troppo difficili da colpire" (playtest 2026-07-29): un bersaglio che vola, ondeggia e
+      // ha anche il corpo piccolo diventa frustrante invece che impegnativo.
+      enemy_fly:    { dispH: 44, hbW: 34, hbH: 28 },
       enemy_flea:   { dispH: 34, hbW: 20, hbH: 16 },
       enemy_hopper: { dispH: 48, hbW: 40, hbH: 30 },
       enemy_boss:   { dispH: 96, hbW: 64, hbH: 56 },
@@ -1719,6 +1767,35 @@ class GameScene extends Phaser.Scene {
     else if (cfg.fly) this.dropFromCeiling(e, targetScale);
     else this.emergeFromGround(e, targetScale, y, x, surfY, !!cfg.boss);
     return e;
+  }
+
+  // Quanti nemici "contano" per il tetto: solo quelli abbastanza vicini da poter dare fastidio.
+  // Quelli rimasti indietro (tipicamente bloccati dietro una membrana ancora intera) non devono
+  // impedire la comparsa di nuovi, o l'assedio si spegne da solo — succedeva davvero.
+  nemiciVicini() {
+    const raggio = this.cameras.main.width * 1.25;
+    let n = 0;
+    this.enemies.getChildren().forEach((e) => {
+      if (e.active && Math.abs(e.x - this.player.x) <= raggio) n++;
+    });
+    return n;
+  }
+
+  // Nome del boss in campo, per i cartelli (furia, sconfitta, "batti il boss per passare").
+  nomeBoss(e) {
+    const k = (e && e.bossKind) || (window.GameState.level >= window.CONFIG.RUN_LEVELS ? 'gran'
+      : (window.GameState.level >= 10 ? 'regina' : 'tappo'));
+    return window.I18n.t('boss_nome_' + k);
+  }
+
+  // Colore "di riposo" di un nemico: dorato se e' il Fuggitivo, il colore della variante se e'
+  // elite, altrimenti nessuna tinta. Da chiamare al posto di clearTint() alla fine di OGNI
+  // telegrafo lampeggiante, o le varianti colorate perdono il colore per sempre.
+  ripristinaTinta(e) {
+    if (!e || !e.active) return;
+    e.clearTint();
+    if (e.fugitive) e.setTint(0xfff0a8);
+    else if (e.eliteTint) e.setTint(e.eliteTint);
   }
 
   // Fine della comparsa: da qui il nemico e' "vivo" e torna soggetto a gravita' e snap al terreno.
@@ -2300,6 +2377,21 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // SCHEGGIA DELLA REGINA: corre a terra SEGUENDO il profilo del terreno (per questo le colline
+  // non la fanno saltellare) e ferisce al contatto. Si scavalca col salto.
+  lanciaScheggia(e, verso) {
+    const sc = this.movers.create(e.x + verso * 40, this.terrainTopAt(e.x + verso * 40) - 10, 'wax_glob')
+      .setDepth(8).setScale(0.85);
+    sc.setTint(0xc98a5a);
+    sc.body.setAllowGravity(false);
+    sc.setVelocityX(verso * 240);
+    sc.scheggia = true;
+    sc.setAngularVelocity(verso * 420);
+    // vive qualche secondo, poi sparisce: non deve accumularsi per tutto il livello
+    this.time.delayedCall(2600, () => { if (sc.active) sc.destroy(); });
+    window.Sfx.crack();
+  }
+
   // Anello dell'ONDA D'URTO: cerchio giallo che si espande attorno al giocatore.
   blastFx(R) {
     const ring = this.add.circle(this.player.x, this.player.y, R || 84, 0xffe08a, 0.18).setDepth(11).setScale(0.3);
@@ -2441,7 +2533,7 @@ class GameScene extends Phaser.Scene {
         // Un colpo INTERROMPE l'attacco in carica/affondo del nemico (ricompensa il colpire per primo).
         if (e.atkState && e.atkState !== 'idle') { e.atkState = 'idle'; e.atkReadyAt = this.time.now + 500; if (e._baseScale) e.setScale(e._baseScale); }
         // Idem per il moscerino: un colpo lo butta fuori dalla carica/picchiata.
-        if (e.kind === 'fly' && e.diveState && e.diveState !== 'hover') { e.diveState = 'recover'; e.diveReadyAt = this.time.now + 900; e.clearTint(); }
+        if (e.kind === 'fly' && e.diveState && e.diveState !== 'hover') { e.diveState = 'recover'; e.diveReadyAt = this.time.now + 900; this.ripristinaTinta(e); }
       }
     }
     if (e.hp <= 0) {
@@ -2461,7 +2553,7 @@ class GameScene extends Phaser.Scene {
       if (e.kind === 'boss') {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
-        this.showBanner(window.I18n.t('game_boss_dead'), '#ffd166');
+        this.showBanner(window.I18n.t('game_boss_dead', { nome: this.nomeBoss(e) }), '#ffd166');
         this.addWaxPickup(e.x - 22, e.y - 8, true);
         this.addWaxPickup(e.x + 22, e.y - 8, true);
       } else {
@@ -2503,11 +2595,11 @@ class GameScene extends Phaser.Scene {
 
     if (e.atkState === 'windup') {
       e.setVelocityX(0);
-      e.setTint((Math.floor(now / 90) % 2) ? 0xffe066 : 0xffffff);  // lampeggia = "sta per saltare"
+      e.setTint((Math.floor(now / 90) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));  // lampeggia = "sta per saltare"
       if (now >= e.windupUntil) {                       // fine carica -> parte l'affondo
         e.atkState = 'lunge';
         e.lungeUntil = now + 320;
-        e.clearTint();
+        this.ripristinaTinta(e);
         if (e._baseScale) e.setScale(e._baseScale);
         e.setVelocity(e.lungeDir * (e.speed * 3.0 + 120), -190);
       }
@@ -2565,11 +2657,11 @@ class GameScene extends Phaser.Scene {
 
     if (e.atkState === 'windup') {
       e.setVelocityX(0);
-      e.setTint((Math.floor(now / 90) % 2) ? 0xffb066 : 0xffffff);
+      e.setTint((Math.floor(now / 90) % 2) ? 0xffb066 : (e.eliteTint || 0xffffff));
       if (now >= e.windupUntil) {
         e.atkState = 'lunge';
         e.lungeUntil = now + 520;
-        e.clearTint();
+        this.ripristinaTinta(e);
         if (e._baseScale) e.setScale(e._baseScale);
         e.setVelocity(e.lungeDir * (e.speed * 2.4 + 160), -420);
       }
@@ -2626,37 +2718,28 @@ class GameScene extends Phaser.Scene {
   bossAI(e, now) {
     const dir = Math.sign(this.player.x - e.x) || 1;
 
-    // --- REGINA DELLE CROSTE (boss del 2o tratto): non salta, CARICA in orizzontale. Il balzo
-    // e' la firma del Tappo; dare alla Regina lo stesso attacco avrebbe reso i due boss la
-    // stessa cosa con un colore diverso. La carica si schiva saltandola, non scappando.
-    if (e.bossAtk === 'caricawind') {
+    // --- REGINA DELLE CROSTE (boss del 2o tratto): ONDATA DI SCHEGGE.
+    // Prima caricava in orizzontale, ma il terreno e' a colline e la carica ci andava a SCATTI
+    // (il corpo veniva riagganciato al profilo a ogni dislivello) — bocciata dall'utente
+    // 2026-07-29. Ora resta ferma e sbatte il guscio a terra: partono tre schegge che CORRONO
+    // LUNGO IL PROFILO del terreno, quindi le colline non le disturbano, anzi le seguono. Si
+    // schivano col salto, esattamente come si sarebbe schivata la carica.
+    if (e.bossAtk === 'ondatawind') {
       e.setVelocityX(0);
       e.setTint((Math.floor(now / 80) % 2) ? 0xff6b5a : (e.eliteTint || 0xffffff));
-      if (now >= e.caricaWindupUntil) {
-        if (e.eliteTint) e.setTint(e.eliteTint); else e.clearTint();
-        e.bossAtk = 'carica';
-        e.caricaDir = dir;
-        e.caricaFineAt = now + 1100;
-        e.contactDamage = Math.round(e._dannoBase * 1.6);   // travolge: fa piu' male del contatto normale
-        window.Sfx.emerge && window.Sfx.emerge(true);
-      }
-      return;
-    }
-    if (e.bossAtk === 'carica') {
-      e.setVelocityX(e.caricaDir * e.speed * 4.2);
-      e.setFlipX(e.caricaDir < 0);
-      // polvere sotto: fa capire che sta arrivando lanciata
-      if (now >= (e._polvereAt || 0)) {
-        e._polvereAt = now + 60;
-        this.groundPuff(e.x - e.caricaDir * 30, this.terrainTopAt(e.x));
-      }
-      const alMuro = e.body.blocked.left || e.body.blocked.right;
-      if (now >= e.caricaFineAt || alMuro) {
+      const bs = e._baseScale || (e._baseScale = e.scaleX);
+      e.setScale(bs * 0.94, bs * 1.14);            // si solleva sulle zampe
+      if (now >= e.ondataWindupUntil) {
+        this.ripristinaTinta(e);
+        e.setScale(bs);
         e.bossAtk = null;
-        e.setVelocityX(0);
-        e.contactDamage = e._dannoBase;
-        if (alMuro) { this.cameras.main.shake(220, 0.012); this.bossSlamFx(e, e.x, e.y); }
-        e.slamReadyAt = now + (e._enraged ? 2200 : 3400);
+        e.slamReadyAt = now + (e._enraged ? 2400 : 3600);
+        this.bossSlamFx(e, e.x, this.terrainTopAt(e.x));
+        this.cameras.main.shake(240, 0.013);
+        const verso = Math.sign(this.player.x - e.x) || 1;
+        for (let i = 0; i < 3; i++) {
+          this.time.delayedCall(i * 150, () => { if (e.active && !this.locked) this.lanciaScheggia(e, verso); });
+        }
       }
       return;
     }
@@ -2667,7 +2750,7 @@ class GameScene extends Phaser.Scene {
       e.setVelocityX(0);
       e.setTint((Math.floor(now / 90) % 2) ? 0xff8a4a : 0xffffff);
       if (now >= e.slamWindupUntil) {
-        e.clearTint();
+        this.ripristinaTinta(e);
         if (e._baseScale) e.setScale(e._baseScale);
         e.bossAtk = 'slamjump';
         e.slamStartAt = now;
@@ -2735,7 +2818,7 @@ class GameScene extends Phaser.Scene {
     if (enraged && !e._enraged) {                 // passaggio di fase (2a): FURIA
       e._enraged = true;
       this.cameras.main.shake(200, 0.01);
-      this.showBanner(window.I18n.t('game_boss_enrage'), '#ff7043');
+      this.showBanner(window.I18n.t('game_boss_enrage', { nome: this.nomeBoss(e) }), '#ff7043');
       e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
       e._summonAt = now + 2500;
     }
@@ -2761,10 +2844,8 @@ class GameScene extends Phaser.Scene {
     if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
         e._grounded) {
       if (e.bossKind === 'regina') {
-        // La Regina carica invece di saltare: telegrafo piu' corto ma la corsa e' lunga, si
-        // schiva col salto. Raggio piu' largo (arriva da lontano).
-        e.bossAtk = 'caricawind';
-        e.caricaWindupUntil = now + 520;
+        e.bossAtk = 'ondatawind';
+        e.ondataWindupUntil = now + 620;   // telegrafo lungo: si vede che sta per sbattere
         e.setVelocityX(0);
         return;
       }
@@ -2782,7 +2863,7 @@ class GameScene extends Phaser.Scene {
       if (!e.spitWindupAt) e.spitWindupAt = now;
       e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
       if (now - e.spitWindupAt >= 320) {
-        if (e.eliteTint) e.setTint(e.eliteTint); else e.clearTint();
+        this.ripristinaTinta(e);
         e.spitWindupAt = 0;
         if (e._collapse) { this.spitAt(e, -240); this.spitAt(e, -120); this.spitAt(e, 0); this.spitAt(e, 120); this.spitAt(e, 240); }  // 5 vie (finale)
         else if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
@@ -2851,9 +2932,9 @@ class GameScene extends Phaser.Scene {
       const bs = e._baseScale || (e._baseScale = e.scaleX);
       const t = Phaser.Math.Clamp((now - e.spitWindupAt) / 300, 0, 1);
       e.setScale(bs * (1 + 0.18 * t), bs * (1 - 0.16 * t));           // si comprime (carica)
-      e.setTint((Math.floor(now / 70) % 2) ? 0x9fe0ff : 0xffffff);
+      e.setTint((Math.floor(now / 70) % 2) ? 0x9fe0ff : (e.eliteTint || 0xffffff));
       if (now - e.spitWindupAt >= 300) {
-        e.setScale(bs); e.clearTint(); e.spitWindupAt = 0;
+        e.setScale(bs); this.ripristinaTinta(e); e.spitWindupAt = 0;
         this.spitAt(e);                                              // espelle
         e.nextSpit = now + e.spitEvery;
       }
@@ -2882,9 +2963,9 @@ class GameScene extends Phaser.Scene {
     // CARICA: fermo a mezz'aria, lampeggia; poi parte la picchiata verso il bersaglio bloccato.
     if (e.diveState === 'wind') {
       e.setVelocity(0, -8);
-      e.setTint((Math.floor(now / 60) % 2) ? 0xffe066 : 0xffffff);
+      e.setTint((Math.floor(now / 60) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
       if (now >= e.diveTimer) {
-        e.clearTint();
+        this.ripristinaTinta(e);
         const dx = e.diveTX - e.x, dy = e.diveTY - e.y, d = Math.hypot(dx, dy) || 1;
         const sp = Math.max(360, e.speed * 3.2);   // picchiata scattante (schivabile grazie al telegrafo)
         e.setVelocity((dx / d) * sp, (dy / d) * sp);
@@ -2946,7 +3027,10 @@ class GameScene extends Phaser.Scene {
     this.invulnUntil = Math.max(this.invulnUntil, now + 400); // il rimbalzo ti porta via pulito (niente colpo al ritorno)
     this.setJuice(1 + window.CONFIG.JUICE_LAND, 1 - window.CONFIG.JUICE_LAND);
     window.Sfx.jump();
-    this.damageEnemy(e, Math.max(1, Math.round(p.damage * 1.1)), true);
+    // Sui BOSS il rimbalzo funziona lo stesso (prima li si attraversava e sembrava un bug —
+    // segnalato sulla Regina), ma il danno e' ridotto: saltargli in testa non deve diventare
+    // la scorciatoia per batterli.
+    this.damageEnemy(e, Math.max(1, Math.round(p.damage * (e.kind === 'boss' ? 0.35 : 1.1))), true);
   }
 
   hurtPlayer(dmg, sourceX) {
@@ -3016,7 +3100,10 @@ class GameScene extends Phaser.Scene {
     const pl = window.GameState.player;
     if (!pl.shield) { if (this.shieldAura) this.shieldAura.setVisible(false); return; }
     if (!this.shieldAura) {
-      this.shieldAura = this.add.circle(this.player.x, this.player.y, 24, 0x8fd0ff, 0.12)
+      // Raggio preso dall'ALTEZZA VERA del personaggio a schermo: a 24 fissi copriva solo il
+      // busto e sembrava una bolla storta (segnalato dall'utente 2026-07-29).
+      const raggio = Math.max(28, Math.round((this.heroVisual ? this.heroVisual.displayHeight : 56) * 0.46));
+      this.shieldAura = this.add.circle(this.player.x, this.player.y, raggio, 0x8fd0ff, 0.12)
         .setStrokeStyle(2.5, 0xbfe8ff, 0.9).setDepth(9);   // dietro il PG (depth 10): alone, non lo copre
     }
     const charged = now >= (this.shieldReadyAt || 0);
@@ -3072,6 +3159,21 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // Riepilogo per la schermata di vittoria + incasso e record. Stava dentro UpgradeScene.choose
+   // (era li' che finiva la run); ora che l'ultimo livello salta la carta, vive qui.
+  datiVittoria() {
+    const livelli = window.GameState.level;
+    const infezione = window.GameState.infezione || 0;
+    const primaMax = window.Meta.get().infezioneMax;
+    const meta = window.Meta.bankRun(window.GameState.wax, livelli);
+    window.Meta.recordWin(infezione);
+    const sbloccato = (infezione > primaMax) && (infezione < window.CONFIG.INFEZIONE_MAX);
+    return {
+      earned: window.GameState.wax, bank: meta.bank, levels: livelli,
+      infezione: infezione, sbloccato: sbloccato ? infezione + 1 : null,
+    };
+  }
+
   levelComplete() {
     if (this.locked) return;
     this.locked = true;
@@ -3092,7 +3194,11 @@ class GameScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
 
-    this.time.delayedCall(1300, () => this.scene.start('UpgradeScene'));
+    // Ultimo livello: niente carta di potenziamento, si va alla VITTORIA. Sceglierne una che
+    // non si usera' mai era solo un passaggio a vuoto fra il colpo finale e i titoli.
+    const ultimo = window.GameState.level >= window.CONFIG.RUN_LEVELS;
+    this.time.delayedCall(1300, () => this.scene.start(ultimo ? 'VictoryScene' : 'UpgradeScene',
+      ultimo ? this.datiVittoria() : undefined));
   }
 
   gameOver() {
@@ -3110,7 +3216,10 @@ class GameScene extends Phaser.Scene {
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
     this.add.rectangle(W / 2, H / 2, W, H, 0x1c0a12, 0.78).setDepth(50).setScrollFactor(0);
-    window.GameGfx.panel(this, W / 2, H / 2 + 10, 620, 260, { accento: 0xb3374f, depth: 50 });
+    // setScrollFactor(0): senza, il pannello (disegnato in coordinate del MONDO) scorreva con la
+    // telecamera e finiva mezzo fuori schermo — il "riquadro a sinistra" segnalato dall'utente.
+    window.GameGfx.panel(this, W / 2, H / 2 + 10, 620, 260, { accento: 0xb3374f, depth: 50 })
+      .setScrollFactor(0);
     this.add.text(W / 2, H / 2 - 56, window.I18n.t('over_title'), {
       fontFamily: 'monospace', fontSize: '30px', color: '#ff8a8a',
       stroke: '#1c0a12', strokeThickness: 6,
@@ -3205,7 +3314,7 @@ class GameScene extends Phaser.Scene {
     // MANOPOLA DI PROVA "durataCorsa" (src/taratura.js): a 1 e' il tempo normale.
     const rushTime = Math.round((Math.round(this.worldW / 115) * 1000 + 11000)
       * (window.Taratura ? window.Taratura.v('durataCorsa') : 1));
-    this.rushEndAt = this.time.now + steps.length * STEP + rushTime;   // il cronometro scade DOPO il VIA
+    this.rushLeftMs = steps.length * STEP + rushTime;   // il cronometro scade DOPO il VIA
 
     const label = this.add.text(W / 2, H * 0.30, window.I18n.t('rush_countdown_title'), {
       fontFamily: 'monospace', fontSize: '24px', color: '#ffd166', stroke: '#14161f', strokeThickness: 5,
@@ -3285,27 +3394,55 @@ class GameScene extends Phaser.Scene {
     if (newAmp >= curAmp) { this.jx = ax; this.jy = ay; }
   }
 
-  update(time) {
+  // I proiettili (getto del giocatore e sputi dei nemici) non hanno un terreno SOLIDO contro cui
+  // sbattere: il pavimento e' una mappa di altezze, e l'unico corpo fisico e' un rettangolo piatto
+  // in fondo al mondo. Quindi qui si controlla a mano, ogni frame, se hanno passato il profilo del
+  // terreno o del soffitto. Senza, volavano attraverso le colline (segnalato dall'utente).
+  fermaProiettiliNelTerreno() {
+    const fuori = (o) => o.y >= this.terrainTopAt(o.x) || o.y <= this.ceilingYAt(o.x);
+    this.shots.getChildren().forEach((sh) => {
+      if (sh.active && fuori(sh)) {
+        if (sh.bounceLeft > 0) {   // abilita' RIMBALZO: rimbalza sul terreno invece di spappolarsi
+          sh.bounceLeft -= 1;
+          sh.y = Phaser.Math.Clamp(sh.y, this.ceilingYAt(sh.x) + 6, this.terrainTopAt(sh.x) - 6);
+          sh.body.velocity.y *= -1;
+        } else this.popShot(sh);
+      }
+    });
+    this.projectiles.getChildren().forEach((pr) => {
+      if (pr.active && fuori(pr)) this.popProjectile(pr);
+    });
+  }
+
+  update(time, delta) {
     window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
     this.animateWax(time);                    // cerume "fluido": ondeggia e cola
+    this.fermaProiettiliNelTerreno();         // colline e soffitto fermano i colpi (non sono solidi)
+    // Schegge della Regina: incollate al profilo del terreno (e' il motivo per cui non saltellano).
+    this.movers.getChildren().forEach((m) => {
+      if (m.active && m.scheggia) m.y = this.terrainTopAt(m.x) - 10;
+    });
     if (this.locked) { this.player.setVelocityX(0); return; }
     const p = window.GameState.player;
     const k = this.keys;
     const now = time;
+    const dt = Math.min(delta || 16.7, 100);   // tetto: se il telefono si impunta, il tempo non salta
 
     // ASSEDIO: si vince SOPRAVVIVENDO fino allo scadere del cronometro (niente timpano).
     if (this.levelKind === 'siege') {
-      const left = Math.max(0, Math.ceil((this.siegeEndAt - now) / 1000));
+      this.siegeLeftMs = Math.max(0, this.siegeLeftMs - dt);
+      const left = Math.ceil(this.siegeLeftMs / 1000);
       this.updateBigTimer(window.I18n.t('hud_siege', { s: left }), left, now);
-      if (now >= this.siegeEndAt) { this.levelComplete(); return; }
+      if (this.siegeLeftMs <= 0) { this.levelComplete(); return; }
     } else if (this.levelKind === 'rush') {
       // CORSA A TEMPO (round 2, F.1): se il tempo scade PRIMA del timpano -> game over (deciso
       // con l'utente). Il controllo `player.x < goalX` evita che, nel caso limite in cui tempo
       // scaduto e traguardo raggiunto capitino nello stesso frame, si perda una corsa in realta'
       // vinta (il blocco "Traguardo" qui sotto la completerebbe comunque, se lo lasciamo passare).
-      const left = Math.max(0, Math.ceil((this.rushEndAt - now) / 1000));
+      this.rushLeftMs = Math.max(0, this.rushLeftMs - dt);
+      const left = Math.ceil(this.rushLeftMs / 1000);
       this.updateBigTimer(window.I18n.t('hud_rush', { s: left }), left, now);
-      if (now >= this.rushEndAt && this.player.x < this.goalX) { this.gameOver(); return; }
+      if (this.rushLeftMs <= 0 && this.player.x < this.goalX) { this.gameOver(); return; }
     }
 
     // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
@@ -3320,7 +3457,7 @@ class GameScene extends Phaser.Scene {
       if (cleanPct < goalPct) {
         this.cleanHint(now);                       // sei al timpano ma manca cerume da pulire
       } else if (bossBlocking) {
-        if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard'), '#ffb04a'); }
+        if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard', { nome: this.nomeBoss(null) }), '#ffb04a'); }
       } else {
         this.levelComplete(); return;
       }
@@ -3349,7 +3486,7 @@ class GameScene extends Phaser.Scene {
       const surf0 = this.terrainTopAt(this.player.x);
       const piediDopo = (pbody.bottom - surf0) >= -44 ? surf0 : pbody.bottom;
       const preda = this.enemies.getChildren().find((e) => {
-        if (!e.active || e.spawning || e.kind === 'boss' || e.fugitive || !e.body) return false;
+        if (!e.active || e.spawning || e.fugitive || !e.body) return false;
         if (Math.abs(pbody.center.x - e.body.center.x) > e.body.halfWidth + pbody.halfWidth) return false;
         // Arrivi DALL'ALTO: o i piedi sono ancora sopra la testa, o l'hanno oltrepassata in questo
         // stesso frame (caduta veloce: fra un frame e l'altro si puo' saltare tutto il nemico).

@@ -203,24 +203,8 @@ class UpgradeScene extends Phaser.Scene {
       window.GameState.ownedAbilities.push(u.ability);
     }
 
-    // RUN COMPLETATA (round A, A.1): il livello appena finito e' l'ultimo (window.GameState.level
-    // non e' ancora stato incrementato: qui vale ancora il livello che si e' appena chiuso). Si
-    // incassa il cerume come a fine run (stesso meccanismo di gameOver) + si segna la vittoria, e
-    // si va alla VITTORIA invece che al livello successivo.
-    const finishedLevel = window.GameState.level;
-    if (finishedLevel >= window.CONFIG.RUN_LEVELS) {
-      const infezione = window.GameState.infezione || 0;
-      const primaMax = window.Meta.get().infezioneMax;
-      const meta = window.Meta.bankRun(window.GameState.wax, finishedLevel);
-      window.Meta.recordWin(infezione);          // round A, A.5: sblocca il grado successivo
-      const sbloccato = (infezione > primaMax) && (infezione < window.CONFIG.INFEZIONE_MAX);
-      this.scene.start('VictoryScene', {
-        earned: window.GameState.wax, bank: meta.bank, levels: finishedLevel,
-        infezione: infezione, sbloccato: sbloccato ? infezione + 1 : null,
-      });
-      return;
-    }
-
+    // (La fine della run NON passa piu' di qui: dal livello finale GameScene.levelComplete va
+    // diritta a VictoryScene, senza far scegliere una carta che non si userebbe mai.)
     window.GameState.level += 1;
     // SCELTA DEL PERCORSO (round A, A.3): ogni livello NON-boss e' preceduto da una porta.
     // I livelli boss (multipli di 5, stessa regola di GameScene.create) restano fissi.

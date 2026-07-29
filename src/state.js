@@ -30,6 +30,15 @@ window.CONFIG = {
   // cosi' l'economia si tara da un punto solo. Misurata 2026-07-22 (vedi ROADMAP A.4b): SANA,
   // non toccare i prezzi UNLOCKS/BLUEPRINTS, e' questa l'unica manopola da girare se mai servisse.
   WAX_GAIN: 0.55,
+  // GIRO DI BILANCIAMENTO 2026-07-29 (playtest: "ai livelli alti diventa estenuante pulire il
+  // cerume, ci vuole troppo tempo"). Tre manopole invece di ritoccare venti numeri sparsi:
+  DANNO_PG: 1.5,          // quanto piu' forte picchia il giocatore (mischia e getto)
+  VITA_CERUME: 0.8,       // quanto e' piu' fragile ogni blocco di cerume
+  VITA_NEMICI: 0.8,       // quanto sono piu' fragili i nemici
+  // Da questo livello in poi il cerume da pulire cala: un livello lungo il triplo non deve
+  // chiedere il triplo del tempo di pulizia, o la parte finale della run diventa una corvee.
+  MENO_CERUME_DA: 8,
+  MENO_CERUME_PASSO: 0.055,   // -5,5% di membrane per ogni livello oltre la soglia (min 60%)
 
   // Quanti livelli compongono una RUN COMPLETA (round A, A.1): raggiunto e superato questo
   // livello (che e' sempre un boss, essendo multiplo di 5) la run e' VINTA -> VictoryScene invece
@@ -237,7 +246,9 @@ window.GameState = {
     const maxHp = Math.round((100 + lv('hp') * U.hp.per) * TP);
     // KIT scelto nell'Arsenale (window.ARMI). I moltiplicatori si applicano DOPO i potenziamenti
     // comprati al negozio, cosi' il carattere del kit si sente sempre allo stesso modo.
-    const scelta = (window.Meta && window.Meta.get().arma) || 'fioc';
+    // ARSENALE CHIUSO (2026-07-29): finche' il pulsante non c'e' nel menu, si gioca sempre col
+    // kit base. La riga sotto e' l'unico interruttore da togliere per riaprirlo.
+    const scelta = 'fioc';
     const arma = (window.ARMI || []).find((a) => a.id === scelta) || (window.ARMI || [{}])[0] || {};
     const M = arma.mischia || { cadenza: 360, danno: 1 };
     const G = arma.getto || { cadenza: 340, danno: 1, palline: 1, gittata: 850 };
@@ -245,13 +256,13 @@ window.GameState = {
       maxHp: maxHp,
       hp: maxHp,
       arma: arma.id || 'fioc',   // kit in mano: lo leggono meleeSwing/fireJet via armaCorrente()
-      damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno * TD),
+      damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno * TD * window.CONFIG.DANNO_PG),
       moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
       attackCooldown: M.cadenza,   // ms tra una bastonata e l'altra (corpo a corpo automatico)
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
-      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno * TD),  // un po' sotto al corpo a corpo
+      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno * TD * window.CONFIG.DANNO_PG),  // un po' sotto al corpo a corpo
       shotCooldown: G.cadenza,   // ms tra uno spruzzo e l'altro
       shotLife: G.gittata,       // ms di vita di una pallina = quanto lontano arriva il getto
       doubleJump: lv('djump') > 0,

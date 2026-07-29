@@ -431,16 +431,21 @@ window.__earwaxChecks = function (opts) {
   // (Meta scrive su localStorage, ma il browser di questi controlli e' EFFIMERO — niente
   // rischio per i dati salvati veri del giocatore, che vivono in un profilo/browser separato.)
   {
-    const cardStub = { id: 'damage', rep: true, apply: (s) => { s.damage += 8; } };
+    // ⚠️ PERCORSO CAMBIATO (2026-07-29): finito l'ultimo livello si va DIRITTI alla vittoria,
+    // senza far scegliere una carta di potenziamento che non si userebbe mai (segnalato dal
+    // playtest). Quindi il controllo ora guida GameScene.levelComplete, non UpgradeScene.choose.
     fermaMeta();
     window.GameState.reset();
     window.GameState.level = window.CONFIG.RUN_LEVELS;
+    g.scene.start('GameScene');
+    passaTick();
+    const gsWin = g.scene.getScene('GameScene');
+    avanza(gsWin, 10);
     window.GameState.wax = 321;
     const winsPrima = window.Meta.get().wins;
     const bankPrima = window.Meta.get().bank;
-    g.scene.start('UpgradeScene');
-    passaTick();
-    g.scene.getScene('UpgradeScene').choose(cardStub);
+    gsWin.levelComplete();
+    avanza(gsWin, 110);        // levelComplete aspetta 1,3s prima di cambiare scena
     passaTick();
 
     const attive = g.scene.getScenes(true).map((s) => s.scene.key);
@@ -510,14 +515,18 @@ window.__earwaxChecks = function (opts) {
     };
 
     const F = bossDelLivello(window.CONFIG.RUN_LEVELS);
-    const hpAttesaFinale = Math.round((420 + window.CONFIG.RUN_LEVELS * 40) * 1.7);
+    // Le vite attese si LEGGONO dalla costante del gioco (CONFIG.VITA_NEMICI, giro di
+    // bilanciamento 2026-07-29) invece di ricopiarle a mano: se no il controllo va ri-aggiustato
+    // a ogni taratura e smette di dire qualcosa.
+    const V = window.CONFIG.VITA_NEMICI;
+    const hpAttesaFinale = Math.round(Math.round((420 + window.CONFIG.RUN_LEVELS * 40) * 1.7) * V);
     const finaleFlag = !!(F.boss && F.boss.finale);
     const hpFinaleOk = !!(F.boss && F.boss.maxHp === hpAttesaFinale);
     forzaFase3(F.gs, F.boss);
     const crolloOk = !!(F.boss && F.boss._collapse === true && F.gs.quakeTimer);
 
     const M = bossDelLivello(5);
-    const hpNormaleOk = !!(M.boss && M.boss.maxHp === (420 + 5 * 40) && !M.boss.finale);
+    const hpNormaleOk = !!(M.boss && M.boss.maxHp === Math.round((420 + 5 * 40) * V) && !M.boss.finale);
     forzaFase3(M.gs, M.boss);
     const intermedioNoCrollo = !!(M.boss && !M.boss._collapse);
 
@@ -564,15 +573,20 @@ window.__earwaxChecks = function (opts) {
     // Controlla il danno SOLO nella finestra del rimbalzo (fino a poco dopo lo stacco): un
     // eventuale colpo DOPO, quando il nemico torna e l'invuln e' scaduta, e' un colpo legittimo,
     // non un fallimento dello stomp.
-    let rimbalzoMin = 0, hpDopoRimbalzo = 100, staccoAlRimbalzo = null;
+    let rimbalzoMin = 0, hpDopoRimbalzo = 100, staccoAlRimbalzo = null, testaNemico = null;
     for (let i = 0; i < 20; i++) {
       t += 16.6; g.loop.step(t);                       // frame RAW (niente god-mode: il danno conta)
       // Quanto distavano i piedi dalla testa nel frame in cui e' partito il rimbalzo. Nasce da un
       // difetto vero (playtest 2026-07-27): la rilevazione anticipava di 48px e il PG rimbalzava
       // per aria, senza che si vedesse l'impatto. Il PG a fine frame e' gia' risalito di ~vy/60px,
       // quindi il valore atteso e' una decina di px in negativo, non una cinquantina.
-      if (staccoAlRimbalzo === null && gs.player.body.velocity.y < -50 && e.body) {
-        staccoAlRimbalzo = gs.player.body.bottom - e.body.top;
+      // ⚠️ Dal giro di bilanciamento 2026-07-29 il colpo del PG e' x1.5 e i nemici hanno il 20%
+      // di vita in meno: un cerumino di livello 2 MUORE sotto il piede, quindi al frame del
+      // rimbalzo il suo corpo puo' non esistere piu'. Si tiene da parte la quota della testa
+      // frame per frame, e si misura lo stacco con l'ultima nota buona.
+      if (e.body) testaNemico = e.body.top;
+      if (staccoAlRimbalzo === null && gs.player.body.velocity.y < -50 && testaNemico !== null) {
+        staccoAlRimbalzo = gs.player.body.bottom - testaNemico;
       }
       if (gs.player.body.velocity.y < rimbalzoMin) rimbalzoMin = gs.player.body.velocity.y;
       hpDopoRimbalzo = window.GameState.player.hp;
@@ -591,45 +605,106 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [19] ARSENALE (2026-07-27): il KIT scelto deve arrivare davvero in partita — statistiche
-  // di partenza, forma del colpo corpo a corpo e gittata del getto. Nasce dal fatto che i kit
-  // toccano tre punti lontani tra loro (newPlayer, meleeSwing, spawnPellet): se uno dei tre non
-  // legge il kit, l'arma "comprata" sembra identica a quella base e non se ne accorge nessuno.
+  // [19] ARSENALE CHIUSO (2026-07-29). Dopo il playtest l'utente ha deciso di pubblicare con UN
+  // SOLO kit (coton fioc + spruzzino): "si colpisce prevalentemente da lontano, quindi variare le
+  // armi corpo a corpo ha poco senso". Il meccanismo resta tutto in piedi, ma il gioco deve
+  // partire SEMPRE col kit base — anche se in Meta e' rimasta salvata un'altra arma da prima.
+  // Questo controllo verifica proprio quello: che nessun residuo di salvataggio cambi la partita.
+  // ⚠️ Se un domani si riapre l'arsenale, questo controllo va rimesso com'era (verificava che il
+  // kit scelto arrivasse davvero in newPlayer, meleeSwing e spawnPellet): sta nella cronologia git.
   {
     const armaSalvata = window.Meta.get().arma;
-    const esiti = [];
-    ['fioc', 'martello', 'idro', 'pompa'].forEach((id) => {
-      const kit = window.ARMI.find((a) => a.id === id);
-      window.Meta.setUnlock('arma_' + id, 1);
-      window.Meta.setArma(id);
-      fermaMeta();
-      window.GameState.reset();
-      window.GameState.level = 2;
-      window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
-      g.scene.start('GameScene');
-      passaTick();
-      const gs = g.scene.getScene('GameScene');
-      avanza(gs, 12);
-      const p = window.GameState.player;
-      // il colpo corpo a corpo usa davvero la portata del kit?
-      const M = window.armaCorrente().mischia;
-      esiti.push({
-        id: id,
-        arma: p.arma === id,
-        cadenza: p.attackCooldown === kit.mischia.cadenza,
-        gittata: p.shotLife === kit.getto.gittata,
-        palline: p.jetPellets === (kit.getto.palline || 1),
-        portata: M.portata === kit.mischia.portata,
-        extra: (!kit.getto.calamita || p.magnet === true) && (!kit.getto.perfora || p.jetPierce === true),
-      });
-    });
+    window.Meta.setUnlock('arma_martello', 1);
+    window.Meta.setArma('martello');            // salvataggio "sporco": si prova a forzare un kit
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsArm = g.scene.getScene('GameScene');
+    avanza(gsArm, 12);
+    const pArm = window.GameState.player;
+    const base = window.ARMI.find((a) => a.id === 'fioc');
+    const restaBase = pArm.arma === 'fioc'
+      && pArm.attackCooldown === base.mischia.cadenza
+      && pArm.shotLife === base.getto.gittata
+      && window.armaCorrente().mischia.portata === base.mischia.portata;
     window.Meta.setArma(armaSalvata || 'fioc');
-    const rotti = esiti.filter((e) => !(e.arma && e.cadenza && e.gittata && e.palline && e.portata && e.extra));
-    if (rotti.length === 0) ok('arsenale: il kit scelto arriva in partita', '-', esiti.map((e) => e.id).join(' '));
-    else ko('arsenale: il kit scelto arriva in partita', '-', JSON.stringify(rotti));
+    if (restaBase) ok('arsenale chiuso: si parte sempre col kit base', '-', 'coton fioc + spruzzino');
+    else ko('arsenale chiuso: si parte sempre col kit base', '-', 'arma=' + pArm.arma
+      + ' cadenza=' + pArm.attackCooldown + ' gittata=' + pArm.shotLife);
   }
 
-  // [20] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [20] PROIETTILI FERMATI DAL TERRENO (bug segnalato dal playtest 2026-07-29: "i proiettili
+  // attraversano le colline"). Il pavimento e' una MAPPA DI ALTEZZE, non un corpo fisico: l'unico
+  // collider era un rettangolo piatto in fondo al mondo, quindi tutto cio' che stava sopra quel
+  // rettangolo — cioe' ogni collina — veniva attraversato. Ora c'e' un controllo a mano ogni
+  // frame; questo test lo tiene onesto.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 3;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsP = g.scene.getScene('GameScene');
+    avanza(gsP, 20);
+    gsP.shots.getChildren().forEach((s) => { if (s.active) s.destroy(); });
+    // Piazza una pallina DENTRO il terreno (sotto il profilo) e una dentro il soffitto: dopo un
+    // frame non devono piu' esistere.
+    const x = Math.round(gsP.worldW * 0.5);
+    const dentroTerra = gsP.shots.create(x, gsP.terrainTopAt(x) + 30, 'soap');
+    dentroTerra.body.setAllowGravity(false);
+    const dentroSoffitto = gsP.shots.create(x + 60, gsP.ceilingYAt(x + 60) - 30, 'soap');
+    dentroSoffitto.body.setAllowGravity(false);
+    avanza(gsP, 3);
+    const terraOk = !dentroTerra.active;
+    const soffittoOk = !dentroSoffitto.active;
+    // E nessuna pallina sopravvissuta puo' trovarsi sotto il profilo del terreno.
+    const nessunaSepolta = gsP.shots.getChildren().every((s) => !s.active || s.y < gsP.terrainTopAt(s.x));
+    if (terraOk && soffittoOk && nessunaSepolta) ok('i proiettili non attraversano le colline', 3);
+    else ko('i proiettili non attraversano le colline', 3,
+      'terra=' + terraOk + ' soffitto=' + soffittoOk + ' nessunaSepolta=' + nessunaSepolta);
+  }
+
+  // [21] CRONOMETRO A PROVA DI PAUSA (bug segnalato 2026-07-29: "se c'e' un timer e metto in
+  // pausa, il tempo non si ferma"). La causa era sottile: le scadenze erano calcolate
+  // sull'orologio della SCENA (che in pausa si ferma) mentre update() le confrontava con quello
+  // del GIOCO (che non si ferma), quindi alla ripresa il conto faceva un salto pari alla pausa.
+  // Ora si conta il tempo RIMASTO, scalato di `delta` a ogni frame della scena.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 4;
+    window.GameState.prossimoLivello = { kind: 'siege', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsT = g.scene.getScene('GameScene');
+    avanza(gsT, 20);
+    const primaPausa = gsT.siegeLeftMs;
+    gsT.scene.launch('PauseScene', { from: 'GameScene' });
+    gsT.scene.pause();
+    passaTick();
+    for (let i = 0; i < 180; i++) { t += 16.6; g.loop.step(t); }   // ~3 secondi di pausa VERA
+    const dopoPausa = gsT.siegeLeftMs;
+    gsT.scene.resume();
+    try { g.scene.stop('PauseScene'); } catch (e) { /* niente */ }
+    passaTick();
+    avanza(gsT, 30);                                               // mezzo secondo di gioco vero
+    const dopoRipresa = gsT.siegeLeftMs;
+    const fermoInPausa = Math.abs(dopoPausa - primaPausa) < 50;    // in pausa NON deve scendere
+    const riparte = dopoRipresa < dopoPausa - 200;                 // ripreso, deve tornare a scendere
+    if (fermoInPausa && riparte) {
+      ok('il cronometro si ferma in pausa', 4, 'in pausa ' + Math.round(primaPausa - dopoPausa)
+        + 'ms, poi riparte (' + Math.round(dopoPausa - dopoRipresa) + 'ms in mezzo secondo)');
+    } else {
+      ko('il cronometro si ferma in pausa', 4, 'prima=' + Math.round(primaPausa)
+        + ' dopoPausa=' + Math.round(dopoPausa) + ' dopoRipresa=' + Math.round(dopoRipresa));
+    }
+  }
+
+  // [22] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 
