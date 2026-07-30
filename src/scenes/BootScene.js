@@ -18,9 +18,9 @@ class BootScene extends Phaser.Scene {
     // altri 5 erano generati a codice con PixelArt.fromGrid — ora rimosso). Caricate DIRETTAMENTE
     // dal file (non via `img`) per non passare dai vecchi data URI in SPRITE_DATA, che avrebbero
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
-    [['enemy_spit', 'gorgogliante'],
-     ['enemy_fly', 'moscerino'], ['enemy_flea', 'pulce'], ['enemy_hopper', 'saltatore'],
-     ['enemy_boss', 'boss'], ['enemy_boss_regina', 'regina']]
+    // Restano immagini FERME solo i nemici non ancora animati (2026-07-30: solo il saltatore,
+    // le cui zampe vanno rigenerate — vedi ROADMAP §animazioni nemici).
+    [['enemy_hopper', 'saltatore']]
       .forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
 
     // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE
@@ -33,9 +33,21 @@ class BootScene extends Phaser.Scene {
     // versione nuova dell'animazione. Sbagliarla non da' errore, taglia gli sprite di traverso.
     this.load.spritesheet('enemy_blob', 'assets/spritesheets/enemies/cerumino_crawl_px.png',
       { frameWidth: 116, frameHeight: 72 });
-    // CROSTA ANIMATA (2026-07-28), stessa idea e stessa chiave di prima ('enemy_crust').
-    this.load.spritesheet('enemy_crust', 'assets/spritesheets/enemies/crosta_crawl_px.png',
-      { frameWidth: 118, frameHeight: 70 });
+    // TUTTI GLI ALTRI NEMICI, ANIMATI. Ognuno tiene la sua chiave storica ('enemy_crust',
+    // 'enemy_fly', ...): cosi' la tabella ART, le hitbox e ogni altro punto che li mostra
+    // continuano a funzionare senza sapere che ora sono sprite sheet — chi non chiede
+    // un'animazione vede il frame 0.
+    // ⚠️ Le misure devono combaciare con quello che stampa tools\bake_sheet.py ("12 frame da
+    // WxH"): dipendono dal riquadro comune dei frame e CAMBIANO se si ri-baka una versione nuova.
+    // Sbagliarle non da' errore: taglia gli sprite di traverso.
+    [['enemy_crust', 'crosta_crawl_px', 118, 70],
+     ['enemy_fly', 'moscerino_fly_px', 88, 77],
+     ['enemy_flea', 'pulce_walk_px', 74, 64],
+     ['enemy_spit', 'gorgogliante_crawl_px', 80, 67],
+     ['enemy_boss', 'boss_walk_px', 210, 144],
+     ['enemy_boss_regina', 'regina_walk_px', 225, 129]]
+      .forEach(([chiave, file, w, h]) => this.load.spritesheet(chiave,
+        'assets/spritesheets/enemies/' + file + '.png', { frameWidth: w, frameHeight: h }));
 
     // Immagini "vere" (fondale, timpano, protuberanze): sono INCORPORATE come data URI
     // (src/assets_data.js) cosi' si caricano anche da file:// (i browser bloccano i
@@ -118,15 +130,22 @@ class BootScene extends Phaser.Scene {
       }
     });
 
-    // La CROSTA e' secca e pesante: si trascina piu' lenta del cerumino (5 fps contro 8), come
-    // gia' annotato quando si erano decise le animazioni dei nemici.
-    if (!this.anims.exists('crust_crawl')) {
-      this.anims.create({
-        key: 'crust_crawl',
-        frames: this.anims.generateFrameNumbers('enemy_crust', { start: 0, end: 11 }),
-        frameRate: 5, repeat: -1,
-      });
-    }
+    // CICLI DEI NEMICI. La velocita' e' scelta per CARATTERE, non per comodita': la crosta e'
+    // secca e pesante e si trascina (5), il cerumino striscia (8), il moscerino sbatte le ali
+    // (16, e' l'unico che vola), i due boss sono moli lente (6).
+    [['crust_crawl', 'enemy_crust', 11, 5],
+     ['fly_flap', 'enemy_fly', 7, 16],
+     ['flea_walk', 'enemy_flea', 11, 9],
+     ['spit_crawl', 'enemy_spit', 11, 6],
+     ['boss_walk', 'enemy_boss', 11, 6],
+     ['regina_walk', 'enemy_boss_regina', 11, 6]].forEach(([chiave, sheet, ultimo, fps]) => {
+      if (!this.anims.exists(chiave)) {
+        this.anims.create({
+          key: chiave, frames: this.anims.generateFrameNumbers(sheet, { start: 0, end: ultimo }),
+          frameRate: fps, repeat: -1,
+        });
+      }
+    });
 
     // player e i 7 NEMICI (round B.2) ora arrivano da PNG (vedi preload): le texture
     // procedurali di moscerino/gorgogliante/pulce/saltatore/boss sono state rimosse. Qui sotto

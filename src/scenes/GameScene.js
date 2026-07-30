@@ -1695,7 +1695,13 @@ class GameScene extends Phaser.Scene {
     e.kind = kind;
     // Nemici ANIMATI: ognuno parte da un frame a caso, altrimenti un gruppo che compare insieme
     // si muove all'unisono e si vede che sono copie della stessa creatura.
-    const CICLO = { blob: 'blob_crawl', crust: 'crust_crawl' };
+    // Il boss ha due cicli diversi a seconda di CHI e' (Tappo o Regina): la tabella li tiene
+    // separati, cosi' aggiungere il prossimo nemico animato resta una riga.
+    const CICLO = {
+      blob: 'blob_crawl', crust: 'crust_crawl', fly: 'fly_flap',
+      flea: 'flea_walk', spit: 'spit_crawl',
+      boss: (cfg.bossKind === 'regina') ? 'regina_walk' : 'boss_walk',
+    };
     if (CICLO[kind] && this.anims.exists(CICLO[kind])) {
       e.play(CICLO[kind]);
       e.anims.setProgress(Math.random());
