@@ -97,6 +97,7 @@ window.I18n = (function () {
       // --- Livello completato ---
       done_title: 'LEVEL {n} COMPLETE!',
       done_sub: 'Ear canal cleaned!',
+      done_cura: 'You catch your breath:  +{n} HP',
       // --- Game over ---
       over_title: 'OVERWHELMED BY EARWAX',
       over_level: 'Run ended at level {n}',
@@ -371,6 +372,7 @@ window.I18n = (function () {
       // --- Livello completato ---
       done_title: 'LIVELLO {n} COMPLETATO!',
       done_sub: 'Condotto ripulito!',
+      done_cura: 'Riprendi fiato:  +{n} vita',
       // --- Game over ---
       over_title: 'SOPRAFFATTO DAL CERUME',
       over_level: 'Run terminata al livello {n}',

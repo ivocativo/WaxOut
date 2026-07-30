@@ -1290,7 +1290,7 @@ class GameScene extends Phaser.Scene {
     const p = this.pickups.create(x, y, 'wax_glob').setDepth(7);
     p.body.setAllowGravity(false);
     p.body.setSize(14, 14, true);
-    if (heal) { p.isHeal = true; p.setTint(0xff8fae); p.waxValue = 2; p.healValue = 14; }
+    if (heal) { p.isHeal = true; p.setTint(0xff8fae); p.waxValue = 2; p.healValue = window.CONFIG.CURA_PICKUP; }
     else p.waxValue = 5;
     this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut' });
   }
@@ -3193,6 +3193,23 @@ class GameScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff7e8',
       stroke: '#14161f', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+
+    // CURA DI FINE LIVELLO (chiesta dall'utente 2026-07-29): "l'equivalente di una pallina",
+    // cioe' quanto una cura raccolta a terra (CONFIG.CURA_PICKUP). La vita NON si ricarica
+    // del tutto fra un livello e l'altro — quella scelta resta, e' il motivo per cui la run e'
+    // una corsa a lungo respiro — ma arrivare al livello dopo con un filo di fiato in piu' evita
+    // che una brutta partenza si trascini fino alla fine.
+    const pl = window.GameState.player;
+    if (pl.hp < pl.maxHp) {
+      const prima = pl.hp;
+      pl.hp = Math.min(pl.maxHp, pl.hp + window.CONFIG.CURA_PICKUP);
+      const recuperata = Math.round(pl.hp - prima);
+      this.add.text(W / 2, H / 2 + 58, window.I18n.t('done_cura', { n: recuperata }), {
+        fontFamily: 'monospace', fontSize: '16px', color: '#9fe6a0',
+        stroke: '#14161f', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+      this.healFx(this.player.x, this.player.y);
+    }
 
     // Ultimo livello: niente carta di potenziamento, si va alla VITTORIA. Sceglierne una che
     // non si usera' mai era solo un passaggio a vuoto fra il colpo finale e i titoli.

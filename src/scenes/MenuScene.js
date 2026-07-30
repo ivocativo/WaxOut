@@ -39,8 +39,13 @@ class MenuScene extends Phaser.Scene {
       stroke: '#14161f', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    // Mascotte (spazio libero adesso: non piu' schiacciate contro il blocco comandi)
-    const guy = this.add.sprite(W / 2 - 150, 300, 'player_a').setScale(2.6);
+    // Mascotte: il personaggio VERO, quello animato che si usa in partita. Qui era rimasto il
+    // vecchio sprite pixel di due restyling fa (segnalato dall'utente 2026-07-29): chi apriva il
+    // gioco vedeva un personaggio, poi ne trovava un altro appena premeva Inizia.
+    // Le animazioni sono registrate da BootScene, quindi sono gia' pronte qui.
+    const guy = this.add.sprite(W / 2 - 150, 300, 'hero_idle', 0);
+    guy.setScale(150 / guy.height);            // stessa statura della mascotte nemica
+    if (this.anims.exists('hero_idle_a')) guy.play('hero_idle_a');
     this.tweens.add({ targets: guy, y: '-=12', duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     // Mascotte nemico: scala calcolata dalla texture (l'immagine AI e' molto piu' grande della
     // vecchia texture pixel — a scala fissa 2.6 sarebbe gigantesca). ~150px di altezza.

@@ -37,6 +37,9 @@ window.CONFIG = {
   VITA_NEMICI: 0.8,       // quanto sono piu' fragili i nemici
   // Da questo livello in poi il cerume da pulire cala: un livello lungo il triplo non deve
   // chiedere il triplo del tempo di pulizia, o la parte finale della run diventa una corvee.
+  // Quanta vita vale una "pallina" di cura: sia quelle raccolte a terra sia il recupero
+  // automatico a fine livello (2026-07-29). Un numero solo, cosi' le due cose non divergono.
+  CURA_PICKUP: 14,
   MENO_CERUME_DA: 8,
   MENO_CERUME_PASSO: 0.055,   // -5,5% di membrane per ogni livello oltre la soglia (min 60%)
 

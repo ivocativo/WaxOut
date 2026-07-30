@@ -104,6 +104,20 @@ class BootScene extends Phaser.Scene {
         frameRate: 8, repeat: -1,
       });
     }
+    // ANIMAZIONI DEL PERSONAGGIO: registrate QUI e non piu' solo in GameScene, cosi' sono
+    // disponibili anche prima di iniziare a giocare — al menu serviva il personaggio animato e
+    // c'era rimasto il vecchio sprite pixel (segnalato dall'utente 2026-07-29). GameScene le
+    // registra ancora con la stessa guardia `exists`, quindi non cambia niente per lei.
+    [['hero_walk_a', 'hero_walk', 18], ['hero_run_a', 'hero_run', 22],
+     ['hero_idle_a', 'hero_idle', 10], ['hero_jump_a', 'hero_jump', 18]].forEach(([chiave, sheet, fps]) => {
+      if (!this.anims.exists(chiave)) {
+        this.anims.create({
+          key: chiave, frames: this.anims.generateFrameNumbers(sheet, { start: 0, end: 24 }),
+          frameRate: fps, repeat: -1,
+        });
+      }
+    });
+
     // La CROSTA e' secca e pesante: si trascina piu' lenta del cerumino (5 fps contro 8), come
     // gia' annotato quando si erano decise le animazioni dei nemici.
     if (!this.anims.exists('crust_crawl')) {
