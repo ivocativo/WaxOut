@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (62 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (63 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -248,6 +248,24 @@ spruzzino). Il meccanismo resta INTERO: per riaprirlo servono il pulsante in `Me
 riga in `state.js` (`const scelta = 'fioc'`). Il controllo [19] ora verifica il contrario di
 prima — che nessun salvataggio vecchio cambi il kit.
 
+## E.bis — Coda del round 4 (2026-07-31)
+
+- **Rimbalzo che non rimbalzava.** Col potenziamento RIMBALZO i colpi si piantavano lo stesso
+  nelle colline. Il rimedio del giro prima invertiva la velocita' VERTICALE, ma un colpo sparato
+  in piano ha vy≈0: invertire zero lo lasciava incollato al pendio a bruciare un rimbalzo per
+  fotogramma, e dopo tre si spappolava comunque. Ora `rimbalzaSulTerreno()` misura la PENDENZA
+  del profilo su 16px e specchia la velocita' attorno alla perpendicolare, poi spinge il colpo
+  fuori dalla superficie (senza, rientra il frame dopo e ne consuma un altro). Vale anche per il
+  soffitto. Controllo automatico [22].
+- **Comparsa dei nemici** ("vorrei durasse di piu', deve capirsi che escono dal suolo"). Erano
+  380ms in cui il nemico si limitava ad allungarsi — e per giunta partiva schiacciato **al centro
+  della propria statura**, cioe' a mezz'aria: sembrava che si srotolasse per aria, non che
+  uscisse da sotto. Ora sono due tempi, ~1 secondo (1,5 per i boss): prima il pavimento si gonfia
+  in una bolla coi colori del terreno (`GameGfx.CARNE`, larga quanto la creatura) — telegrafo
+  onesto che dice DOVE sta per uscire — poi il nemico spinge fuori **coi piedi appoggiati a
+  terra** per tutta la salita, con sbuffi lungo il percorso. Resta inerte (`e.spawning`) per
+  tutto il tempo, quindi allungarla non alza la difficolta': la abbassa.
+
 ---
 
 # ANIMAZIONI DEI NEMICI ✅ COMPLETE (2026-07-28/30)
@@ -369,10 +387,13 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
     che leggono il kit, controllo automatico [19]. La carta "Martello di Cerume" e' stata sostituita
     da **Testa Pesante** (+30% danno mischia): dare il martello con una carta non ha piu' senso ora
     che l'arma la scegli tu, e Testa Pesante funziona con qualunque kit.
-  - [ ] **ARTE**: le 5 armi usano ancora le vecchie texture disegnate a codice (coton fioc /
-    martello / spruzzino, ripetute). Servono i disegni veri — prompt da scrivere, l'utente genera,
-    poi `tools/bake_sprite.ps1` e una voce nella tabella `WEAPONS` di `GameScene` (tex, perno,
-    scala, mano). **Solo dopo il playtest**, cosi' si disegnano solo i kit che restano.
+  - [x] **ARTE FATTA (2026-07-31)**: le due armi che restano dopo la chiusura dell'arsenale sono
+    disegnate. `assets/sprites/weapons/swab_px.png` (80x12) e `sprayer_px.png` (39x24), stessa
+    pipeline dei nemici (fondo magenta -> `tools/bake_sprite.ps1`), caricate in `BootScene` e
+    descritte nella tabella `WEAPONS` di `GameScene` (perno = dove sta la mano, scala 0,5 perche'
+    sono baked a doppia risoluzione). Il coton fioc ha UNA punta sola: si impugna dal lato nudo.
+    Resta generato a codice solo `PA.hammer`, per il kit dormiente dell'arsenale.
+    **Con questo, nel gioco non c'e' piu' nessuna texture disegnata a codice.**
   - [ ] **TARATURA**: i numeri sono una prima stima (profilo misurato sotto). Da giudicare in mano.
 
 | kit | mischia | getto |

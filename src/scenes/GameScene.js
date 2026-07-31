@@ -225,10 +225,16 @@ class GameScene extends Phaser.Scene {
     // (nessuna ri-generazione del personaggio). Compare durante l'attacco (poi si nasconde).
     // hand = offset [x,y] della mano dal centro fisico (x va specchiato col facing); origin =
     // perno di rotazione dentro la texture (grip). Tutti valori da tarare a occhio.
+    // `origin` = dove sta la MANO dentro l'immagine (e quindi il perno della rotazione).
+    // `scale` porta il disegno alla dimensione a schermo: le immagini nuove sono baked a doppia
+    // risoluzione (80x12 e 39x24) e vengono rimpicciolite a meta', cosi' restano nitide.
     this.WEAPONS = {
-      sprayer: { tex: 'sprayer', origin: [0.18, 0.6], scale: 1.0, hand: [8, -2] },
-      swab:    { tex: 'swab',    origin: [0.10, 0.5], scale: 1.0, hand: [6, -2] },
-      hammer:  { tex: 'hammer',  origin: [0.22, 0.5], scale: 0.9, hand: [6, -6] },
+      // Spruzzino: la mano e' sull'impugnatura, in basso a sinistra del corpo.
+      sprayer: { tex: 'sprayer', origin: [0.23, 0.78], scale: 0.5, hand: [8, -2] },
+      // Coton fioc a una punta: la mano e' all'estremita' NUDA del bastoncino, il batuffolo
+      // sporco di cerume e' la parte che colpisce.
+      swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.5, hand: [6, -2] },
+      hammer:  { tex: 'hammer',  origin: [0.22, 0.5],  scale: 0.9, hand: [6, -6] },
     };
     this.heroWeapon = this.add.sprite(this.player.x, this.player.y, 'sprayer').setDepth(11).setVisible(false);
     this._weaponHideAt = 0;   // istante fino a cui l'arma resta visibile dopo un attacco
@@ -1917,19 +1923,71 @@ class GameScene extends Phaser.Scene {
   // La gravità resta ATTIVA: il collider tiene il corpo appoggiato al pavimento mentre
   // lo sprite si allunga verso l'alto (così non sprofonda mai sotto la linea del terreno).
   emergeFromGround(e, targetScale, restY, x, groundTop, big) {
-    e.setScale(targetScale, targetScale * 0.12);  // appiattito a terra
+    // COMPARSA IN DUE TEMPI (rifatta 2026-07-31: "deve capirsi che escono dal suolo"). Prima
+    // durava 380ms e il nemico si limitava ad allungarsi: sembrava comparso dal nulla, e per il
+    // giocatore era un nemico che si materializzava addosso senza preavviso.
+    // 1) il TERRENO SI GONFIA nel punto: una bolla di carne che cresce, con sbuffi di terra.
+    //    Il nemico non c'e' ancora. E' anche un telegrafo onesto: dice DOVE sta per uscire.
+    // 2) il nemico spinge fuori dalla bolla e si allunga fino alla sua statura.
+    // In tutto ~1 secondo (1,5 per il boss) contro i 380ms di prima. Resta inerte per tutto il
+    // tempo (e.spawning), quindi allungarla non rende il gioco piu' difficile: piu' facile.
+    const GONFIO = big ? 520 : 380;
+    const USCITA = big ? 980 : 620;
+
+    e.setVisible(false);
+    e.setScale(targetScale, targetScale * 0.08);
     e.setAlpha(0.9);
-    this.groundPuff(x, groundTop, big);
-    if (big) this.cameras.main.shake(220, 0.009);
-    window.Sfx.emerge(big);
+    // I PIEDI RESTANO A TERRA mentre cresce. L'immagine ha l'origine al centro: schiacciarla e
+    // basta (com'era prima) lasciava il nemico a mezz'aria, all'altezza della sua vita, e a
+    // schermo non sembrava che uscisse dal terreno ma che si srotolasse per aria. Alzando la y
+    // insieme alla scala, il bordo inferiore resta appoggiato al suolo per tutta la salita.
+    const mezzo = groundTop - restY;                 // meta' altezza a schermo, da spawnEnemy
+    const quotaPer = (s) => groundTop - mezzo * s;   // s = frazione di statura raggiunta
+    e.y = quotaPer(0.08);
+
+    // La bolla usa i colori del terreno (GameGfx.CARNE, depth 4.3) cosi' sembra il pavimento che
+    // si solleva, non un cerchio disegnato sopra: stessa crosta, stesso filo di luce sul bordo.
+    // Cresce SOLO VERSO L'ALTO — l'ellisse ha l'origine al centro, quindi mentre la scalo devo
+    // anche alzarla, se no meta' del gonfiore va sottoterra e a schermo sembra un'ombra.
+    const C = window.GameGfx.CARNE;
+    // larghezza presa dalla creatura stessa: il gonfiore e' il buco da cui esce, quindi deve
+    // starle attorno. Un valore fisso andava bene per la zanzara e diventava un francobollo
+    // sotto al boss.
+    const largo = e.displayWidth * 0.78;
+    const ALTA = 10, MAX = big ? 3.6 : 3.0;
+    const suolo = (s) => groundTop + 4 - (ALTA / 2) * s;   // tiene il fondo appoggiato al terreno
+    const bolla = this.add.ellipse(x, suolo(1), largo, ALTA, C.crosta, 1)
+      .setDepth(4.4).setStrokeStyle(2, C.bordo, 0.7);
     this.tweens.add({
-      targets: e, scaleY: targetScale, alpha: 1,
-      duration: big ? 600 : 380, ease: 'Back.out',
-      onComplete: () => {
-        this.endSpawn(e);
-        // assestamento gommoso
-        this.tweens.add({ targets: e, scaleX: targetScale * 1.1, scaleY: targetScale * 0.9, yoyo: true, duration: 90 });
-      },
+      targets: bolla, scaleY: MAX, scaleX: 1.18, y: suolo(MAX),
+      duration: GONFIO, ease: 'Quad.out',
+    });
+    this.groundPuff(x, groundTop, big);
+    if (big) this.cameras.main.shake(260, 0.010);
+    window.Sfx.emerge(big);
+
+    this.time.delayedCall(GONFIO, () => {
+      if (!e.active) { bolla.destroy(); return; }
+      e.setVisible(true);
+      this.groundPuff(x, groundTop, big);
+      if (big) this.cameras.main.shake(200, 0.008);
+      // la bolla si sgonfia mentre il nemico esce: e' lui che ha preso il suo posto
+      this.tweens.add({ targets: bolla, scaleY: 0.2, y: suolo(0.2), alpha: 0, duration: USCITA * 0.6,
+        onComplete: () => bolla.destroy() });
+      // qualche sbuffo lungo la salita, se no il movimento sembra un semplice ingrandimento
+      [0.3, 0.62].forEach((q) => this.time.delayedCall(USCITA * q, () => {
+        if (e.active) this.groundPuff(e.x, groundTop, false);
+      }));
+      this.tweens.add({
+        targets: e, scaleY: targetScale, y: restY, alpha: 1,
+        duration: USCITA, ease: 'Back.out',
+        onComplete: () => {
+          e.y = restY;                    // Back.out sfora: rimette i piedi esattamente a terra
+          this.endSpawn(e);
+          // assestamento gommoso
+          this.tweens.add({ targets: e, scaleX: targetScale * 1.1, scaleY: targetScale * 0.9, yoyo: true, duration: 90 });
+        },
+      });
     });
   }
 
@@ -3424,6 +3482,36 @@ class GameScene extends Phaser.Scene {
     if (newAmp >= curAmp) { this.jx = ax; this.jy = ay; }
   }
 
+  // RIMBALZO su una superficie INCLINATA (colline e soffitto ondulato). Non basta invertire la
+  // velocita' verticale: una pallina sparata in orizzontale ha vy≈0, e invertire zero lascia il
+  // colpo fermo contro la collina — consumava un rimbalzo per frame finche' finivano e poi si
+  // spappolava lo stesso (segnalato dall'utente 2026-07-31, dopo il fix che le fermava). Qui si
+  // calcola la PENDENZA del terreno nel punto d'urto e si specchia la velocita' attorno alla
+  // perpendicolare: su una salita il colpo schizza in alto, come ci si aspetta.
+  rimbalzaSulTerreno(sh) {
+    const now = this.time.now;
+    if (now < (sh.bounceGrace || 0)) return;   // un urto solo per volta
+    sh.bounceGrace = now + 60;
+    sh.bounceLeft -= 1;
+
+    const soffitto = sh.y <= this.ceilingYAt(sh.x);
+    const quota = (x) => (soffitto ? this.ceilingYAt(x) : this.terrainTopAt(x));
+    // pendenza misurata su 16px attorno al punto: dy/dx del profilo
+    const pend = (quota(sh.x + 8) - quota(sh.x - 8)) / 16;
+    // perpendicolare al profilo, rivolta verso il condotto (su per il terreno, giu' pel soffitto)
+    const verso = soffitto ? 1 : -1;
+    const len = Math.hypot(pend, 1) || 1;
+    const nx = (-pend / len) * verso, ny = (1 / len) * verso;
+
+    const v = sh.body.velocity;
+    const dot = v.x * nx + v.y * ny;
+    sh.setVelocity(v.x - 2 * dot * nx, v.y - 2 * dot * ny);
+    // spinge il colpo FUORI dalla superficie, se no rientra subito e consuma un altro rimbalzo
+    sh.x += nx * 6;
+    sh.y = quota(sh.x) + verso * 7;
+    this.splat(sh.x, sh.y, 'soft');
+  }
+
   // I proiettili (getto del giocatore e sputi dei nemici) non hanno un terreno SOLIDO contro cui
   // sbattere: il pavimento e' una mappa di altezze, e l'unico corpo fisico e' un rettangolo piatto
   // in fondo al mondo. Quindi qui si controlla a mano, ogni frame, se hanno passato il profilo del
@@ -3431,13 +3519,9 @@ class GameScene extends Phaser.Scene {
   fermaProiettiliNelTerreno() {
     const fuori = (o) => o.y >= this.terrainTopAt(o.x) || o.y <= this.ceilingYAt(o.x);
     this.shots.getChildren().forEach((sh) => {
-      if (sh.active && fuori(sh)) {
-        if (sh.bounceLeft > 0) {   // abilita' RIMBALZO: rimbalza sul terreno invece di spappolarsi
-          sh.bounceLeft -= 1;
-          sh.y = Phaser.Math.Clamp(sh.y, this.ceilingYAt(sh.x) + 6, this.terrainTopAt(sh.x) - 6);
-          sh.body.velocity.y *= -1;
-        } else this.popShot(sh);
-      }
+      if (!sh.active || !fuori(sh)) return;
+      if (sh.bounceLeft > 0) this.rimbalzaSulTerreno(sh);   // abilita' RIMBALZO
+      else this.popShot(sh);
     });
     this.projectiles.getChildren().forEach((pr) => {
       if (pr.active && fuori(pr)) this.popProjectile(pr);

@@ -20,6 +20,13 @@ class BootScene extends Phaser.Scene {
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
     // (Dal 2026-07-30 TUTTI i nemici sono animati: non resta nessuna immagine ferma.)
 
+    // ARMI IN MANO (2026-07-31): erano le ultime due texture disegnate a codice di tutto il
+    // gioco. Ora sono immagini vere, stessa pipeline di nemici e timpano (fondo magenta ->
+    // tools\bake_sprite.ps1). Il coton fioc ha UNA sola punta: il bastoncino nudo e' dove il
+    // personaggio impugna, ed e' li' che sta il perno (vedi WEAPONS in GameScene).
+    [['swab', 'swab_px'], ['sprayer', 'sprayer_px']]
+      .forEach(([chiave, file]) => this.load.image(chiave, 'assets/sprites/weapons/' + file + '.png'));
+
     // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE
     // SHEET (12 frame di strisciata, testa a destra come tutti gli altri sprite del gioco). Usare
     // la stessa chiave invece di aggiungerne una nuova fa si' che tutto quello che gia' mostra il
@@ -183,9 +190,10 @@ class BootScene extends Phaser.Scene {
     PA.solid(this, 'bit_hard', C.waxHardLight, 5, 5);
 
     // --- Armi ---
-    PA.swab(this, 'swab');
+    // swab e sprayer arrivano da immagini vere (vedi preload). Il martello resta generato a
+    // codice: e' l'arma del kit "martello" dell'ARSENALE, oggi chiuso — se un domani si riapre
+    // serve una texture, e questa costa zero.
     PA.hammer(this, 'hammer');
-    PA.sprayer(this, 'sprayer');   // arma a distanza tenuta in mano (layer arma)
 
     this.scene.start('MenuScene');
   }

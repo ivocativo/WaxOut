@@ -704,7 +704,65 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [22] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [22] IL RIMBALZO FUNZIONA ANCHE SULLE COLLINE (bug segnalato 2026-07-31, il giro dopo il
+  // controllo [20]: "se ottengo il potenziamento dei proiettili che rimbalzano questi continuano
+  // a fermarsi"). Il primo rimedio invertiva la velocita' VERTICALE, ma un colpo sparato in
+  // orizzontale ha vy≈0: invertire zero lo lasciava incollato alla collina, a bruciare un
+  // rimbalzo per fotogramma. Ora si specchia la velocita' attorno alla perpendicolare del
+  // pendio. Il controllo spara in piano contro una salita e pretende che il colpo SOPRAVVIVA,
+  // esca dal terreno, prenda una componente verticale e consumi UN SOLO rimbalzo.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 3;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsR = g.scene.getScene('GameScene');
+    avanza(gsR, 20);
+    gsR.shots.getChildren().forEach((s) => { if (s.active) s.destroy(); });
+    // cerca una SALITA verso destra (terreno davanti piu' alto, cioe' y minore) in un tratto
+    // sgombro: un cumulo di cerume o un nemico sulla traiettoria spappolerebbero il colpo per
+    // un motivo diverso da quello in prova.
+    // Il livello e' generato a caso ogni volta: cercare solo le salite VERSO DESTRA falliva a
+    // volte per assenza di bersagli. Si accetta il primo pendio nei due sensi e si spara in
+    // salita, qualunque sia il verso.
+    let xr = null, verso = 1;
+    const sgombro = (x) => !gsR.blocks.getChildren().some((b) => b.active && Math.abs(b.x - x) < 90)
+      && !gsR.enemies.getChildren().some((e) => e.active && Math.abs(e.x - x) < 90);
+    for (let x = 200; x < gsR.worldW - 200 && xr === null; x += 4) {
+      if (!sgombro(x)) continue;
+      const qui = gsR.terrainTopAt(x);
+      if (gsR.terrainTopAt(x + 16) < qui - 8) { xr = x; verso = 1; }
+      else if (gsR.terrainTopAt(x - 16) < qui - 8) { xr = x; verso = -1; }
+    }
+    if (xr === null) {
+      ko('i proiettili rimbalzanti non si piantano nelle colline', 3, 'nessuna salita nel livello');
+    } else {
+      const sh = gsR.shots.create(xr, gsR.terrainTopAt(xr) - 2, 'soap');
+      sh.body.setAllowGravity(false);
+      sh.bounceLeft = 2;
+      sh.setVelocity(300 * verso, 0);               // in piano, dritto contro la salita
+      // 10 fotogrammi e non 4: update() gira PRIMA che la fisica sposti i corpi, quindi il
+      // controllo di un frame vede la posizione di quello prima — con una finestra stretta il
+      // colpo risultava ancora sepolto per un semplice sfasamento.
+      avanza(gsR, 10);
+      const vivo = sh.active;
+      const fuori = vivo && sh.y < gsR.terrainTopAt(sh.x);
+      const risale = vivo && sh.body.velocity.y < -20;   // deviato verso l'alto dal pendio
+      const unoSolo = sh.bounceLeft >= 1;                // non li ha bruciati a raffica
+      if (vivo && fuori && risale && unoSolo) {
+        ok('i proiettili rimbalzanti non si piantano nelle colline', 3,
+          'vy ' + Math.round(sh.body.velocity.y) + ', rimbalzi rimasti ' + sh.bounceLeft);
+      } else {
+        ko('i proiettili rimbalzanti non si piantano nelle colline', 3,
+          'vivo=' + vivo + ' fuori=' + fuori + ' risale=' + risale
+          + ' rimasti=' + sh.bounceLeft);
+      }
+    }
+  }
+
+  // [23] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

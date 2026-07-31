@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 62 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 63 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -55,8 +55,13 @@ _BILANCIAMENTO (danno PG x1,5, vita cerume e nemici x0,8, meno membrane dal live
 _**✅ ARSENALE CHIUSO** (decisione dell'utente dopo il playtest): si pubblica col kit unico._
 _**✅ TUTTI E OTTO I NEMICI ANIMATI** (`6b300bf`, `7f05bde`, `69244e3`): non resta piu' nessuna_
 _immagine ferma. Il saltatore ha un SALTO legato ai suoi stati, non una camminata._
-_**STATO ORA:** manca l'ARTE DELLE ARMI (l'unica cosa ancora disegnata a codice), gli **EASTER EGG**_
-_da scegliere e il **BLOCCO C** (Assedio: la tattica del cumulo-rifugio). Poi si va allo STORE._
+_**✅ ARMI DISEGNATE (2026-07-31):** coton fioc e spruzzino sono immagini vere. **Nel gioco non_
+_resta piu' nessuna texture disegnata a codice.** Nello stesso giro: il RIMBALZO dei proiettili_
+_ora funziona anche sulle colline (si specchia sulla perpendicolare del pendio, non piu'_
+_invertendo la sola velocita' verticale) e la COMPARSA dei nemici dura ~1s in due tempi —_
+_il pavimento si gonfia, poi la creatura ne esce coi piedi a terra._
+_**STATO ORA:** restano gli **EASTER EGG** da scegliere e il **BLOCCO C** (Assedio: la tattica_
+_del cumulo-rifugio). Poi si va allo STORE._
 
 **NOME:** l'utente ha scelto **WAXOUT** (2026-07-27) al posto di "Earwax War": "earwax" da solo
 porta al party game di Jackbox e a Earwax Clinic gia' su Play. Il nome NON e' ancora stato
@@ -124,7 +129,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-60 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+63 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -211,8 +216,9 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - `src/scenes/ShopScene.js` — negozio (2 colonne: Potenziamenti + Progetti) + pulsante reset.
 - `src/scenes/MenuScene.js` / `PauseScene.js` — menu e pausa. `src/scenes/BootScene.js` — carica gli
   sprite PNG (assets: personaggio, **7 nemici**, timpano), gli **sprite sheet animati del personaggio**
-  (`hero_walk`/`hero_run`/`hero_idle`/`hero_jump`, frame 84) e genera via codice le poche texture non
-  ancora ridisegnate (i nemici procedurali sono stati rimossi con `4a135cd`).
+  (`hero_walk`/`hero_run`/`hero_idle`/`hero_jump`, frame 84) e **le due armi**
+  (`assets/sprites/weapons/`). Dal 2026-07-31 non resta nessuna texture di gioco disegnata a
+  codice: sopravvive solo `PA.hammer`, per il kit dormiente dell'arsenale.
 - `src/gfx.js` (`GameGfx`) — SOLO rendering (sfondo, cerume, splat, `showBanner`, ecc.). Tenere
   grafica separata dal gameplay: sessione "grafica" tocca gfx.js, "gameplay" GameScene.js.
 - `src/i18n.js` — dizionario EN (default) + IT. Ogni stringa passa da `I18n.t('chiave')`.
@@ -250,8 +256,11 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   pixellati). Fisica/hitbox invariati (`this.player` invisibile, `this.heroVisual` segue). **Attacco:**
   prototipo **arma-in-mano** (`this.heroWeapon`, layer separato e intercambiabile via tabella `WEAPONS`) —
   a distanza punta la mira, corpo a corpo rotea; il braccio/testa del corpo NON seguono (serve una posa
-  dedicata per quello, rimandata). **BUG NOTO (da correggere, vedi ROADMAP §A.1):** nel corpo a corpo il
-  coton fioc compare DUE VOLTE (vecchio `GameGfx.showWeaponSwing` + nuovo layer, entrambi attivi).
+  dedicata per quello, rimandata). Dal 2026-07-31 le due armi sono **immagini disegnate**, non piu'
+  texture generate a codice: nella tabella `WEAPONS` l'`origin` e' il punto dell'immagine dove sta
+  la MANO (cioe' il perno della rotazione) e `scale` 0,5 perche' sono baked a doppia risoluzione.
+  (Il vecchio doppione del coton fioc — `GameGfx.showWeaponSwing` attivo insieme al layer — non
+  c'e' piu'.)
 - **Nemici:** blob (cerumino), crust (crosta, corazzata anti-getto), spit (gorgogliante),
   fly (moscerino, picchiata telegrafata), boss (Tappo di Cerume, si infuria a metà vita).
   **Varianti élite** (dal lvl 3): Corazzato (aura azzurra), Esplosivo (aura rossa),
