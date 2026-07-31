@@ -1609,7 +1609,7 @@ class GameScene extends Phaser.Scene {
       // ha anche il corpo piccolo diventa frustrante invece che impegnativo.
       enemy_fly:    { dispH: 44, hbW: 34, hbH: 28 },
       enemy_flea:   { dispH: 34, hbW: 20, hbH: 16 },
-      enemy_hopper: { dispH: 48, hbW: 40, hbH: 30 },
+      enemy_hopper: { dispH: 52, hbW: 40, hbH: 30 },
       enemy_boss:   { dispH: 96, hbW: 64, hbH: 56 },
       // La Regina e' larga e bassa (carica in orizzontale): stessa altezza a schermo del Tappo
       // ma corpo piu' largo e piu' schiacciato, come dice la sua silhouette.
@@ -2634,6 +2634,10 @@ class GameScene extends Phaser.Scene {
       e.setFlipX(dir < 0);
       return;
     }
+    // Camminando resta nella posa in piedi: il saltatore non ha un ciclo di passo (l'animazione
+    // che ha e' un SALTO), e a schermo si muove cosi' poco fra un balzo e l'altro che una posa
+    // ferma non si nota — mentre un ciclo inventato si noterebbe eccome.
+    if (e.anims && !e.anims.isPlaying) e.setFrame(0);
     e.setVelocityX(dir * e.speed);
     e.setFlipX(dir < 0);
   }
@@ -2669,6 +2673,7 @@ class GameScene extends Phaser.Scene {
         e.lungeUntil = now + 520;
         this.ripristinaTinta(e);
         if (e._baseScale) e.setScale(e._baseScale);
+        e.play('hopper_volo', true);
         e.setVelocity(e.lungeDir * (e.speed * 2.4 + 160), -420);
       }
       return;
@@ -2682,6 +2687,7 @@ class GameScene extends Phaser.Scene {
         e.atkState = 'idle';
         e.atkReadyAt = now + 900;
         e.setVelocityX(0);
+        e.play('hopper_atterra', true);
         this.hopperLandFx(e.x, e.y);
       }
       return;
@@ -2695,8 +2701,9 @@ class GameScene extends Phaser.Scene {
       e.lungeStartAt = now;
       e.setVelocityX(0);
       e.setTint(0xffb066);
-      const bs = e._baseScale || (e._baseScale = e.scaleX);
-      e.setScale(bs * 1.28, bs * 0.75);
+      // Lo schiacciamento ora lo fa il DISEGNO (animazione 'hopper_carica'): quello finto a
+      // scala che c'era prima lo raddoppiava e faceva sembrare il saltatore di gomma.
+      e.play('hopper_carica', true);
       e.setFlipX(dir < 0);
       return;
     }

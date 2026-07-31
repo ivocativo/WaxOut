@@ -18,10 +18,7 @@ class BootScene extends Phaser.Scene {
     // altri 5 erano generati a codice con PixelArt.fromGrid — ora rimosso). Caricate DIRETTAMENTE
     // dal file (non via `img`) per non passare dai vecchi data URI in SPRITE_DATA, che avrebbero
     // la precedenza. La scala e la hitbox a schermo le ricalcola GameScene.spawnEnemy (tabella ART).
-    // Restano immagini FERME solo i nemici non ancora animati (2026-07-30: solo il saltatore,
-    // le cui zampe vanno rigenerate — vedi ROADMAP §animazioni nemici).
-    [['enemy_hopper', 'saltatore']]
-      .forEach(([key, file]) => this.load.image(key, 'assets/sprites/enemies/' + file + '_px.png'));
+    // (Dal 2026-07-30 TUTTI i nemici sono animati: non resta nessuna immagine ferma.)
 
     // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE
     // SHEET (12 frame di strisciata, testa a destra come tutti gli altri sprite del gioco). Usare
@@ -45,7 +42,8 @@ class BootScene extends Phaser.Scene {
      ['enemy_flea', 'pulce_walk_px', 74, 64],
      ['enemy_spit', 'gorgogliante_crawl_px', 80, 67],
      ['enemy_boss', 'boss_walk_px', 210, 144],
-     ['enemy_boss_regina', 'regina_walk_px', 225, 129]]
+     ['enemy_boss_regina', 'regina_walk_px', 225, 129],
+     ['enemy_hopper', 'saltatore_salto_px', 104, 96]]
       .forEach(([chiave, file, w, h]) => this.load.spritesheet(chiave,
         'assets/spritesheets/enemies/' + file + '.png', { frameWidth: w, frameHeight: h }));
 
@@ -146,6 +144,22 @@ class BootScene extends Phaser.Scene {
         });
       }
     });
+
+    // SALTATORE: l'unico che NON ha un ciclo continuo. La sua animazione e' un SALTO, e il salto
+    // ha un inizio e una fine — quindi e' spezzata in tre pezzi che partono sugli stati veri
+    // dell'IA (carica, balzo, atterraggio) invece di girare a vuoto. `repeat: 0` = si ferma
+    // sull'ultimo fotogramma, che e' proprio quello che serve: resta nella posa giusta.
+    // La carica dura 4 frame in ~550ms perche' tanto dura il telegrafo nell'IA: se andasse piu'
+    // veloce finirebbe prima e il nemico resterebbe immobile ad aspettare.
+    [['hopper_carica', 0, 3, 7], ['hopper_volo', 4, 9, 14], ['hopper_atterra', 10, 11, 12]]
+      .forEach(([chiave, da, a, fps]) => {
+        if (!this.anims.exists(chiave)) {
+          this.anims.create({
+            key: chiave, frames: this.anims.generateFrameNumbers('enemy_hopper', { start: da, end: a }),
+            frameRate: fps, repeat: 0,
+          });
+        }
+      });
 
     // player e i 7 NEMICI (round B.2) ora arrivano da PNG (vedi preload): le texture
     // procedurali di moscerino/gorgogliante/pulce/saltatore/boss sono state rimosse. Qui sotto
