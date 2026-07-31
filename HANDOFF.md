@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 63 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 65 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -60,6 +60,10 @@ _resta piu' nessuna texture disegnata a codice.** Nello stesso giro: il RIMBALZO
 _ora funziona anche sulle colline (si specchia sulla perpendicolare del pendio, non piu'_
 _invertendo la sola velocita' verticale) e la COMPARSA dei nemici dura ~1s in due tempi —_
 _il pavimento si gonfia, poi la creatura ne esce coi piedi a terra._
+_**✅ ACCOVACCIAMENTO (2026-07-31):** era fermo dal 20 luglio in attesa di due risposte, che si_
+_sono risolte guardando disegni e codice. **6 frame dei 36** (a 60fps un accovacciamento di 180ms_
+_ne regge 11 in tutto), piu' la CAMMINATA accovacciata a 8 fotogrammi presi dal video._
+_Nuovo `tools/bake_hero_sheet.py`. Vedi §Asset nuovi._
 _**STATO ORA:** restano gli **EASTER EGG** da scegliere e il **BLOCCO C** (Assedio: la tattica_
 _del cumulo-rifugio). Poi si va allo STORE._
 
@@ -129,7 +133,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-63 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+65 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -462,7 +466,6 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   (errore 0px su 30 blocchi, 22 su colline/cunette). I pickup NON servivano fix (gia' agganciati).
 - **Rifinitura terreno:** look organico (con l'arte); taratura ampiezza/frequenza colline+cunette;
   togliere codice morto (`floorEdgeYAt`/`buildFloorProfile`, `addBump`/`addPit` disabilitati).
-- **Asset nuovi da integrare** (vedi sezione dedicata sotto): crouch + sfondo parallax.
 
 **1. GAMEPLAY — tarature (serve il PLAYTEST dell'utente, poco codice)**
 - Tarare i numeri "sensati" mai collaudati dal vivo: durata Corsa, `vy` salto boss, cadenza terremoto,
@@ -504,14 +507,46 @@ PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y
   **AutoSprite**, sheet in `assets/spritesheets/<entità>/`. Il procedurale-a-codice è stato bocciato._
 
 ### 🆕 Asset nuovi da integrare (l'utente li ha aggiunti, 2026-07-20)
-- **CROUCH (animazione accovacciamento):** 36 frame PNG in
-  `assets/spritesheets/hero/Nuova cartella/` (`Image1.png`..`Image36.png`), 708×1298, personaggio
-  accovacciato su **sfondo NERO**. Da fare: (1) togliere il nero → trasparente (tipo `cutout_bg.ps1`,
-  qui la chiave e' il nero puro), (2) montare i frame in UN spritesheet + pixelare/ridimensionare
-  come le altre anim (`hero_*_px`), (3) caricarlo in `BootScene`, (4) agganciare l'anim quando
-  `this.crouching` in `GameScene.update` (oggi c'e' solo uno "schiacciamento" segnaposto via scale).
-  **Dubbi da chiedere all'utente:** 36 frame sono tanti per un accovacciamento — e' un CICLO (giu'→su)
-  o una posa tenuta? Sostituire del tutto lo schiacciamento attuale?
+- ✅ **CROUCH — FATTO (2026-07-31).** I due dubbi si sono risolti guardando i disegni e il codice,
+  senza doverli girare all'utente: **e' una posa tenuta**, non un ciclo (i 36 frame vanno in una
+  direzione sola, in piedi → accovacciato, e non tornano su — per rialzarsi basta rileggerli al
+  contrario, `anims.playReverse`); e **non sostituisce nulla**, perche' lo "schiacciamento" di
+  prima era solo sulla SAGOMA invisibile (gameplay: decide se passi sotto un soffitto basso) e il
+  disegno restava dritto.
+  **Solo 6 frame** dei 36: a 60 fotogrammi al secondo un accovacciamento di 180ms ha spazio per 11
+  immagini in tutto, i primi 7 disegni valevano lo 0,8% della discesa e gli ultimi due erano
+  identici. Scelti campionando il MOVIMENTO (1,17,21,26,30,35), con le distanze che si accorciano
+  verso il fondo: scende di slancio e si assesta.
+  Nuovo strumento **`tools/bake_hero_sheet.py`** (i frame arrivano su fondo nero, non trasparenti
+  come quelli dei nemici, e vanno registrati sul rig del personaggio: celle 84×84, corpo 62px,
+  piedi al 86% — se no il personaggio "salta" al cambio di animazione). ⚠️ posterizzare a **6
+  livelli**, la tavolozza del personaggio e' a multipli di 51: con 22 il costume veniva piu' chiaro
+  degli altri e si vedeva il cambio. Controllo automatico [23].
+  **Limite noto e accettato con l'utente:** il disegno si abbassa al 82% della statura, la sagoma
+  al 68% — il personaggio passa sotto pertugi in cui a occhio non ci starebbe. Alzare la sagoma
+  renderebbe impraticabili passaggi gia' collaudati.
+- ✅ **CAMMINATA ACCOVACCIATA — FATTA (2026-07-31).** 8 fotogrammi presi dal VIDEO
+  `assets/spritesheets/hero/crouch move/crouch move.mp4` (i numeri 74,78,81,85,88,92,95,99 sono un
+  ciclo intero: misurando l'apertura delle gambe lungo il video si vede un passo ogni ~14
+  fotogrammi, quindi il ciclo ne dura 28).
+  **Dal VIDEO e non da pose singole**, ed e' la lezione da ricordare: i fotogrammi di un video
+  vengono tutti dalla stessa generazione, quindi inquadratura, scala, colori e proporzioni
+  combaciano gia'. Le due pose che l'utente aveva generato una per una (restano in
+  `assets/spritesheets/hero/crouch walk/`, non usate) avevano richiesto un metro inventato
+  apposta (il casco), un riallineamento dei colori — saturazione 110 contro 61, si vedeva
+  lampeggiare — e restava comunque la testa disegnata piu' grossa.
+  ⚠️ Lo scontorno delle REGISTRAZIONI DI SCHERMO e' un altro mestiere e ha il suo metodo in
+  `scontorna_registrazione()`: il fondo non e' nero ma il grigio dell'interfaccia (~30,31,34)
+  mentre i contorni del personaggio sono quasi neri, la registrazione ha una FILIGRANA che
+  sopravvive, e l'interno dell'ansa del tubo e' un buco CHIUSO che una macchia d'olio dai bordi
+  non raggiunge mai (restava un grumo scuro dietro la schiena).
+  **12 fotogrammi al secondo non e' un gusto:** accovacciati si va a 99 px/s (220 x 0,45) e il
+  passo disegnato copre ~30px, quindi un ciclo vale ~60px di terreno = ~0,6s. Piu' lenta e i
+  piedi slittano. Controllo automatico [24], che copre anche il ritorno alla posa ferma — il
+  passaggio delicato, perche' rilanciare l'animazione della discesa farebbe rialzare e
+  riabbassare il personaggio.
+  **Limite noto:** nemmeno il video scambia le gambe (stessa gamba sempre avanti). A 50px le due
+  gambe sono lo stesso disegno, quindi quello che si legge e' l'alternanza aperto/chiuso, che c'e'.
 - ✅ **SFONDO PARALLAX — FATTO 2026-07-20** (`be4eb3c`), ma per una strada diversa da quella
   ipotizzata qui: il primo tentativo (tagliare a mano i layer da UNA immagine e upscalarli con
   chainner) e' stato **abbandonato** — quei layer avevano solo 139-250px di altezza vera e a

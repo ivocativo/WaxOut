@@ -218,6 +218,9 @@ class GameScene extends Phaser.Scene {
     if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
     if (!this.anims.exists('hero_idle_a')) this.anims.create({ key: 'hero_idle_a', frames: this.anims.generateFrameNumbers('hero_idle', { start: 0, end: 24 }), frameRate: 10, repeat: -1 });
     if (!this.anims.exists('hero_jump_a')) this.anims.create({ key: 'hero_jump_a', frames: this.anims.generateFrameNumbers('hero_jump', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
+    // L'accovacciamento NON si ripete e si ferma sull'ultimo frame (la posa tenuta): vedi BootScene.
+    if (!this.anims.exists('hero_crouch_a')) this.anims.create({ key: 'hero_crouch_a', frames: this.anims.generateFrameNumbers('hero_crouch', { start: 0, end: 5 }), frameRate: 33, repeat: 0 });
+    if (!this.anims.exists('hero_crouchwalk_a')) this.anims.create({ key: 'hero_crouchwalk_a', frames: this.anims.generateFrameNumbers('hero_crouchwalk', { start: 0, end: 7 }), frameRate: 12, repeat: -1 });
 
     // ---- ARMA IN MANO (layer separato, INTERCAMBIABILE) ----
     // L'arma e' un "adesivo" distinto sopra il personaggio: a distanza RUOTA verso la mira,
@@ -3776,14 +3779,42 @@ class GameScene extends Phaser.Scene {
     // Animazione (sul "vestito" this.heroVisual; la fisica resta sul player invisibile)
     this.heroVisual.setFlipX(this.facing < 0);
     const _vx = Math.abs(this.player.body.velocity.x);
+    // ACCOVACCIAMENTO (2026-07-31). Prima si accorciava solo la sagoma INVISIBILE — quella che
+    // decide se passi sotto un soffitto basso — e il personaggio a schermo restava dritto: si
+    // infilava in pertugi in cui a occhio non ci stava. Ora c'e' il disegno.
+    // E' un PASSAGGIO con posa tenuta, non un ciclo: si scende (180ms), si resta giu' finche'
+    // tieni premuto, e per rialzarsi si rilegge lo stesso foglio al CONTRARIO. Quindi va gestito
+    // sui FRONTI (entro/esco), non sullo stato: rilanciarlo ogni frame lo bloccherebbe sul primo
+    // disegno. Il salto ha la precedenza su tutto e taglia corto la risalita, com'e' giusto.
+    const va = this.heroVisual.anims;
+    const inTransizione = va.isPlaying && va.currentAnim && va.currentAnim.key === 'hero_crouch_a';
     if (!onGround) {
       this.heroVisual.anims.play('hero_jump_a', true);
-    } else if (_vx > 10) {
-      const key = (_vx > p.moveSpeed * 0.85) ? 'hero_run_a' : 'hero_walk_a';
-      this.heroVisual.anims.play(key, true);
-    } else {
-      this.heroVisual.anims.play('hero_idle_a', true);
+    } else if (this.crouching) {
+      if (!this._wasCrouching) {
+        va.play('hero_crouch_a');                      // scende
+      } else if (!inTransizione) {                     // finita la discesa: fermo o in cammino
+        if (_vx > 10) {
+          va.play('hero_crouchwalk_a', true);
+        } else if (this.heroVisual.texture.key !== 'hero_crouch') {
+          // stava camminando accovacciato e si e' fermato: torna alla posa tenuta. NON si
+          // rilancia 'hero_crouch_a', che rifarebbe tutta la discesa da in piedi: si mette
+          // direttamente l'ultimo fotogramma, che E' la posa tenuta.
+          va.stop();
+          this.heroVisual.setTexture('hero_crouch', 5);
+        }
+      }
+    } else if (this._wasCrouching) {
+      va.playReverse('hero_crouch_a');                 // si rialza (anche se stava camminando)
+    } else if (!inTransizione) {                       // ...e la risalita si lascia finire
+      if (_vx > 10) {
+        const key = (_vx > p.moveSpeed * 0.85) ? 'hero_run_a' : 'hero_walk_a';
+        this.heroVisual.anims.play(key, true);
+      } else {
+        this.heroVisual.anims.play('hero_idle_a', true);
+      }
     }
+    this._wasCrouching = this.crouching;
 
     // IA nemici + danno da contatto
     const pb = this.player.getBounds();
@@ -3884,7 +3915,12 @@ class GameScene extends Phaser.Scene {
     // sopra), cosi' nessun evento resta con un frame di ritardo prima di vedersi.
     this.jx += (1 - this.jx) * window.CONFIG.JUICE_SPRING;
     this.jy += (1 - this.jy) * window.CONFIG.JUICE_SPRING;
-    // Posa accovacciata (segnaposto in attesa di un frame dedicato) + juice procedurale.
+    // SAGOMA accovacciata (68% dell'altezza in piedi) + juice procedurale. Questo e' GAMEPLAY: e'
+    // cio' che decide se passi sotto un soffitto basso, e i pertugi dei livelli sono tarati su
+    // questo numero — non va inseguito al disegno. Il disegno (hero_crouch_a, vedi sopra) si
+    // abbassa all'82%: il personaggio sembra un filo piu' alto del buco che attraversa. Scelta
+    // consapevole con l'utente il 2026-07-31: alzare la sagoma renderebbe impraticabili passaggi
+    // gia' collaudati, schiacciare il disegno lo allargherebbe e si vedrebbe.
     this.player.setScale(1.5 * this.jx, (this.crouching ? 1.02 : 1.5) * this.jy);
     // Il "vestito" animato segue il player (piedi = fondo del corpo fisico) e riceve il juice.
     this.heroVisual.setPosition(this.player.x, this.player.body.bottom);

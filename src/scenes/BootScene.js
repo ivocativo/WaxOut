@@ -100,6 +100,23 @@ class BootScene extends Phaser.Scene {
     heroSheet('hero_run',  'hero_run_px.png');
     heroSheet('hero_idle', 'hero_idle_px.png');
     heroSheet('hero_jump', 'hero_jump_px.png');
+    // ACCOVACCIAMENTO (2026-07-31): 6 frame invece di 25 — e' un PASSAGGIO, non un ciclo, e a 60
+    // fotogrammi al secondo un accovacciamento di 180ms ha spazio per 11 immagini in tutto. I 36
+    // disegni originali stanno in assets/spritesheets/hero/crouch/: i primi 7 valevano lo 0,8%
+    // della discesa e gli ultimi due erano identici. Scelti campionando il MOVIMENTO, con le
+    // distanze che si accorciano verso il fondo (scende di slancio e si assesta).
+    // ⚠️ 6 livelli di posterizzazione, non 22: le altre animazioni del personaggio usano una
+    // tavolozza a multipli di 51 (6 passi per canale) e con 22 il costume risultava piu' chiaro
+    // e piu' pulito degli altri — si vedeva il cambio di vestito ogni volta che ci si abbassava.
+    // Rigenerabile: tools\bake_hero_sheet.py "...\crouch" ...\hero_crouch_px.png 1,17,21,26,30,35 6
+    heroSheet('hero_crouch', 'hero_crouch_px.png');
+    // CAMMINATA ACCOVACCIATA (2026-07-31): 8 fotogrammi presi dal VIDEO in
+    // assets\spritesheets\hero\crouch move\. Dal video e non da pose singole perche' cosi'
+    // vengono tutti dalla stessa generazione: inquadratura, scala, colori e proporzioni del
+    // personaggio combaciano gia', senza doverli rimettere in riga a mano.
+    // Rigenerabile: tools\bake_hero_sheet.py "...\crouch move.mp4" ...\hero_crouchwalk_px.png
+    //               video:74,78,81,85,88,92,95,99 6 rif=...\crouch\Image35.png alto=50
+    heroSheet('hero_crouchwalk', 'hero_crouchwalk_px.png');
   }
 
   create() {
@@ -134,6 +151,25 @@ class BootScene extends Phaser.Scene {
         });
       }
     });
+    // L'accovacciamento e' l'unica animazione del personaggio che NON si ripete: 6 frame a 33/s
+    // (180ms) e poi si FERMA sull'ultimo, che e' la posa tenuta. Per rialzarsi si rilegge al
+    // contrario (`anims.playReverse`), quindi un solo foglio serve per andare giu' e tornare su.
+    if (!this.anims.exists('hero_crouch_a')) {
+      this.anims.create({
+        key: 'hero_crouch_a', frames: this.anims.generateFrameNumbers('hero_crouch', { start: 0, end: 5 }),
+        frameRate: 33, repeat: 0,
+      });
+    }
+    // La camminata accovacciata invece SI ripete. 12 al secondo non e' un gusto: accovacciati si
+    // va a 99 px/s (220 x 0,45) e il passo disegnato copre ~30px, quindi un ciclo intero vale
+    // ~60px di terreno = ~0,6s. Piu' lenta e i piedi slitterebbero sul pavimento, piu' veloce e
+    // sembrerebbe che pattini.
+    if (!this.anims.exists('hero_crouchwalk_a')) {
+      this.anims.create({
+        key: 'hero_crouchwalk_a', frames: this.anims.generateFrameNumbers('hero_crouchwalk', { start: 0, end: 7 }),
+        frameRate: 12, repeat: -1,
+      });
+    }
 
     // CICLI DEI NEMICI. La velocita' e' scelta per CARATTERE, non per comodita': la crosta e'
     // secca e pesante e si trascina (5), il cerumino striscia (8), il moscerino sbatte le ali

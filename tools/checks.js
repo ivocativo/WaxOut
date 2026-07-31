@@ -762,7 +762,106 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [23] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [23] IL PERSONAGGIO SI ABBASSA DAVVERO QUANDO SI ACCOVACCIA (integrato 2026-07-31). Prima si
+  // accorciava solo la sagoma invisibile e il disegno restava dritto. Qui si tiene premuto giu',
+  // si controlla che parta l'animazione dedicata e che l'altezza A SCHERMO cali, poi si molla e
+  // si controlla che risalga. L'animazione e' un PASSAGGIO che si ferma sull'ultimo frame: se
+  // qualcuno la rilanciasse ogni frame resterebbe incollata al primo disegno, e questo lo becca.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsC = g.scene.getScene('GameScene');
+    avanza(gsC, 24);
+    // ⚠️ getBounds() dello sprite da' la CELLA (84x84), non la sagoma disegnata: misurava sempre
+    // 84 e il controllo passava/falliva a vuoto. L'altezza vera si legge dai PIXEL della texture.
+    const cimaDi = (indice) => {
+      for (let y = 0; y < 84; y++) {
+        for (let x = 0; x < 84; x += 3) {
+          const a = g.textures.getPixelAlpha(x, y, 'hero_crouch', indice);
+          if (a && a > 40) return y;
+        }
+      }
+      return 84;
+    };
+    const cimaInPiedi = cimaDi(0), cimaGiu = cimaDi(5);
+
+    gsC.touch.aimDown = true;                  // "giu'" premuto (stessa via del pad a schermo)
+    avanza(gsC, 3);
+    const partita = gsC.heroVisual.anims.currentAnim
+      && gsC.heroVisual.anims.currentAnim.key === 'hero_crouch_a';
+    avanza(gsC, 20);                           // l'animazione dura ~180ms = 11 fotogrammi
+    const fermaSuUltimo = gsC.heroVisual.anims.currentFrame
+      && gsC.heroVisual.anims.currentFrame.index === 6;   // 6 frame: l'ultimo e' l'indice 6
+    gsC.touch.aimDown = false;
+    avanza(gsC, 2);
+    // La RISALITA e' lo stesso foglio riletto al contrario: subito dopo aver mollato deve essere
+    // ancora l'animazione dell'accovacciamento a girare. Se il personaggio saltasse dritto a
+    // "fermo" vorrebbe dire che si rialza di scatto in un fotogramma.
+    const risalitaInCorso = gsC.heroVisual.anims.currentAnim
+      && gsC.heroVisual.anims.currentAnim.key === 'hero_crouch_a';
+    avanza(gsC, 30);
+    const tornaNormale = gsC.heroVisual.anims.currentAnim
+      && gsC.heroVisual.anims.currentAnim.key === 'hero_idle_a';
+    const tornaSuPrimo = risalitaInCorso && tornaNormale;
+    const scende = cimaGiu > cimaInPiedi + 5;            // la testa cala di almeno 5px
+    if (partita && scende && fermaSuUltimo && tornaSuPrimo) {
+      ok('il personaggio si abbassa quando si accovaccia', 2,
+        'testa da y=' + cimaInPiedi + ' a y=' + cimaGiu + ' (-' + (cimaGiu - cimaInPiedi)
+        + 'px), posa tenuta e poi si rialza');
+    } else {
+      ko('il personaggio si abbassa quando si accovaccia', 2,
+        'animazione=' + partita + ' scende=' + scende + ' posaTenuta=' + fermaSuUltimo
+        + ' risale=' + tornaSuPrimo + ' (testa ' + cimaInPiedi + ' -> ' + cimaGiu + ')');
+    }
+  }
+
+  // [24] CAMMINATA ACCOVACCIATA (2026-07-31). Tre stati che si devono susseguire senza incastri:
+  // accovacciato fermo = posa tenuta; accovacciato che si muove = ciclo di camminata; e tornando
+  // fermo si deve RIPRENDERE la posa tenuta. Quest'ultimo e' il passaggio delicato: rilanciare
+  // 'hero_crouch_a' rifarebbe tutta la discesa da in piedi (il personaggio si alzerebbe e si
+  // riabbasserebbe), quindi si rimette a mano l'ultimo fotogramma. Se qualcuno un domani lo
+  // "semplifica" con un play(), questo controllo lo becca.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsW = g.scene.getScene('GameScene');
+    avanza(gsW, 24);
+    gsW.touch.aimDown = true;
+    avanza(gsW, 20);                                   // la discesa dura ~180ms
+    const chiave = () => (gsW.heroVisual.anims.currentAnim || {}).key;
+    const fermoGiu = chiave();
+    gsW.touch.right = true;                            // ...e ora cammina accovacciato
+    avanza(gsW, 14);
+    const inCammino = chiave();
+    const altezzaCammino = gsW.heroVisual.frame.height;
+    gsW.touch.right = false;
+    avanza(gsW, 20);                                   // si ferma, restando accovacciato
+    const tornaFermo = gsW.heroVisual.texture.key;
+    const nonSiRialza = !gsW.heroVisual.anims.isPlaying;
+    gsW.touch.aimDown = false;
+    avanza(gsW, 40);
+    const finito = chiave();
+    const ok1 = fermoGiu === 'hero_crouch_a';
+    const ok2 = inCammino === 'hero_crouchwalk_a';
+    const ok3 = tornaFermo === 'hero_crouch' && nonSiRialza;
+    const ok4 = finito === 'hero_idle_a';
+    if (ok1 && ok2 && ok3 && ok4) {
+      ok('camminata accovacciata', 2, 'posa tenuta -> ciclo -> posa tenuta -> in piedi');
+    } else {
+      ko('camminata accovacciata', 2, 'fermoGiu=' + fermoGiu + ' inCammino=' + inCammino
+        + ' tornaFermo=' + tornaFermo + '/' + nonSiRialza + ' finito=' + finito);
+    }
+  }
+
+  // [25] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

@@ -37,3 +37,6 @@ assets/backgrounds/1/
 
 # Schermate generate da tools/schermata.py: usa e getta, non vanno versionate
 schermata*.png
+
+# Cache di Python creata quando gli strumenti in tools/ si importano fra loro
+__pycache__/
