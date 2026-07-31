@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-27 · Ultimo commit pushato: `519bdb1`._
+_Ultimo aggiornamento: 2026-07-30 · Ultimo commit pushato: `69244e3`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 60 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 62 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -45,10 +45,18 @@ _bianco + scia di scintille); **UN BOSS PER TRATTO DI 5 LIVELLI** — nuova **Re
 _al 10 (corazzata contro il getto, carica invece di saltare, chiama croste); **restyle di TUTTE le_
 _schermate di contorno** con un linguaggio unico in `GameGfx` (paintSceneBg/panel/sceneTitle/_
 _uiButton); **app da 23 a ~10 MB** (protuberanze non piu' caricate + elenco esplicito nel workflow)._
-_**STATO ORA:** Blocchi A, B e D chiusi, Arsenale fatto nelle meccaniche. **Prossimi:** disegnare le_
-_5 armi (dopo il playtest), animare gli altri 6 nemici, la **MUSICA con brani veri** e gli_
-_**EASTER EGG** (proposte pronte in `ROADMAP.md` §DA DECIDERE), e il **BLOCCO C** (Assedio: la_
-_tattica del cumulo-rifugio). L'utente RIMANDA lo store._
+_**✅ MUSICA** a brani veri CC0 (`27463ae`) + **CREDITI** nel pannello "?" (`6b300bf`)._
+_**✅ PLAYTEST ROUND 4 (2026-07-29, `238d6af`): 19 segnalazioni chiuse** — proiettili che_
+_attraversavano le colline, cronometro che non si fermava in pausa, pannello del game over fuori_
+_schermo, assedio che smetteva di generare nemici, cerume che sbucava dal soffitto, pedane_
+_irraggiungibili, elite che perdevano il colore, boss attraversabili col salto, cartelli che_
+_dicevano sempre "Tappo di Cerume", carta di potenziamento al 15o livello. Piu' il giro di_
+_BILANCIAMENTO (danno PG x1,5, vita cerume e nemici x0,8, meno membrane dal livello 8)._
+_**✅ ARSENALE CHIUSO** (decisione dell'utente dopo il playtest): si pubblica col kit unico._
+_**✅ TUTTI E OTTO I NEMICI ANIMATI** (`6b300bf`, `7f05bde`, `69244e3`): non resta piu' nessuna_
+_immagine ferma. Il saltatore ha un SALTO legato ai suoi stati, non una camminata._
+_**STATO ORA:** manca l'ARTE DELLE ARMI (l'unica cosa ancora disegnata a codice), gli **EASTER EGG**_
+_da scegliere e il **BLOCCO C** (Assedio: la tattica del cumulo-rifugio). Poi si va allo STORE._
 
 **NOME:** l'utente ha scelto **WAXOUT** (2026-07-27) al posto di "Earwax War": "earwax" da solo
 porta al party game di Jackbox e a Earwax Clinic gia' su Play. Il nome NON e' ancora stato

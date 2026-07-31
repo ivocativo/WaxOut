@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (60 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (62 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -225,9 +225,66 @@ solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
 
 ---
 
+# BLOCCO E — Playtest round 4 ✅ CHIUSO (2026-07-29/30)
+
+19 segnalazioni dell'utente, tutte chiuse in `238d6af` + `fc329ac`. I due bug piu' istruttivi,
+annotati perche' la causa non era dove sembrava:
+- **Proiettili che attraversavano le colline**: il pavimento e' una MAPPA DI ALTEZZE, non un corpo
+  fisico; l'unico collider era il rettangolo piatto in fondo al mondo, quindi tutto cio' che
+  stava sopra veniva attraversato. Ora un controllo per frame. Controllo automatico [20].
+- **Cronometro che non si fermava in pausa**: le scadenze erano calcolate sull'orologio della
+  SCENA (che in pausa si ferma) e confrontate in update() con quello del GIOCO (che non si
+  ferma) — alla ripresa il conto saltava in avanti. Ora si conta il tempo RIMASTO, scalato di
+  delta a ogni frame: immune per costruzione. Controllo automatico [21].
+
+**Bilanciamento** (playtest: "ai livelli alti pulire e' estenuante"): tre manopole in `CONFIG`
+invece di venti numeri sparsi — `DANNO_PG` 1,5 · `VITA_CERUME` 0,8 · `VITA_NEMICI` 0,8 — piu'
+meno membrane dal livello 8 in su (fino al -40%). Piu' una cura di fine livello (`CURA_PICKUP`,
+lo stesso valore di una pallina raccolta a terra).
+
+**ARSENALE CHIUSO.** Decisione dell'utente: "si colpisce prevalentemente da lontano, quindi
+variare le armi corpo a corpo ha poco senso". Si pubblica col kit unico (coton fioc +
+spruzzino). Il meccanismo resta INTERO: per riaprirlo servono il pulsante in `MenuScene` e una
+riga in `state.js` (`const scelta = 'fioc'`). Il controllo [19] ora verifica il contrario di
+prima — che nessun salvataggio vecchio cambi il kit.
+
+---
+
+# ANIMAZIONI DEI NEMICI ✅ COMPLETE (2026-07-28/30)
+
+Tutti e otto animati con Claude Design + `tools/bake_sheet.py`. Non resta nessuna immagine ferma.
+
+| nemico | animazione | note |
+|---|---|---|
+| cerumino | strisciata, 8 fps | il primo, ha aperto la strada |
+| crosta | strisciata, 5 fps | piu' lenta apposta: e' secca e pesante |
+| moscerino | battito d'ali, 16 fps | ⚠️ frame 1 e 5 avevano l'ala TRANCIATA per 58px sul bordo della cella: sostituiti coi frame 0 e 4, i pixel persi non si recuperano |
+| pulce | passo, 9 fps | lo "stacco fra zampa e corpo" e' vero a piena risoluzione ma sparisce a 34px: NON rattoppato, vedi sotto |
+| gorgogliante | strisciata, 6 fps | |
+| Tappo di Cerume | passo, 6 fps | |
+| Regina delle Croste | passo, 6 fps | |
+| saltatore | SALTO a 3 spezzoni | unico senza ciclo: carica/balzo/atterraggio legati agli stati dell'IA |
+
+**Due lezioni pagate, da ricordare per i prossimi disegni:**
+1. **Margine nella cella.** Se la creatura tocca il bordo viene tranciata di netto e i pixel non
+   tornano. E' successo alle ali del moscerino. Nel prompt va chiesto margine abbondante.
+2. **Il prompt governa il DISEGNO, non il MONTAGGIO.** Claude Design ritaglia la creatura a pezzi
+   e indovina dove sono le articolazioni: chiedere "metti un perno nel ginocchio" nel prompt
+   dell'immagine non serve, va detto alla fase di montaggio — o si sceglie un'animazione che non
+   richiede articolazioni (e' cosi' che si e' risolto il saltatore, con squash/stretch di tutto
+   il corpo invece di un passo).
+3. `tools/ripara_sheet.py` riempie i buchi all'attaccatura delle zampe. Provato su pulce e boss:
+   alla dimensione di gioco NON migliora niente e impasta i vuoti veri fra le zampe. Resta li'
+   per quando un difetto si vedra' davvero. ⚠️ Il colore va preso solo da pixel PIENI: dai
+   semitrasparenti entra l'alone magenta dello scontorno e la toppa viene a chiazze viola.
+
+---
+
 # DA DECIDERE CON L'UTENTE (proposte pronte, NON implementate)
 
-## M — MUSICA CON BRANI VERI ✅ FATTA (2026-07-28) — restava solo la scelta dei brani, arrivata
+## M — MUSICA ✅ CHIUSA (2026-07-28). Quattro brani CC0 in `assets/musica/`, fonti tracciate in
+## `assets/musica/FONTI.md`, crediti nel pannello "?" del menu.
+## Quello che segue resta come promemoria di COME e' stata fatta.
 **Come farlo, in concreto.**
 - **Quanti brani:** 4 — menu, livello, boss/assedio, vittoria. Con meno si sente il vuoto, con
   piu' cresce il peso senza che il giocatore se ne accorga.
