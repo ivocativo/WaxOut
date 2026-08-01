@@ -936,7 +936,84 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [26] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [26] ASSEDIO A QUOTA (2026-07-31, idea dell'utente). Prima si vinceva SOPRAVVIVENDO fino allo
+  // scadere del cronometro, e la tattica migliore era arrampicarsi su un cumulo e stare fermi —
+  // cioe' CONSERVARE il cerume in un gioco che chiede di pulirlo. Ora bisogna eliminare una quota
+  // di nemici. Tre cose da tenere vere:
+  //   a) la quota deve stare BEN SOTTO ai nemici che il gioco riesce a mandare, se no si finisce
+  //      ad aspettare che compaiano invece di combatterli (misurato: ~52 in 56s al livello 13);
+  //   b) raggiunta la quota il livello finisce SUBITO, anche con tempo che avanza;
+  //   c) tempo scaduto senza quota NON e' game over: e' una botta piu' un supplementare.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 13;
+    window.GameState.prossimoLivello = { kind: 'siege', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsA = g.scene.getScene('GameScene');
+    avanza(gsA, 20);
+    const quota = gsA.siegeQuota;
+    const durata = gsA.siegeLeftMs;
+    // quanti nemici riesce a mandare in tutto l'assedio, con un giocatore che li elimina subito
+    let mandati = 0;
+    const spawnOrig = gsA.spawnEnemy.bind(gsA);
+    gsA.spawnEnemy = function () { mandati++; return spawnOrig.apply(null, arguments); };
+    mandati = 0;
+    for (let i = 0; i < 900; i++) {              // 15 secondi
+      avanza(gsA, 1);
+      gsA.enemies.getChildren().forEach((e) => { if (e.active && !e.spawning) e.destroy(); });
+    }
+    gsA.spawnEnemy = spawnOrig;
+    const disponibili = Math.round(mandati * (durata / 1000) / 15);
+    const quotaSostenibile = quota > 0 && quota <= disponibili * 0.7;
+
+    // (b) raggiunta la quota si chiude subito
+    window.GameState.reset();
+    window.GameState.level = 13;
+    window.GameState.prossimoLivello = { kind: 'siege', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsB = g.scene.getScene('GameScene');
+    avanza(gsB, 20);
+    gsB.siegeKills = gsB.siegeQuota - 1;
+    const tempoCheAvanza = gsB.siegeLeftMs;
+    const e2 = gsB.spawnEnemy('blob', { x: gsB.player.x + 200 });
+    for (let i = 0; i < 200 && e2.spawning; i++) avanza(gsB, 1);
+    gsB.damageEnemy(e2, 99999, true);
+    avanza(gsB, 2);
+    const chiudeSubito = !gsB.scene.isActive() || gsB.locked;
+
+    // (c) tempo scaduto senza quota: botta + supplementare, NON game over
+    window.GameState.reset();
+    window.GameState.level = 13;
+    window.GameState.prossimoLivello = { kind: 'siege', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsC = g.scene.getScene('GameScene');
+    avanza(gsC, 20);
+    gsC.siegeKills = 0;
+    gsC.siegeLeftMs = 30;
+    window.GameState.player.hp = window.GameState.player.maxHp;
+    const vitaPrima = window.GameState.player.hp;
+    for (let i = 0; i < 6; i++) { t += 16.6; g.loop.step(t); }   // niente god-mode: la botta conta
+    const vitaDopo = window.GameState.player.hp;
+    const vivo = gsC.scene.isActive() && !gsC.locked;
+    const supplementare = gsC.siegeLeftMs > 1000;
+    const faMale = vitaDopo < vitaPrima;
+
+    if (quotaSostenibile && chiudeSubito && vivo && supplementare && faMale) {
+      ok('assedio a quota', 13, 'quota ' + quota + ' su ~' + disponibili + ' disponibili in '
+        + Math.round(durata / 1000) + 's; finisce alla quota; tempo scaduto = -'
+        + (vitaPrima - vitaDopo) + ' vita e ' + Math.round(gsC.siegeLeftMs / 1000) + 's in piu');
+    } else {
+      ko('assedio a quota', 13, 'quota=' + quota + '/' + disponibili + ' sostenibile=' + quotaSostenibile
+        + ' chiudeSubito=' + chiudeSubito + ' vivo=' + vivo + ' supplementare=' + supplementare
+        + ' faMale=' + faMale);
+    }
+  }
+
+  // [27] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

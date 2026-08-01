@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (66 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (67 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -203,25 +203,37 @@ Diagnosi: i frame di invulnerabilita' **esistevano gia'** (0,9s + rinculo), quin
 
 ---
 
-# BLOCCO C — ASSEDIO: la tattica migliore contraddice l'obiettivo 🧠
-**Scoperto dal playtest dell'utente (2026-07-22):** «per sopravvivere conviene andare in cima a un
-cumulo di cerume e resistere da lì». E' una strategia EMERGENTE, di per se' un buon segno — ma
-attenzione a cosa implica: **il gioco chiede di PULIRE il cerume, e la mossa vincente è
-CONSERVARNE un cumulo per starci sopra.** Se resta l'unica via che funziona, l'Assedio diventa
-"sali e aspetta": si risolve una volta e poi si ripete identico.
+# BLOCCO C — ASSEDIO ✅ RISOLTO (2026-07-31, idea dell'utente)
 
-Tre strade (da decidere con l'utente, la 2 è la proposta):
-1. **Punire il camping**: i moscerini volano gia' — se puntassero chi sta in alto, il cumulo
-   smetterebbe di essere un rifugio sicuro.
-2. ⭐ **Farlo consumare**: il cumulo si sgretola mentre lo si usa come piattaforma. Il giocatore
-   guadagna TEMPO, non sicurezza; la posizione diventa una RISORSA che si spende. Mantiene valida
-   la scoperta dell'utente ma le mette un prezzo, e soprattutto **riallinea la tattica
-   all'obiettivo** invece di contraddirlo.
-3. **Accettarla e progettarla**: l'Assedio diventa esplicitamente "difendi una posizione", con
-   l'arena dedicata gia' in arretrato (F.2b).
+**Il problema (playtest 2026-07-22):** «per sopravvivere conviene andare in cima a un cumulo di
+cerume e resistere da lì». Strategia emergente, di per se' un buon segno — ma il gioco chiede di
+PULIRE il cerume, e la mossa vincente era CONSERVARNE un cumulo per starci sopra. L'Assedio
+rischiava di diventare "sali e aspetta": si risolve una volta e poi si ripete identico.
 
-NB: l'utente conferma che **l'Assedio funziona ed e' molto difficile** — quindi non e' rotto, e'
-solo da bilanciare. Prima verifica dal vivo di questo tipo di livello.
+**La soluzione, proposta dall'utente: una QUOTA DI UCCISIONI.** Non si vince piu' sopravvivendo
+allo scadere del cronometro, ma eliminando `10 + livello` nemici prima che scada. Il rifugio non
+serve piu' a niente: fermo non uccidi, e non completi. Raggiunta la quota il livello finisce
+SUBITO, anche se avanza tempo, cosi' essere aggressivi ti fa uscire prima.
+
+⚠️ **La quota e' vincolata dal SOFFITTO di nemici che il gioco riesce a mandare**, non e' un
+numero libero. Misurato con un giocatore perfetto (elimina ogni nemico appena compare, cosi' il
+tetto a schermo non blocca mai le nuove comparse): al livello 13 ne arrivano ~52 in 56 secondi.
+La quota sta sotto la meta' (23 su 56 = 41%). Se si avvicinasse al soffitto il gioco si
+rovescerebbe: si finirebbe ad ASPETTARE che i nemici compaiano, l'opposto di un assedio. Il
+controllo automatico [26] verifica proprio questo rapporto, cosi' se un domani si tocca la
+frequenza delle comparse o la durata, il numero non resta indietro in silenzio.
+
+**Tempo scaduto senza quota** (scelta dell'utente fra quattro possibilita'): non e' game over.
+Prendi una botta pari al 20% della vita massima (`CONFIG.SIEGE_PENALITA`, una frazione e non un
+numero fisso, cosi' resta significativa anche con tanti Cuori Extra) e ti tocca un supplementare
+di 15s (`CONFIG.SIEGE_SUPPLEMENTARE`). Se continui a non farcela le botte si sommano e prima o
+poi ci lasci la pelle: la regola si chiude da sola senza buttare una run al primo errore.
+
+**Buttata la vecchia proposta** (il cumulo che si sgretola sotto i piedi): era una toppa che
+rendeva il rifugio scomodo, invece di togliergli il senso. Quella dell'utente e' piu' pulita.
+
+Resta aperta l'**arena dedicata** per l'Assedio (oggi riusa un livello normale col cronometro):
+lavoro grosso, da pianificare a parte.
 
 ---
 

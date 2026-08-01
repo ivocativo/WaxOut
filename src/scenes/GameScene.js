@@ -119,6 +119,8 @@ class GameScene extends Phaser.Scene {
     // il conto alla rovescia faceva un salto in avanti pari alla pausa (segnalato 2026-07-29).
     // Contando il tempo residuo il problema non puo' ripresentarsi, con qualunque orologio.
     this.siegeLeftMs = 0;  // ms mancanti alla fine dell'assedio (0 = non assedio)
+    this.siegeQuota = 0;   // quanti nemici bisogna eliminare (0 = non assedio)
+    this.siegeKills = 0;   // quanti ne hai eliminati finora
     this.rushLeftMs = 0;   // ms mancanti alla fine della corsa (0 = non corsa)
     this.bigTimerText = null;
 
@@ -405,11 +407,27 @@ class GameScene extends Phaser.Scene {
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
     } else if (this.levelKind === 'siege') {
-      // ASSEDIO: non serve raggiungere il timpano, bisogna SOPRAVVIVERE a tempo mentre i
-      // nemici arrivano fitti. Vince allo scadere del cronometro (vedi update).
+      // ASSEDIO: non serve raggiungere il timpano, bisogna ELIMINARE UNA QUOTA di nemici prima
+      // che scada il cronometro (vedi update).
+      //
+      // PERCHE' LA QUOTA (idea dell'utente, 2026-07-31). Prima si vinceva solo SOPRAVVIVENDO
+      // fino allo scadere del tempo, e questo rendeva la tattica migliore l'opposto
+      // dell'obiettivo del gioco: conveniva arrampicarsi su un cumulo di cerume e stare fermi,
+      // cioe' CONSERVARE il cerume in un gioco che ti chiede di pulirlo. Con una quota di
+      // uccisioni il rifugio non serve piu' a niente: fermo non uccidi, e non completi.
+      // (La vecchia proposta era far sgretolare il cumulo sotto i piedi: una toppa che rendeva
+      // il rifugio scomodo invece di togliergli il senso. Questa e' meglio, ed e' stata buttata.)
+      //
+      // LA QUOTA STA SOTTO LA META' DEI NEMICI DISPONIBILI, e non e' un numero a caso: misurato
+      // con un giocatore perfetto (che elimina ogni nemico appena compare, cosi' il tetto a
+      // schermo non blocca mai le nuove comparse), al livello 13 il gioco riesce a mandarne ~52
+      // in 56 secondi. Se la quota si avvicinasse a quel soffitto il gioco si rovescerebbe:
+      // finiresti ad ASPETTARE che i nemici compaiano, che e' l'opposto di un assedio.
       this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.45), 6);
       spawnDelay = Math.max(1000, 1750 - lvl * 90);
       this.siegeLeftMs = 30000 + lvl * 2000;
+      this.siegeQuota = 10 + lvl;
+      this.siegeKills = 0;
       for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
       this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
     } else {
@@ -2672,6 +2690,13 @@ class GameScene extends Phaser.Scene {
     if (e.hp <= 0) {
       window.Sfx.enemyDie();
       const pl = window.GameState.player;
+      // ASSEDIO: ogni nemico eliminato conta per la quota, e appena la raggiungi hai finito —
+      // anche se avanza tempo. Cosi' essere aggressivi ti fa uscire prima, invece di lasciarti
+      // ad aspettare che il cronometro finisca.
+      if (this.levelKind === 'siege' && !this.locked) {
+        this.siegeKills += 1;
+        if (this.siegeKills >= this.siegeQuota) { this.levelComplete(); return; }
+      }
       // Il cerume dei nemici ora si RACCOGLIE (pallina, come le pedane) invece di accreditarsi
       // da solo — l'economia passa quasi tutta da qui (F.1b). ECCEZIONE Fuggitivo Dorato:
       // ricompensa EVENTO, accredito istantaneo come prima (niente pallina da rincorrere).
@@ -3494,6 +3519,21 @@ class GameScene extends Phaser.Scene {
   }
 
   // `text` = stringa gia' formattata (i18n) da mostrare; `secondsLeft` guida SOLO il lampeggio.
+  // Cronometro dell'assedio scaduto con la quota non ancora raggiunta: una botta e un
+  // supplementare. La mercy-invuln va tolta di mezzo prima, se no un colpo preso un attimo
+  // prima si mangerebbe la penalita' e sembrerebbe che la regola non funzioni. Lo SCUDO invece
+  // puo' pararla: e' un'abilita' rara, e il cartello spiega comunque cos'e' successo.
+  siegeTempoScaduto() {
+    const pl = window.GameState.player;
+    this.siegeLeftMs = window.CONFIG.SIEGE_SUPPLEMENTARE;
+    this.invulnUntil = 0;
+    this.hurtPlayer(Math.round(pl.maxHp * window.CONFIG.SIEGE_PENALITA), this.player.x - this.facing * 40);
+    this.showBanner(window.I18n.t('game_siege_overtime', {
+      s: Math.round(window.CONFIG.SIEGE_SUPPLEMENTARE / 1000),
+    }), '#ff6b3d');
+    this.cameras.main.shake(260, 0.012);
+  }
+
   updateBigTimer(text, secondsLeft, now) {
     if (!this.bigTimerText) return;
     this.bigTimerText.setText(text);
@@ -3611,12 +3651,18 @@ class GameScene extends Phaser.Scene {
     const now = time;
     const dt = Math.min(delta || 16.7, 100);   // tetto: se il telefono si impunta, il tempo non salta
 
-    // ASSEDIO: si vince SOPRAVVIVENDO fino allo scadere del cronometro (niente timpano).
+    // ASSEDIO: si vince ELIMINANDO la quota di nemici prima che scada il cronometro.
     if (this.levelKind === 'siege') {
       this.siegeLeftMs = Math.max(0, this.siegeLeftMs - dt);
       const left = Math.ceil(this.siegeLeftMs / 1000);
-      this.updateBigTimer(window.I18n.t('hud_siege', { s: left }), left, now);
-      if (this.siegeLeftMs <= 0) { this.levelComplete(); return; }
+      this.updateBigTimer(window.I18n.t('hud_siege', {
+        s: left, n: this.siegeKills, q: this.siegeQuota,
+      }), left, now);
+      // TEMPO SCADUTO SENZA QUOTA: non e' finita, ma fa male. Scelta dell'utente fra quattro
+      // possibilita': "punisce senza troncare di netto". Prendi una botta e ti tocca un tempo
+      // supplementare; se continui a non farcela le botte si sommano e prima o poi ci lasci la
+      // pelle, quindi la regola si chiude da sola senza dover buttare la run al primo errore.
+      if (this.siegeLeftMs <= 0) this.siegeTempoScaduto();
     } else if (this.levelKind === 'rush') {
       // CORSA A TEMPO (round 2, F.1): se il tempo scade PRIMA del timpano -> game over (deciso
       // con l'utente). Il controllo `player.x < goalX` evita che, nel caso limite in cui tempo

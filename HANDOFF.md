@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 66 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 67 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -64,8 +64,11 @@ _**✅ ACCOVACCIAMENTO (2026-07-31):** era fermo dal 20 luglio in attesa di due 
 _sono risolte guardando disegni e codice. **6 frame dei 36** (a 60fps un accovacciamento di 180ms_
 _ne regge 11 in tutto), piu' la CAMMINATA accovacciata a 8 fotogrammi presi dal video._
 _Nuovo `tools/bake_hero_sheet.py`. Vedi §Asset nuovi._
-_**STATO ORA:** restano gli **EASTER EGG** da scegliere e il **BLOCCO C** (Assedio: la tattica_
-_del cumulo-rifugio). Poi si va allo STORE._
+_**✅ ASSEDIO RISOLTO (2026-07-31, idea dell'utente):** non si vince piu' sopravvivendo al_
+_cronometro ma eliminando una QUOTA di nemici. Il cumulo-rifugio non serve piu': fermo non_
+_uccidi. Tempo scaduto = botta + supplementare, non game over. Dettaglio in `ROADMAP.md` §C._
+_**STATO ORA:** restano gli **EASTER EGG** da scegliere e l'ARENA dedicata dell'assedio._
+_Poi si va allo STORE._
 
 **NOME: ✅ APPLICATO (2026-07-31).** L'app si chiama **WAXOUT** ("earwax" da solo portava al
 party game di Jackbox e a Earwax Clinic gia' su Play). Nel menu: "WAXOUT" grande e "The Earwax
@@ -151,7 +154,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-66 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+67 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,

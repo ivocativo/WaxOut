@@ -39,6 +39,11 @@ window.CONFIG = {
   // chiedere il triplo del tempo di pulizia, o la parte finale della run diventa una corvee.
   // Quanta vita vale una "pallina" di cura: sia quelle raccolte a terra sia il recupero
   // automatico a fine livello (2026-07-29). Un numero solo, cosi' le due cose non divergono.
+  // ASSEDIO (2026-07-31): tempo scaduto senza quota = una botta e un supplementare, non la
+  // fine della partita. La penalita' e' una FRAZIONE della vita massima, non un numero fisso,
+  // cosi' resta significativa anche a chi ha comprato tanti Cuori Extra.
+  SIEGE_PENALITA: 0.2,
+  SIEGE_SUPPLEMENTARE: 15000,
   CURA_PICKUP: 14,
   MENO_CERUME_DA: 8,
   MENO_CERUME_PASSO: 0.055,   // -5,5% di membrane per ogni livello oltre la soglia (min 60%)
