@@ -2601,9 +2601,30 @@ class GameScene extends Phaser.Scene {
   positionWeapon() {
     const w = this.heroWeapon; if (!w || !w.visible) return;
     const cfg = this._weaponCfg || this.WEAPONS.sprayer;
+    if (this._weaponMode === 'ranged') {
+      // L'arma sta su un ARCO attorno alla spalla, non a un'altezza fissa: si sposta nella
+      // direzione in cui miri, come farebbe un braccio che si alza o si abbassa.
+      // Non e' solo estetica — a mira ORIZZONTALE l'arma finiva dentro la sagoma del torso ed
+      // era di fatto invisibile (verificato a schermo il 2026-07-31): sulla direzione che si usa
+      // il 90% del tempo non si vedeva cosa avevi in mano.
+      // ⚠️ Resta il limite noto: il BRACCIO disegnato non segue, quindi mirando dritto in su
+      // l'arma sembra ancora sospesa. Si chiude ridisegnando le due armi CON l'avambraccio
+      // attaccato e il perno alla spalla — vedi HANDOFF §Posa d'attacco.
+      const a = this._weaponAim;
+      const raccorcia = this.crouching ? 0.6 : 1;
+      // Spostamento in AVANTI costante oltre all'arco: mirando dritto in su o in giu' il coseno
+      // e' zero, e senza questo l'arma finirebbe sull'asse del corpo — anzi un filo dietro, per
+      // via del perno dentro l'immagine — invece che dal lato in cui stai guardando.
+      const avanti = (this.facing < 0 ? -1 : 1) * GameScene.BRACCIO_AVANTI;
+      w.setPosition(this.player.x + avanti + Math.cos(a) * GameScene.BRACCIO_RAGGIO,
+        this.player.y + GameScene.BRACCIO_SPALLA * raccorcia + Math.sin(a) * GameScene.BRACCIO_RAGGIO);
+      w.setFlipY(this._weaponFlip);
+      w.setRotation(a);
+      return;
+    }
+    // Corpo a corpo: resta appesa alla mano, perche' li' e' il TWEEN a disegnare l'arco del colpo.
     const hx = cfg.hand[0] * (this.facing < 0 ? -1 : 1);
     w.setPosition(this.player.x + hx, this.player.y + cfg.hand[1]);
-    if (this._weaponMode === 'ranged') { w.setFlipY(this._weaponFlip); w.setRotation(this._weaponAim); }
   }
 
   damageBlock(b, dmg) {
@@ -4061,4 +4082,9 @@ GameScene.ELITE_TINT = { tank: 0x9fc7e8, boom: 0xff7a4a, split: 0xb79bff };
 // Quante macchie di cerume al massimo addosso al personaggio. Senza tetto, dopo qualche minuto
 // il PG diventa una palla di cerume che cammina e non si legge piu' nulla.
 GameScene.MACCHIE_MAX = 10;
+// Dove sta la SPALLA rispetto al centro del corpo, e quanto e' lungo il braccio teso: l'arma a
+// distanza si posiziona su quell'arco, nella direzione di mira (vedi positionWeapon).
+GameScene.BRACCIO_SPALLA = -16;
+GameScene.BRACCIO_RAGGIO = 13;
+GameScene.BRACCIO_AVANTI = 6;
 window.GameScene = GameScene;
