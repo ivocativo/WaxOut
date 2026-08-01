@@ -305,6 +305,30 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   la MANO (cioe' il perno della rotazione) e `scale` 0,5 perche' sono baked a doppia risoluzione.
   (Il vecchio doppione del coton fioc — `GameGfx.showWeaponSwing` attivo insieme al layer — non
   c'e' piu'.)
+- **POSA D'ATTACCO — RISOLTA SENZA DISEGNARE POSE (2026-08-01).** Il problema: l'arma puntava la
+  mira ma il BRACCIO del personaggio non la seguiva, quindi mirando in su sembrava sospesa. La
+  strada ovvia erano otto pose del corpo, una per direzione — otto disegni da tenere coerenti, ed
+  e' proprio la coerenza il punto dove ogni volta ci siamo fatti male (teste di taglia diversa,
+  colori piu' accesi).
+  La strada presa costa UN disegno: l'arma e' stata ridisegnata **con l'avambraccio e il guanto
+  attaccati**, e il perno spostato alla SPALLA (`WEAPONS.sprayer.origin = [0.02, 0.57]`). Il gioco
+  gia' ruotava l'arma attorno al perno: ora ruotando l'immagine ruota anche il braccio, e tutte e
+  otto le direzioni funzionano da sole. Sorgente in `art_sources/hero/arm-gun.png` (e la versione
+  senza busto in `arm-gun-tagliato.png`: il disegno arriva con spalla, zaino, cinghia e tubo, che
+  vanno tolti perche' il corpo ce li ha gia').
+  Prima di questo l'arma stava a un'altezza FISSA e cadeva DENTRO la sagoma del torso mirando
+  dritto avanti — la direzione che si usa quasi sempre. Ora sta sull'arco della spalla
+  (`BRACCIO_SPALLA/RAGGIO/AVANTI` in GameScene): misurato, finisce a +21px dal centro su un corpo
+  la cui semi-larghezza e' 17.
+  ⚠️ **Il coton fioc NON ha il braccio**: e' l'arma da mischia, dove l'arco del colpo lo disegna
+  un tween e il perno e' la mano. Se un domani lo si vuole anche li', serve lo stesso trattamento
+  piu' una revisione di `showMeleeWeapon`.
+  ⚠️ **Nuovo `tools/bake_sprite.py`** accanto al vecchio `bake_sprite.ps1`: fa la stessa cosa ma
+  SCONTORNA PRIMA e rimpicciolisce DOPO. Il vecchio fa il contrario (limite di GDI+): finche' si
+  riduce poco va bene, ma il braccio andava da 1304px a 74 — ogni pixel finale e' la media di
+  diciotto di partenza, e attorno alla sagoma entravano nel calcolo i pixel MAGENTA del fondo,
+  lasciando una frangia viola su tutto il bordo. Il nuovo spalma il colore del bordo dentro la
+  zona trasparente prima di ridurre, e RIFERISCE quanti pixel violacei restano (6 su 955).
 - **Nemici:** blob (cerumino), crust (crosta, corazzata anti-getto), spit (gorgogliante),
   fly (moscerino, picchiata telegrafata), boss (Tappo di Cerume, si infuria a metà vita).
   **Varianti élite** (dal lvl 3): Corazzato (aura azzurra), Esplosivo (aura rossa),
