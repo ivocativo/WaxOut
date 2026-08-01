@@ -24,10 +24,13 @@ class BootScene extends Phaser.Scene {
     // gioco. Ora sono immagini vere, stessa pipeline di nemici e timpano (fondo magenta ->
     // tools\bake_sprite.ps1). Il coton fioc ha UNA sola punta: il bastoncino nudo e' dove il
     // personaggio impugna, ed e' li' che sta il perno (vedi WEAPONS in GameScene).
-    // Lo 'sprayer' e' l'arma COL BRACCIO attaccato (2026-08-01): ruotando l'immagine ruota
-    // anche il braccio, quindi la mira funziona in tutte e otto le direzioni senza disegnare
-    // otto pose del corpo. Il perno sta alla spalla — vedi WEAPONS in GameScene.
-    [['swab', 'swab_px'], ['sprayer', 'sprayer_arm_px']]
+    // ⚠️ NON rimettere il braccio dentro l'immagine dell'arma: provato il 2026-08-01 e
+    // BUTTATO. Funzionava benissimo come meccanica (un disegno solo, e la mira andava in tutte
+    // e otto le direzioni), ma il corpo del personaggio ha GIA' DUE BRACCIA disegnate: quello
+    // dell'arma diventava il terzo. Per farlo servirebbe ridisegnare il personaggio senza un
+    // braccio, cioe' rigenerare tutte e quattro le animazioni da 25 frame. Il sorgente resta
+    // in art_sources/hero/arm-gun.png se un domani si rifa' il personaggio da zero.
+    [['swab', 'swab_px'], ['sprayer', 'sprayer_px']]
       .forEach(([chiave, file]) => this.load.image(chiave, 'assets/sprites/weapons/' + file + '.png'));
 
     // CERUMINO ANIMATO: stessa chiave 'enemy_blob' degli altri nemici, ma caricata come SPRITE

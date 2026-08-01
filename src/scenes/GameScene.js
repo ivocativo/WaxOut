@@ -238,9 +238,8 @@ class GameScene extends Phaser.Scene {
     // `scale` porta il disegno alla dimensione a schermo: le immagini nuove sono baked a doppia
     // risoluzione (80x12 e 39x24) e vengono rimpicciolite a meta', cosi' restano nitide.
     this.WEAPONS = {
-      // Spruzzino COL BRACCIO: il perno e' la SPALLA, cioe' il bordo sinistro dell'immagine,
-      // non l'impugnatura. Ruotando attorno a quel punto e' il braccio intero a girare.
-      sprayer: { tex: 'sprayer', origin: [0.02, 0.57], scale: 0.5, hand: [8, -2] },
+      // Spruzzino: la mano e' sull'impugnatura, in basso a sinistra del corpo.
+      sprayer: { tex: 'sprayer', origin: [0.23, 0.78], scale: 0.5, hand: [8, -2] },
       // Coton fioc a una punta: la mano e' all'estremita' NUDA del bastoncino, il batuffolo
       // sporco di cerume e' la parte che colpisce.
       swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.5, hand: [6, -2] },
@@ -4086,7 +4085,6 @@ GameScene.MACCHIE_MAX = 10;
 // Dove sta la SPALLA rispetto al centro del corpo, e quanto e' lungo il braccio teso: l'arma a
 // distanza si posiziona su quell'arco, nella direzione di mira (vedi positionWeapon).
 GameScene.BRACCIO_SPALLA = -16;
-GameScene.BRACCIO_RAGGIO = 0;    // 0 da quando il braccio e' DENTRO l'immagine dell'arma:
-                                 // il perno e' gia' la spalla, non serve allontanarla
-GameScene.BRACCIO_AVANTI = 3;
+GameScene.BRACCIO_RAGGIO = 13;
+GameScene.BRACCIO_AVANTI = 6;
 window.GameScene = GameScene;
