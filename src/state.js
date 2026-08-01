@@ -1,4 +1,4 @@
-// Earwax War — stato globale di gioco e costanti condivise.
+// Waxout — stato globale di gioco e costanti condivise.
 // Niente moduli ES: usiamo variabili globali (window.*) così tutto gira da file://.
 
 window.CONFIG = {

@@ -13,6 +13,7 @@ on:
       - 'vendor/**'
       - 'capacitor.config.json'
       - 'package.json'
+      - 'android-res/**'
       - '.github/workflows/build-android.yml'
 
 jobs:
@@ -67,6 +68,16 @@ jobs:
       - name: Crea il progetto Android
         run: npx cap add android
 
+      # L'ICONA. La cartella android/ non e' versionata (la riga sopra la ricrea da zero a ogni
+      # compilazione), quindi l'icona non si puo' tenere li' dentro: sta in android-res/, che e'
+      # nel repository, e si ricopia qui sopra quella generica di Capacitor.
+      # Si rigenera da una sola immagine con:  python tools\fai_icone.py art_sources\icona_waxout.png
+      - name: Metti l'icona dell'app
+        run: |
+          cp -r android-res/. android/app/src/main/res/
+          echo "--- icone in posa ---"
+          ls android/app/src/main/res/mipmap-xxxhdpi/
+
       - name: Sincronizza Capacitor
         run: npx cap sync android
 
@@ -79,6 +90,6 @@ jobs:
       - name: Carica l'APK come risultato scaricabile
         uses: actions/upload-artifact@v4
         with:
-          name: earwax-war-apk
+          name: waxout-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

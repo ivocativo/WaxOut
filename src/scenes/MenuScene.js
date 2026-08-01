@@ -21,7 +21,7 @@ class MenuScene extends Phaser.Scene {
     // sul fondale ora "vero" (piu' movimentato del vecchio gradiente piatto).
     this.add.rectangle(W / 2, 108, 620, 168, 0x000000, 0.3).setStrokeStyle(2, 0xffd166, 0.35).setDepth(-1);
 
-    const title = this.add.text(W / 2, 66, 'EARWAX WAR', {
+    const title = this.add.text(W / 2, 66, 'WAXOUT', {
       fontFamily: 'monospace', fontSize: '60px', color: '#fdf0d5',
       stroke: '#14161f', strokeThickness: 8,
     }).setOrigin(0.5);

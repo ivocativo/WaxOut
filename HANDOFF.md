@@ -67,9 +67,27 @@ _Nuovo `tools/bake_hero_sheet.py`. Vedi §Asset nuovi._
 _**STATO ORA:** restano gli **EASTER EGG** da scegliere e il **BLOCCO C** (Assedio: la tattica_
 _del cumulo-rifugio). Poi si va allo STORE._
 
-**NOME:** l'utente ha scelto **WAXOUT** (2026-07-27) al posto di "Earwax War": "earwax" da solo
-porta al party game di Jackbox e a Earwax Clinic gia' su Play. Il nome NON e' ancora stato
-applicato al codice — vedi `ROADMAP.md` §N. Cartella e repository restano `earwaxwar`.
+**NOME: ✅ APPLICATO (2026-07-31).** L'app si chiama **WAXOUT** ("earwax" da solo portava al
+party game di Jackbox e a Earwax Clinic gia' su Play). Nel menu: "WAXOUT" grande e "The Earwax
+War" sotto — il vecchio nome fa da spiegazione al nuovo e la parola chiave resta.
+appId **`io.github.ivocativo.waxout`**: ⚠️ dopo la pubblicazione non si cambia piu'.
+Cartella e repository restano `earwaxwar` (cambiarli romperebbe percorsi e cronologia senza
+portare niente al giocatore).
+⚠️ **Le chiavi di salvataggio restano `earwaxwar.*`** (`meta.v1`, `lang`, `vol`, `music`,
+`taratura.v1`): sono le etichette sotto cui il telefono tiene banca, sblocchi e record.
+Rinominarle per coerenza estetica avrebbe azzerato i progressi di chi gia' gioca.
+⚠️ Cambiando l'appId il telefono vede Waxout come un'app DIVERSA da Earwax War: dopo
+l'aggiornamento ne convivono due e la vecchia va disinstallata a mano.
+
+**ICONA DELL'APP (2026-07-31):** immagine sorgente in `art_sources/icona_waxout.png` (primo piano
+del personaggio col cerume che cola dal casco, generata dall'utente); `tools/fai_icone.py` ne
+ricava tutte le misure in `android-res/`, che il workflow ricopia dentro al progetto Android dopo
+averlo generato (la cartella `android/` non e' versionata, quindi l'icona non si puo' tenere li').
+⚠️ **LA ZONA SICURA e' il punto dove si sbaglia:** da Android 8 il telefono ritaglia l'icona
+con una maschera che cambia da marca a marca (cerchio, quadrato stondato, goccia) e mangia il ~39%
+esterno. L'immagine consegnata aveva la testa al 95% dell'altezza: lasciata com'era, su mezzo
+parco telefoni si sarebbe vista col casco tagliato. Lo strumento la rimpicciolisce dentro il 58%
+centrale e riempie il resto col colore di fondo.
 
 Gioco: **run-and-gun / roguelite 2D** (stile Metal Slug + Vampire Survivors/Gungeon) a tema
 "pulizia del condotto uditivo". Obiettivo finale: pubblicazione su **Google Play** (Android,

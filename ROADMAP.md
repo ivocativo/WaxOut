@@ -356,18 +356,27 @@ In ordine di rapporto tra risata e lavoro:
    fioc nelle orecchie". Costo quasi zero, e fa sorridere chi lo nota.
 8. **Codice Konami** 🤖 — da tastiera, cambia il cappello del personaggio. Vale solo su PC.
 
-## N — NOME DELL'APP: ✅ SCELTO **WAXOUT** (utente, 2026-07-27)
+## N — NOME DELL'APP: ✅ SCELTO E APPLICATO — **WAXOUT** (scelto 2026-07-27, applicato 2026-07-31)
 Perche' si cambiava: "Earwax War" non e' occupato, ma **"Earwax" da solo e' il party game di
 Jackbox** e su Play c'e' gia' **Earwax Clinic** — cercando "earwax game" si finisce su di loro.
 Verificato che **Waxout** non risulta occupato da nessun gioco o app. Limite dello store: 30
 caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
-- [ ] **Applicare il nome** (lavoro mio, ~1 ora, tutto reversibile finche' non si pubblica):
-  `capacitor.config.json` (appName e **appId**, es. `com.ivocativo.waxout` — ⚠️ l'appId dopo la
-  pubblicazione NON si puo' piu' cambiare), `package.json`, il titolo nel menu (`i18n.js`), i
-  tre `.md`, il nome dell'APK. La cartella e il repository possono restare `earwaxwar`: cambiarli
-  romperebbe percorsi e cronologia senza portare niente al giocatore.
-- [ ] Valutare un sottotitolo tipo "Waxout - la guerra del cerume" per non perdere la parola
-  chiave "earwax" nelle ricerche (la descrizione dello store la indicizza comunque).
+- [x] **NOME APPLICATO (2026-07-31).** `capacitor.config.json` (appName "Waxout" e appId
+  **`io.github.ivocativo.waxout`** — ⚠️ dopo la pubblicazione NON si puo' piu' cambiare),
+  `package.json`, `index.html`, il titolo nel menu, il nome dell'APK. Cartella e repository
+  restano `earwaxwar`: cambiarli romperebbe percorsi e cronologia senza portare niente al
+  giocatore.
+  ⚠️ **NON toccate le chiavi di salvataggio** (`earwaxwar.meta.v1`, `.lang`, `.vol`,
+  `.music`, `.taratura.v1`): sono le etichette sotto cui il telefono tiene banca, sblocchi e
+  record. Rinominarle avrebbe azzerato i progressi di chi gia' gioca, in cambio di niente.
+  ⚠️ Cambiando l'appId il telefono considera Waxout un'app DIVERSA da Earwax War: dopo
+  l'aggiornamento ne convivono due, e la vecchia va disinstallata a mano.
+- [x] **Sottotitolo risolto senza scrivere niente di nuovo:** il menu ora fa "WAXOUT" grande e
+  "The Earwax War" / "La Guerra del Cerume" sotto — il vecchio nome diventa la spiegazione del
+  nuovo, e la parola chiave "earwax" resta.
+- [x] **ICONA (2026-07-31).** Immagine generata dall'utente (primo piano del personaggio col
+  cerume che cola dal casco), lavorata da `tools/fai_icone.py` in tutte le misure. Vedi
+  `HANDOFF.md` per la zona sicura, che e' il punto dove si sbaglia.
 
 ---
 
