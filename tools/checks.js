@@ -562,7 +562,15 @@ window.__earwaxChecks = function (opts) {
       if (Math.abs(gs.terrainTopAt(x) - 360) < 6 && !(gs.membraneXs || []).some((mx) => Math.abs(mx - x) < 150)) { ex = x; break; }
     }
     const e = gs.spawnEnemy('blob', { x: ex });
-    avanza(gs, 40);                                    // fa emergere il nemico (god-mode)
+    // ASPETTA CHE ABBIA FINITO DI EMERGERE, non un numero fisso di fotogrammi. Prima erano 40
+    // (~660ms) e bastavano, ma dal 2026-07-31 la comparsa dura ~1s: il nemico era ancora
+    // `spawning`, cioe' inerte e senza gravita', e il salto gli passava attraverso. Peggio, il
+    // controllo falliva a INTERMITTENZA, perche' nel banco di prova i tween non seguono
+    // l'orologio simulato ma il tempo reale (vedi in cima a questo file), quindi a volte la
+    // comparsa finiva in tempo e a volte no. Aspettare la CONDIZIONE invece del tempo toglie
+    // di mezzo tutta questa fragilita'.
+    for (let i = 0; i < 200 && e.spawning; i++) avanza(gs, 1);
+    avanza(gs, 4);                                     // un attimo per assestarsi a terra
     if (gs.spawnTimer) gs.spawnTimer.remove();          // (di nuovo: avanza potrebbe averlo ricreato? no, ma sicuri)
     gs.platforms.getChildren().forEach((p) => { if (p.active && Math.abs(p.x - e.x) < 100) p.destroy(); });
     gs.blocks.getChildren().forEach((b) => { if (b.active && Math.abs(b.x - e.x) < 90 && b.y < e.body.top + 10) b.destroy(); });
@@ -727,17 +735,24 @@ window.__earwaxChecks = function (opts) {
     // Il livello e' generato a caso ogni volta: cercare solo le salite VERSO DESTRA falliva a
     // volte per assenza di bersagli. Si accetta il primo pendio nei due sensi e si spara in
     // salita, qualunque sia il verso.
-    let xr = null, verso = 1;
+    // Non ci si accontenta del primo pendio buono: si cerca il PIU' RIPIDO di tutto il livello.
+    // Fermarsi al primo faceva fallire il controllo ogni tanto per "nessuna salita" — un livello
+    // generato piatto non e' un difetto del gioco, ed e' esattamente il tipo di intermittenza che
+    // toglie fiducia a tutta la suite.
+    let xr = null, verso = 1, meglio = 0;
     const sgombro = (x) => !gsR.blocks.getChildren().some((b) => b.active && Math.abs(b.x - x) < 90)
       && !gsR.enemies.getChildren().some((e) => e.active && Math.abs(e.x - x) < 90);
-    for (let x = 200; x < gsR.worldW - 200 && xr === null; x += 4) {
+    for (let x = 200; x < gsR.worldW - 200; x += 4) {
       if (!sgombro(x)) continue;
       const qui = gsR.terrainTopAt(x);
-      if (gsR.terrainTopAt(x + 16) < qui - 8) { xr = x; verso = 1; }
-      else if (gsR.terrainTopAt(x - 16) < qui - 8) { xr = x; verso = -1; }
+      const su = qui - gsR.terrainTopAt(x + 16);       // salita andando a destra
+      const giu = qui - gsR.terrainTopAt(x - 16);      // salita andando a sinistra
+      if (su > meglio) { meglio = su; xr = x; verso = 1; }
+      if (giu > meglio) { meglio = giu; xr = x; verso = -1; }
     }
+    if (meglio < 5) xr = null;                          // troppo piatto per essere una prova vera
     if (xr === null) {
-      ko('i proiettili rimbalzanti non si piantano nelle colline', 3, 'nessuna salita nel livello');
+      ko("i proiettili rimbalzanti non si piantano nelle colline", 3, "livello troppo piatto: pendenza massima " + meglio + "px su 16");
     } else {
       const sh = gsR.shots.create(xr, gsR.terrainTopAt(xr) - 2, 'soap');
       sh.body.setAllowGravity(false);
@@ -861,7 +876,67 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [25] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [25] CI SI SPORCA DI CERUME NEL CORPO A CORPO (2026-07-31, idea dell'utente). Tre cose che
+  // devono restare vere: le macchie compaiono colpendo, non superano MAI il tetto (senza, dopo
+  // qualche minuto il personaggio e' una palla di cerume), e SEGUONO il corpo invece di restare
+  // incollate al livello. L'ultima e' quella che si romperebbe in silenzio.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsS = g.scene.getScene('GameScene');
+    avanza(gsS, 24);
+    const pulitoAllInizio = gsS.macchie.length === 0;
+    // porta il PG addosso a un cumulo di cerume e picchia finche' non si sporca per bene
+    // Si picchia CAMBIANDO bersaglio quando il cumulo si sbriciola: col danno x1,5 e la vita del
+    // cerume x0,8 un cumulo cade in due bastonate, e fermandosi al primo il controllo misurava
+    // una macchia sola — non provava affatto che il tetto tenga, che e' l'affermazione piu'
+    // importante di tutte.
+    let colpi = 0, bersagli = 0;
+    const MAX = window.GameScene.MACCHIE_MAX;
+    while (gsS.macchie.length < MAX && bersagli < 60) {
+      const muro = gsS.blocks.getChildren().find((b) => b.active && !b.ceiling);
+      if (!muro) break;
+      bersagli++;
+      gsS.player.body.reset(muro.x - 24, muro.y - 30);
+      avanza(gsS, 1);
+      for (let i = 0; i < 14 && muro.active && gsS.macchie.length < MAX; i++) {
+        gsS.lastAttack = 0;                       // salta l'attesa fra un colpo e l'altro
+        // ⚠️ doMelee e non meleeSwing: e' doMelee a GIRARE il personaggio verso il bersaglio.
+        // Chiamando direttamente meleeSwing il colpo partiva nel verso in cui il PG guardava per
+        // caso, quindi mancava quasi sempre il muro — il controllo passava lo stesso ma provava
+        // molto meno di quanto sembrasse (4 macchie in 260 bastonate).
+        gsS.doMelee(gsS.time.now, muro);
+        colpi++;
+        avanza(gsS, 2);
+      }
+    }
+    const siSporca = gsS.macchie.length > 0;
+    const sottoIlTetto = gsS.macchie.length <= MAX;
+    const arrivaAlTetto = gsS.macchie.length === MAX;   // il tetto e' stato davvero raggiunto
+    // ...e ora si muove: le macchie devono spostarsi INSIEME a lui
+    const m0 = gsS.macchie[0];
+    const primaX = m0 ? m0.x : 0;
+    const pgPrima = gsS.player.x;
+    gsS.player.body.reset(pgPrima + 120, gsS.player.y);
+    avanza(gsS, 3);
+    const spostamentoPg = gsS.player.x - pgPrima;
+    const seguono = m0 ? Math.abs((m0.x - primaX) - spostamentoPg) < 6 : false;
+    if (pulitoAllInizio && siSporca && sottoIlTetto && arrivaAlTetto && seguono) {
+      ok('ci si sporca di cerume colpendo', 2, gsS.macchie.length + ' macchie in ' + colpi
+        + ' colpi su ' + bersagli + ' cumuli, tetto ' + MAX + ' rispettato, seguono il corpo');
+    } else {
+      ko('ci si sporca di cerume colpendo', 2, 'pulitoAllInizio=' + pulitoAllInizio
+        + ' siSporca=' + siSporca + ' sottoIlTetto=' + sottoIlTetto
+        + ' arrivaAlTetto=' + arrivaAlTetto + ' seguono=' + seguono
+        + ' (' + gsS.macchie.length + ' macchie)');
+    }
+  }
+
+  // [26] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 65 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 66 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -133,7 +133,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-65 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+66 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -255,6 +255,25 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   allunga a salto/atterraggio/inversione/colpo (`JUICE_*` in `state.js`, `jx`/`jy` + `setJuice` in GameScene).
 - **Carattere comico:** fumetto con battute a inizio livello/uccisione/colpo/boss (`SPEECH` in
   `state.js`, `speech_*` in i18n; `maybeSpeech`/`showSpeech` in GameScene, `GameGfx.showSpeech` per il rendering).
+- **SPORCARSI DI CERUME (2026-07-31, idea dell'utente):** nel corpo a corpo lo schizzo torna
+  addosso e il personaggio si insozza (`sporcati`/`posizionaMacchie` in GameScene, tetto
+  `GameScene.MACCHIE_MAX` = 10). **Solo estetica**, deciso con l'utente: non tocca velocita', mira
+  ne' danno. Una macchia ogni due colpi andati a segno (misurato: 10 macchie in ~31 bastonate,
+  cioe' un livello), e si riparte puliti al livello dopo — lo stesso momento in cui viene
+  restituita un po' di vita. Non serve arte: sono ellissi nei colori del cerume che si ricordano
+  dove stanno RISPETTO al corpo e lo seguono, come il vestito animato e l'arma in mano.
+  Tre cose imparate facendolo, tutte visibili solo a schermo:
+  (1) la posizione NON si puo' indovinare con un rettangolo — la sagoma e' stretta in cima e larga
+  in mezzo, e le macchie finivano per aria di fianco al PG. Ora si sorteggia un punto e si chiede
+  a `textures.getPixelAlpha()` se e' corpo, riprovando se e' vuoto: funziona da solo anche se un
+  domani il personaggio viene ridisegnato;
+  (2) vanno SPECCHIATE col verso, se no una macchia sul petto finisce sulla schiena appena ti giri;
+  (3) vanno ALZATE quando ci si accovaccia (il disegno accovacciato e' 51px invece di 62), se no
+  restano sospese sopra la testa.
+  Colori del cerume, mai verso il rosso: il PG lampeggia quando incassa, e le macchie non devono
+  confondersi con quel segnale. Controllo automatico [25].
+  💡 Sblocca anche l'**icona dell'app**, che in lista aveva gia' annotata l'idea "il personaggio
+  che si sporca di cerume": ora e' un fotogramma vero del gioco, non un disegno inventato.
 - **Personaggio (grafica/animazione, dal 2026-07-12/13):** esploratore da **immagine AI** (Leonardo),
   **animato** con **AutoSprite**: idle/camminata/corsa/salto (sprite sheet in `assets/spritesheets/hero/`,
   pixellati). Fisica/hitbox invariati (`this.player` invisibile, `this.heroVisual` segue). **Attacco:**

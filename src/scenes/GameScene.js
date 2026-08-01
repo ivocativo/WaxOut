@@ -214,6 +214,10 @@ class GameScene extends Phaser.Scene {
     this.HERO_ORIGIN_Y = 0.86;    // altezza dei piedi nel fotogramma (si tara)
     this.heroVisual = this.add.sprite(this.player.x, this.player.body.bottom, 'hero_walk', 0)
       .setDepth(10).setOrigin(0.5, this.HERO_ORIGIN_Y);
+    // Macchie di cerume addosso (vedi sporcati()). Si azzerano qui, quindi a ogni livello si
+    // riparte puliti: il livello nuovo e' gia' il momento in cui si tira il fiato e si recupera
+    // un po' di vita, ed e' il posto naturale anche per ripulirsi.
+    this.macchie = [];
     if (!this.anims.exists('hero_walk_a')) this.anims.create({ key: 'hero_walk_a', frames: this.anims.generateFrameNumbers('hero_walk', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
     if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
     if (!this.anims.exists('hero_idle_a')) this.anims.create({ key: 'hero_idle_a', frames: this.anims.generateFrameNumbers('hero_idle', { start: 0, end: 24 }), frameRate: 10, repeat: -1 });
@@ -2441,6 +2445,65 @@ class GameScene extends Phaser.Scene {
     if (hitAny) {
       this.cameras.main.shake(hitEnemy ? 130 : 60, hitEnemy ? 0.010 : 0.004);
       this.hitStop(M.fermo || (hitEnemy ? 78 : 40));
+      this.sporcati(hitEnemy);          // lo schizzo torna addosso: ci si sporca di cerume
+    }
+  }
+
+  // ---- SPORCARSI DI CERUME (2026-07-31) ----
+  // Idea dell'utente: nel corpo a corpo lo schizzo torna addosso. E' SOLO ESTETICA — non tocca
+  // velocita', mira o danno: sporcarsi che peggiora il gioco sarebbe un'altra meccanica, da
+  // pensare a parte.
+  // Non serve ridisegnare il personaggio sporco: le macchie sono "adesivi" che si ricordano dove
+  // stanno RISPETTO AL CORPO e lo seguono ogni fotogramma, come gia' fanno il vestito animato e
+  // l'arma in mano. I colori sono quelli del cerume, mai verso il rosso: quando il PG prende una
+  // botta lampeggia, e le macchie non devono confondersi con quel segnale.
+  sporcati(daNemico) {
+    if (this.macchie.length >= GameScene.MACCHIE_MAX) return;
+    // Non a ogni colpo, se no col tetto a 10 ci si insozza in tre secondi: cosi' ci vogliono
+    // una ventina di colpi andati a segno, che e' un livello intero.
+    if (Math.random() > 0.5) return;
+
+    const C = window.CONFIG.COLORS;
+    const col = daNemico ? C.waxSoftLight : C.waxHardLight;
+    // DOVE. Serve un punto che stia DAVVERO sul corpo. Tirare a indovinare un rettangolo non
+    // basta: la sagoma e' stretta in cima (la testa) e larga in mezzo (zaino + braccia), quindi
+    // le macchie finivano per aria di fianco al personaggio. Qui si sorteggia un punto e si
+    // CHIEDE ALLA TEXTURE se e' pieno, ripetendo finche' non si trova. Il fotogramma corrente
+    // basta come stampo: la sagoma cambia poco fra un fotogramma e l'altro.
+    // La cella e' 84x84 e il punto d'appoggio (i piedi) sta a (42, 72), vedi HERO_ORIGIN_Y.
+    let ox = 0, oy = 0, trovato = false;
+    for (let tent = 0; tent < 10 && !trovato; tent++) {
+      ox = Phaser.Math.Between(-8, 12);
+      oy = Phaser.Math.Between(-46, -18);        // busto e testa: lo schizzo arriva dalle mani
+      const a = this.textures.getPixelAlpha(Math.round(42 + ox), Math.round(72 + oy),
+        this.heroVisual.texture.key, this.heroVisual.frame.name);
+      trovato = a > 40;
+    }
+    if (!trovato) return;
+
+    // Piccole e un po' schiacciate, non bollini tondi: a 62px di statura una macchia di 3px si
+    // legge come schizzo, una di 8px sembra un adesivo.
+    const rx = Phaser.Math.FloatBetween(1.1, 2.4);
+    const m = this.add.ellipse(this.heroVisual.x, this.heroVisual.y,
+      rx * 2, rx * Phaser.Math.FloatBetween(1.1, 1.7), col, 0.82)
+      .setDepth(10.5)                      // sopra il vestito (10), sotto l'arma in mano (11)
+      .setRotation(Phaser.Math.FloatBetween(-0.7, 0.7));
+    m.ox = ox; m.oy = oy;
+    this.macchie.push(m);
+    this.posizionaMacchie();
+  }
+
+  // Le macchie seguono il corpo. Due accorgimenti: si specchiano col verso (una macchia sul petto
+  // resta sul petto anche girandosi) e si ALZANO quando ci si accovaccia — il disegno accovacciato
+  // e' 51px invece di 62, quindi senza correzione le macchie del busto resterebbero per aria.
+  posizionaMacchie() {
+    if (!this.macchie.length) return;
+    const v = this.facing < 0 ? -1 : 1;
+    const compressione = this.crouching ? 0.82 : 1;
+    for (let i = 0; i < this.macchie.length; i++) {
+      const m = this.macchie[i];
+      m.setPosition(this.heroVisual.x + m.ox * v, this.heroVisual.y + m.oy * compressione);
+      m.setScale(this.jx, this.jy);
     }
   }
 
@@ -3925,6 +3988,7 @@ class GameScene extends Phaser.Scene {
     // Il "vestito" animato segue il player (piedi = fondo del corpo fisico) e riceve il juice.
     this.heroVisual.setPosition(this.player.x, this.player.body.bottom);
     this.heroVisual.setScale(this.HERO_SCALE * this.jx, this.HERO_SCALE * this.jy);
+    this.posizionaMacchie();          // le macchie di cerume seguono il corpo
     // Arma in mano (layer): segue la mano finche' visibile, poi si nasconde a fine attacco.
     if (this.heroWeapon.visible) {
       if (this.time.now > this._weaponHideAt) this.heroWeapon.setVisible(false);
@@ -3945,4 +4009,7 @@ class GameScene extends Phaser.Scene {
 // Scelte per MOLTIPLICAZIONE sull'arte ambra dei nemici: il blu-acciaio la raffredda (corazza),
 // il rosso la accende (esplosivo), il viola la sposta di tono senza spegnerla (si sdoppia).
 GameScene.ELITE_TINT = { tank: 0x9fc7e8, boom: 0xff7a4a, split: 0xb79bff };
+// Quante macchie di cerume al massimo addosso al personaggio. Senza tetto, dopo qualche minuto
+// il PG diventa una palla di cerume che cammina e non si legge piu' nulla.
+GameScene.MACCHIE_MAX = 10;
 window.GameScene = GameScene;
