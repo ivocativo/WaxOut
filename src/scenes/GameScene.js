@@ -1971,13 +1971,16 @@ class GameScene extends Phaser.Scene {
     });
     this.groundPuff(x, groundTop, big);
     if (big) this.cameras.main.shake(260, 0.010);
-    window.Sfx.emerge(big);
 
     this.time.delayedCall(GONFIO, () => {
       if (!e.active) { bolla.destroy(); return; }
       e.setVisible(true);
       this.groundPuff(x, groundTop, big);
       if (big) this.cameras.main.shake(200, 0.008);
+      // IL SUONO STA QUI, non all'inizio: e' uno "whoop" che sale, cioe' il verso di qualcosa che
+      // SPUNTA. Suonarlo mentre il pavimento si sta ancora gonfiando lo faceva finire 800ms prima
+      // che la creatura uscisse, e poi silenzio (difetto nato allungando la comparsa il 30/07).
+      window.Sfx.emerge(big);
       // la bolla si sgonfia mentre il nemico esce: e' lui che ha preso il suo posto
       this.tweens.add({ targets: bolla, scaleY: 0.2, y: suolo(0.2), alpha: 0, duration: USCITA * 0.6,
         onComplete: () => bolla.destroy() });

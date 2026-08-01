@@ -402,7 +402,30 @@ Emersi giocando SENZA god-mode (che nei test li nascondeva — vedi `earwaxwar-s
 - **Telefono "non funziona":** era solo l'IP del PC cambiato (DHCP). Nessuna modifica al codice.
 Tutti da riprovare a fondo dall'utente (senza god-mode).
 
-### 🎵 Audio (rifacimento synth) — FATTO E VERIFICATO (logica), NON ancora committato
+### 🔊 EFFETTI SONORI — TARATI DALL'UTENTE A ORECCHIO (2026-07-31)
+
+**Come ci si e' arrivati, perche' e' il pezzo riutilizzabile.** Primo giro: banco di prova con i
+14 effetti uno per uno (`scratchpad/fai_banco.py`) → l'utente ne boccia 9. Secondo giro: 9 suoni
+x 2 alternative proposte da me leggendo cosa aveva tenuto → **ne passa UNA su nove**. A quel
+punto era chiaro che stavo indovinando: io non posso sentire, e "non mi convince" non basta a
+sapere dove andare. Terzo giro: **pannello con le manopole** (`scratchpad/fai_manopole.py`) —
+volume, nota/soffio, tono di partenza e di arrivo, durata, brillantezza, coda, tipo d'onda — e
+l'utente li ha modellati lui in una sessione sola. **I numeri in `sfx.js` sono i suoi, non miei:
+se vanno rifatti si rigenera il pannello e si rigirano i cursori, non si tira a indovinare.**
+Lezione: quando il giudizio e' estetico e l'utente non ha il vocabolario per descriverlo, dargli
+i comandi batte qualunque quantita' di proposte.
+- Teoria mia SMENTITA dai fatti, da non ripetere: avevo dedotto "il problema e' che suonano da
+  chiptune". Ma i due suoni piu' chiptune del gioco (fanfara di fine livello e trombetta del game
+  over, onde quadre/dente di sega che suonano una melodia) l'utente li ha **tenuti**.
+- Promossi com'erano: cumulo distrutto, sputo, raccolta, fine livello, game over.
+- Lo SPRUZZO ha ora zero soffio: solo una nota che precipita. Il vecchio sibilo non gli piaceva.
+- ⚠️ **Il suono della comparsa ora parte quando la creatura SPUNTA** (dentro il secondo tempo
+  di `emergeFromGround`), non quando il pavimento comincia a gonfiarsi. Allungando l'animazione a
+  1s il 30/07 avevo lasciato il suono a 180ms all'inizio: finiva 800ms prima che la creatura
+  uscisse. Misurato dopo la correzione: suono e comparsa entrambi a 382ms. Nel banco delle
+  manopole questo NON era giudicabile — li' il suono si sente da solo, senza animazione sotto.
+
+### 🎵 Audio (rifacimento synth) — storia precedente
 Rifatto `src/sfx.js` (2026-07-17): sintesi più ricca (busta ADSR, filtri, detune, mandata
 delay+riverbero), **13 effetti stratificati con variazione** a ogni colpo, e un **vero motore
 musicale** (scheduler a lookahead, voci basso/accordi/lead + batteria sintetica) con **3 atmosfere

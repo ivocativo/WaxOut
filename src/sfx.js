@@ -606,52 +606,61 @@ window.Sfx = (function () {
     toggleMusic, musicEnabled, startMusic, stopMusic, setMusic, loadTracks,
     addAudioButton, addMusicButton,
 
-    // colpo dello swab: un "whiff" leggero e arioso
+    // ⚠️ I NUMERI DI QUESTI OTTO SUONI LI HA SCELTI L'UTENTE A ORECCHIO (2026-07-31), girando i
+    // cursori di un banco di prova, dopo che nove proposte fatte da me alla cieca ne avevano
+    // azzeccata una sola. Non sono "sensati sulla carta": sono quelli che gli piacciono. Se un
+    // domani vanno rifatti, si rifa' il banco (scratchpad/fai_manopole.py) e si rigirano i
+    // cursori — non si tirano a indovinare.
+    // La forma e' sempre la stessa: uno strato di NOTA (oscillatore) e uno di SOFFIO (rumore
+    // filtrato), dosati fra loro, con l'inviluppo ricavato dalla durata.
+
+    // colpo dello swab: schiocco corto e acuto che sale
     hit() {
-      synth({ freq: jit(760), glideTo: 300, type: 'triangle', dur: 0.07, peak: 0.03, a: 0.003, d: 0.03, s: 0.2, r: 0.03 });
-      noiseBurst({ dur: 0.05, peak: 0.02, type: 'highpass', freq: 2600 });
+      synth({ freq: 460, glideTo: 1520, type: 'square', dur: 0.06, peak: 0.0175, a: 0.0036, d: 0.018, s: 0.4, r: 0.024, filter: { type: 'lowpass', freq: 5000 }, send: 0.01 });
+      noiseBurst({ dur: 0.06, peak: 0.0285, type: 'lowpass', freq: 5000, to: 16500, a: 0.0036, d: 0.018, s: 0.4, r: 0.024, send: 0.01 });
     },
-    // cerume scheggiato: piccolo "tok" umido
+    // cerume scheggiato: "tok" grave e ruvido, con un filo di coda
     crack() {
-      synth({ freq: jit(210, 0.06), glideTo: 105, type: 'square', dur: 0.08, peak: 0.05, a: 0.002, d: 0.05, s: 0.15, r: 0.03, filter: { type: 'lowpass', freq: 1800 } });
-      noiseBurst({ dur: 0.04, peak: 0.02, type: 'lowpass', freq: 1200 });
+      synth({ freq: 210, glideTo: 105, type: 'sawtooth', dur: 0.08, peak: 0.027, a: 0.0048, d: 0.024, s: 0.4, r: 0.032, filter: { type: 'lowpass', freq: 1800 }, send: 0.32 });
+      noiseBurst({ dur: 0.08, peak: 0.023, type: 'lowpass', freq: 1800, to: 900, a: 0.0048, d: 0.024, s: 0.4, r: 0.032, send: 0.32 });
     },
-    // blocco distrutto: "splat" succoso a piu' strati
+    // blocco distrutto: "splat" succoso a piu' strati (l'utente lo ha promosso com'era)
     smash() {
       noiseBurst({ dur: 0.24, peak: 0.1, type: 'lowpass', freq: 1400, to: 300, send: 0.18 });
       synth({ freq: jit(175, 0.05), glideTo: 55, type: 'sawtooth', dur: 0.22, peak: 0.06, a: 0.003, d: 0.08, s: 0.3, r: 0.08, filter: { type: 'lowpass', freq: 900 } });
       synth({ freq: jit(360, 0.06), glideTo: 150, type: 'triangle', dur: 0.12, peak: 0.03, a: 0.002, d: 0.05, s: 0.2, r: 0.05 });
     },
-    // salto: "boing" comico verso l'alto
+    // salto: nota morbida che sale + un risucchio dal terreno molle (scelta B dell'utente)
     jump() {
-      synth({ freq: jit(300, 0.05), glideTo: jit(680, 0.05), type: 'square', dur: 0.13, peak: 0.045, detune: [-5, 6], a: 0.004, d: 0.05, s: 0.4, r: 0.05, filter: { type: 'lowpass', freq: 2400 } });
+      synth({ freq: 240, glideTo: 600, type: 'triangle', dur: 0.14, peak: 0.05, a: 0.004, d: 0.05, s: 0.4, r: 0.06, filter: { type: 'lowpass', freq: 1800 } });
+      noiseBurst({ dur: 0.07, peak: 0.03, type: 'lowpass', freq: 800, to: 1800, a: 0.002, d: 0.03, s: 0.2, r: 0.03 });
     },
-    // scatto: whoosh d'aria
+    // scatto: sventagliata che sale, cupa e con molta coda
     dash() {
-      noiseBurst({ dur: 0.17, peak: 0.05, type: 'highpass', freq: 1400, to: 3600, send: 0.15 });
-      synth({ freq: 520, glideTo: 920, type: 'triangle', dur: 0.12, peak: 0.02, a: 0.004, d: 0.05, s: 0.3, r: 0.05 });
+      synth({ freq: 830, glideTo: 1590, type: 'square', dur: 0.22, peak: 0.032, a: 0.0132, d: 0.066, s: 0.4, r: 0.088, filter: { type: 'lowpass', freq: 1150 }, send: 0.23 });
+      noiseBurst({ dur: 0.22, peak: 0.018, type: 'lowpass', freq: 1150, to: 2200, a: 0.0132, d: 0.066, s: 0.4, r: 0.088, send: 0.23 });
     },
-    // colpito: "ahi" discendente
+    // colpito: quasi tutto soffio, con un guizzo che precipita
     hurt() {
-      synth({ freq: jit(400, 0.04), glideTo: 120, type: 'sawtooth', dur: 0.22, peak: 0.07, a: 0.004, d: 0.06, s: 0.5, r: 0.08, filter: { type: 'lowpass', freq: 1600 }, send: 0.12 });
-      noiseBurst({ dur: 0.08, peak: 0.02, type: 'lowpass', freq: 900 });
+      synth({ freq: 1250, glideTo: 60, type: 'square', dur: 0.15, peak: 0.0074, a: 0.009, d: 0.045, s: 0.4, r: 0.06, filter: { type: 'lowpass', freq: 4600 }, send: 0.13 });
+      noiseBurst({ dur: 0.15, peak: 0.0596, type: 'lowpass', freq: 4600, to: 221, a: 0.009, d: 0.045, s: 0.4, r: 0.06, send: 0.13 });
     },
-    // nemico eliminato: si sgonfia con uno splat
+    // nemico eliminato: si sgonfia in basso, cupo e con lunga coda
     enemyDie() {
-      synth({ freq: jit(240, 0.06), glideTo: 50, type: 'sawtooth', dur: 0.26, peak: 0.06, a: 0.003, d: 0.08, s: 0.35, r: 0.09, filter: { type: 'lowpass', freq: 1100 }, send: 0.12 });
-      noiseBurst({ dur: 0.13, peak: 0.04, type: 'lowpass', freq: 800, to: 300 });
+      synth({ freq: 140, glideTo: 50, type: 'square', dur: 0.26, peak: 0.0221, a: 0.0156, d: 0.078, s: 0.4, r: 0.104, filter: { type: 'lowpass', freq: 1150 }, send: 0.35 });
+      noiseBurst({ dur: 0.26, peak: 0.0319, type: 'lowpass', freq: 1150, to: 411, a: 0.0156, d: 0.078, s: 0.4, r: 0.104, send: 0.35 });
     },
-    // sputo: "ptu!"
+    // sputo: "ptu!" (l'utente lo ha promosso com'era)
     spit() {
       synth({ freq: jit(620, 0.06), glideTo: 250, type: 'triangle', dur: 0.06, peak: 0.045, a: 0.002, d: 0.03, s: 0.2, r: 0.03 });
       noiseBurst({ dur: 0.06, peak: 0.03, type: 'bandpass', freq: 1500, q: 1.5 });
     },
-    // getto di acqua e sapone: "pfff" pulito e arioso
+    // getto dello spruzzino: NIENTE soffio, solo una nota che precipita (l'utente ha portato la
+    // manopola nota/soffio a fondo scala: il vecchio sibilo non gli piaceva proprio)
     spray() {
-      noiseBurst({ dur: 0.1, peak: 0.04, type: 'highpass', freq: 2400, to: 3600 });
-      synth({ freq: 760, glideTo: 520, type: 'triangle', dur: 0.07, peak: 0.018, a: 0.003, d: 0.03, s: 0.2, r: 0.03 });
+      synth({ freq: 760, glideTo: 90, type: 'triangle', dur: 0.12, peak: 0.05, a: 0.0072, d: 0.036, s: 0.4, r: 0.048, filter: { type: 'lowpass', freq: 6000 }, send: 0.01 });
     },
-    // cerume raccolto: "bloop" allegro
+    // cerume raccolto: "bloop" allegro (l'utente lo ha promosso com'era)
     pick() {
       synth({ freq: jit(500, 0.05), glideTo: jit(880, 0.05), type: 'sine', dur: 0.1, peak: 0.05, a: 0.004, d: 0.04, s: 0.4, r: 0.05, send: 0.1 });
       synth({ freq: jit(1000, 0.05), type: 'sine', dur: 0.05, peak: 0.02, a: 0.003, d: 0.03, s: 0.1, r: 0.02, when: (ctx ? ctx.currentTime + 0.05 : 0) });
@@ -674,10 +683,18 @@ window.Sfx = (function () {
       });
       synth({ freq: noteToFreq('C3'), glideTo: 90, type: 'sawtooth', dur: 0.5, peak: 0.06, a: 0.01, d: 0.1, s: 0.6, r: 0.2, when: t + 0.54, filter: { type: 'lowpass', freq: 1000 }, send: 0.16 });
     },
-    // nemico che emerge dal terreno o cala dal soffitto: "splorch" gommoso che sale
+    // nemico che spunta dal terreno: uno "whoop" che sale, sordo per il boss.
+    // ⚠️ Suona quando la creatura SPUNTA davvero, non quando il pavimento inizia a gonfiarsi:
+    // la chiamata sta dentro il secondo tempo di emergeFromGround. Nel banco di prova questo non
+    // si poteva giudicare (li' il suono si sente da solo, senza animazione sotto).
     emerge(big) {
-      synth({ freq: 70, glideTo: big ? 150 : 240, type: 'sawtooth', dur: 0.18, peak: big ? 0.08 : 0.05, a: 0.005, d: 0.06, s: 0.5, r: 0.07, filter: { type: 'lowpass', freq: big ? 700 : 1100 }, send: 0.12 });
-      noiseBurst({ dur: 0.1, peak: 0.035, type: 'lowpass', freq: 600 });
+      if (big) {
+        synth({ freq: 120, glideTo: 1330, type: 'sine', dur: 0.18, peak: 0.0275, a: 0.0108, d: 0.054, s: 0.4, r: 0.072, filter: { type: 'lowpass', freq: 3700 }, send: 0.21 });
+        noiseBurst({ dur: 0.18, peak: 0.0235, type: 'lowpass', freq: 3700, to: 18000, a: 0.0108, d: 0.054, s: 0.4, r: 0.072, send: 0.21 });
+      } else {
+        synth({ freq: 140, glideTo: 1580, type: 'sine', dur: 0.18, peak: 0.0395, a: 0.0108, d: 0.054, s: 0.4, r: 0.072, filter: { type: 'lowpass', freq: 4200 }, send: 0.25 });
+        noiseBurst({ dur: 0.18, peak: 0.0105, type: 'lowpass', freq: 4200, to: 18000, a: 0.0108, d: 0.054, s: 0.4, r: 0.072, send: 0.25 });
+      }
     },
   };
 })();
