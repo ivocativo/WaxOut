@@ -471,7 +471,22 @@ movimento, attacco, IA di ogni nemico, proiettili, calamita, juice, macchie, arm
 Quasi tutti i difetti degli ultimi giorni sono nati li' dentro.
 
 ## Ordine della revisione (da fare, 🧠)
-- [ ] **1. Spezzare `update()`** in blocchi con un nome, uno per argomento. NON riscriverla.
+- [x] **1. Spezzare `update()` ✅ FATTO (2026-08-02): da 460 righe a 27.** Nove blocchi con un
+  nome — `aggiornaCronometri`, `controllaTraguardo`, `agganciaAlTerreno`, `aggiornaAmbiente`,
+  `comandiDelGiocatore`, `animaPersonaggio`, `aggiornaNemici`, `aggiornaAbilita`,
+  `chiudiFotogramma`. Nessuna riga di logica riscritta: i corpi sono stati SPOSTATI tali e quali
+  (script in `scratchpad/spezza_update.py`).
+  **Come si e' verificato che non e' cambiato niente**, oltre ai 68 controlli: confronto delle
+  righe di codice prima/dopo. Sparite 2 righe, ed erano i due `return` che fermavano update() —
+  ricompaiono entrambe come `return true`. Tutto il resto sono solo intestazioni, chiusure,
+  cinque `const p` e le nove chiamate.
+  ⚠️ Due errori fatti e corretti durante l'estrazione, da sapere se si rifa' lo stesso giro:
+  (1) sbagliare di UNA riga il confine finale si mangia la parentesi di chiusura del metodo;
+  (2) far assorbire a un blocco i commenti che lo precedono e' giusto (se no restano orfani a
+  spiegare codice che non c'e' piu'), ma va messo un LIMITE al blocco precedente, se no si porta
+  via anche la riga di chiamata di quello dopo.
+  Restano solo `now` e `dt` come variabili locali di update(): `p` e `k` sono diventate morte
+  e sono state tolte.
 - [ ] **2. Spezzare `create()`**, stessa cura e meno urgenza: e' la porta d'ingresso al gioco.
 - [ ] **3. Portare fuori la costruzione del livello**: 561 righe che non toccano ne' nemici ne'
   combattimento, il pezzo che si stacca piu' pulito (-14% al file).

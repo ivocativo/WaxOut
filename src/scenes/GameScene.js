@@ -3682,20 +3682,9 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  update(time, delta) {
-    window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
-    this.animateWax(time);                    // cerume "fluido": ondeggia e cola
-    this.fermaProiettiliNelTerreno();         // colline e soffitto fermano i colpi (non sono solidi)
-    // Schegge della Regina: incollate al profilo del terreno (e' il motivo per cui non saltellano).
-    this.movers.getChildren().forEach((m) => {
-      if (m.active && m.scheggia) m.y = this.terrainTopAt(m.x) - 10;
-    });
-    if (this.locked) { this.player.setVelocityX(0); return; }
-    const p = window.GameState.player;
-    const k = this.keys;
-    const now = time;
-    const dt = Math.min(delta || 16.7, 100);   // tetto: se il telefono si impunta, il tempo non salta
-
+  // Cronometri delle modalita' a tempo (assedio e corsa). Restituisce TRUE se il livello e'
+  // finito qui dentro: in quel caso update() deve fermarsi subito, senza toccare altro.
+  aggiornaCronometri(now, dt) {
     // ASSEDIO: si vince ELIMINANDO la quota di nemici prima che scada il cronometro.
     if (this.levelKind === 'siege') {
       this.siegeLeftMs = Math.max(0, this.siegeLeftMs - dt);
@@ -3716,9 +3705,14 @@ class GameScene extends Phaser.Scene {
       this.rushLeftMs = Math.max(0, this.rushLeftMs - dt);
       const left = Math.ceil(this.rushLeftMs / 1000);
       this.updateBigTimer(window.I18n.t('hud_rush', { s: left }), left, now);
-      if (this.rushLeftMs <= 0 && this.player.x < this.goalX) { this.gameOver(); return; }
+      if (this.rushLeftMs <= 0 && this.player.x < this.goalX) { this.gameOver(); return true; }
     }
+    return false;
+  }
 
+  // Timpano raggiunto: si completa solo se il cerume pulito arriva alla soglia e, nei livelli
+  // boss, se il boss e' morto. Restituisce TRUE se il livello si e' concluso.
+  controllaTraguardo(now) {
     // Traguardo: bisogna PULIRE almeno la soglia di cerume E raggiungere il timpano.
     // Nei livelli boss il timpano resta "sbarrato" finche' il Tappo di Cerume e' vivo.
     if (this.levelKind !== 'siege' && this.player.x >= this.goalX) {
@@ -3733,10 +3727,19 @@ class GameScene extends Phaser.Scene {
       } else if (bossBlocking) {
         if (!this._bossHintShown) { this._bossHintShown = true; this.showBanner(window.I18n.t('game_boss_guard', { nome: this.nomeBoss(null) }), '#ffb04a'); }
       } else {
-        this.levelComplete(); return;
+        this.levelComplete(); return true;
       }
     }
+    return false;
+  }
 
+  // Aggancio dei piedi al profilo del terreno (che e' una mappa di altezze, non un corpo
+  // solido), salto sui nemici, atterraggio e ricarica dei salti.
+  // ⚠️ L'ORDINE QUI DENTRO E' SIGNIFICATIVO: il salto sui nemici va rilevato PRIMA dello snap,
+  // se no lo snap risucchia il giocatore a terra attraverso il nemico. Restituisce se e'
+  // appoggiato, dato che serve a mezzo update().
+  agganciaAlTerreno(now) {
+    const p = window.GameState.player;
     // TERRENO A "MAPPA DI ALTEZZE" (prototipo round 4): il PG cammina sul profilo `terrainTopAt`
     // (colline dolci) agganciando i piedi alla superficie frame per frame → camminata liscia su/giu'
     // senza blocchi fisici (niente cuciture che incastrano). NON aggancia mentre SALE in un salto
@@ -3804,6 +3807,13 @@ class GameScene extends Phaser.Scene {
     // bastava ripremere in fretta per ottenere un salto in più (falso doppio salto).
     if (onGround && this.player.body.velocity.y >= 0) { this.jumpsLeft = p.doubleJump ? 2 : 1; this.lastGroundAt = now; }
 
+    return onGround;
+  }
+
+  // Roba che vive per conto suo nel livello: gocce dal soffitto, macerie della frana, pozze
+  // scivolose, calamita del cerume. Restituisce se il giocatore sta su una pozza.
+  aggiornaAmbiente(now, onGround) {
+    const p = window.GameState.player;
     // Gocce dal soffitto: emettitori che si gonfiano e rilasciano gocce che cadono. Il danno
     // al contatto e' gestito dall'overlap player/movers in create(); lo splash a terra qui.
     this.updateDrips(now);
@@ -3828,6 +3838,14 @@ class GameScene extends Phaser.Scene {
       });
     }
 
+    return onSlime;
+  }
+
+  // Tutto quello che nasce da un tasto: accovacciamento, movimento, salto, scatto, mira e
+  // attacco. E' il blocco piu' lungo ed e' l'unico che legge i comandi.
+  comandiDelGiocatore(now, onGround, onSlime) {
+    const p = window.GameState.player;
+    const k = this.keys;
     // ACCOVACCIAMENTO (stile Metal Slug): tieni GIU' a terra -> ti abbassi, così getto e
     // mazza escono all'altezza dei piedi e colpisci i nemici bassi (es. Gorgogliante). In
     // aria GIU' resta la mira verso il basso del getto (gestita più sotto).
@@ -3932,7 +3950,12 @@ class GameScene extends Phaser.Scene {
       else if (wax) this.doMelee(now, wax);
       else this.fireJet(adx, ady);
     }
+  }
 
+  // Quale animazione o posa mostrare, in base a cosa sta facendo il personaggio. Non tocca
+  // la fisica: decide solo cosa si vede.
+  animaPersonaggio(onGround) {
+    const p = window.GameState.player;
     // Animazione (sul "vestito" this.heroVisual; la fisica resta sul player invisibile)
     this.heroVisual.setFlipX(this.facing < 0);
     const _vx = Math.abs(this.player.body.velocity.x);
@@ -3988,7 +4011,10 @@ class GameScene extends Phaser.Scene {
       }
     }
     this._wasCrouching = this.crouching;
+  }
 
+  // Intelligenza di tutte le creature vive, piu' il danno da contatto col giocatore.
+  aggiornaNemici(now) {
     // IA nemici + danno da contatto
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
@@ -4076,7 +4102,12 @@ class GameScene extends Phaser.Scene {
         this.hurtPlayer(e.contactDamage, e.x);
       }
     });
+  }
 
+  // Le abilita' che vivono a ogni fotogramma: bolla compagna, colpi a ricerca, scia dello
+  // scatto, alone dello scudo.
+  aggiornaAbilita(now) {
+    const p = window.GameState.player;
     if (this.companions.length) this.updateCompanions(now);
     if (p.homing) this.updateHomingShots(now);
     if (p.dashStrike) this.updateDashStrike(now);
@@ -4085,6 +4116,12 @@ class GameScene extends Phaser.Scene {
     // JUICE — molla: i moltiplicatori di scala tornano verso 1 ogni frame (rimbalzo morbido).
     // Applicata qui, a fine update(): DOPO ogni possibile trigger di questo stesso frame
     // (atterraggio/inversione/salto sopra, ma anche il contatto coi nemici appena elaborato
+  }
+
+  // Chiusura del fotogramma: juice a molla, sagoma e vestito del personaggio, macchie, arma
+  // in mano, e i due valori che il fotogramma successivo confronta col suo (velocita' e
+  // quota dei piedi).
+  chiudiFotogramma() {
     // sopra), cosi' nessun evento resta con un frame di ritardo prima di vedersi.
     this.jx += (1 - this.jx) * window.CONFIG.JUICE_SPRING;
     this.jy += (1 - this.jy) * window.CONFIG.JUICE_SPRING;
@@ -4113,6 +4150,48 @@ class GameScene extends Phaser.Scene {
     this._prevBottom = this.player.body.bottom;
 
     this.updateHud();
+  }
+
+  // ==========================================================================================
+  // IL FOTOGRAMMA. Gira 60 volte al secondo ed e' l'INDICE del gioco vivo: qui sotto non c'e'
+  // logica, solo l'elenco ordinato di cosa succede in un fotogramma. Ogni riga porta a un metodo
+  // che ha in testa il commento di cosa fa. Per mettere le mani da qualche parte: si legge questo
+  // elenco, si trova il passo giusto, si scende li'.
+  // ⚠️ L'ORDINE NON E' ARBITRARIO — i vincoli noti, in ordine di apparizione:
+  //   · i cronometri e il traguardo vengono PRIMA di tutto: possono chiudere il livello, e da li'
+  //     in poi toccare il personaggio o i nemici sarebbe lavoro su una partita gia' finita;
+  //   · l'aggancio al terreno viene PRIMA dei comandi: dice se si e' appoggiati, e mezzo blocco
+  //     dei comandi (salto, scatto, accovacciamento) dipende da quella risposta;
+  //   · l'animazione viene DOPO i comandi: mostra cosa il personaggio ha appena deciso di fare;
+  //   · la chiusura sta per ultima perche' salva i due valori (velocita' e quota dei piedi) che
+  //     il fotogramma SUCCESSIVO confronta coi propri.
+  // ==========================================================================================
+  update(time, delta) {
+    window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
+    this.animateWax(time);                    // cerume "fluido": ondeggia e cola
+    this.fermaProiettiliNelTerreno();         // colline e soffitto fermano i colpi (non sono solidi)
+    // Schegge della Regina: incollate al profilo del terreno (e' il motivo per cui non saltellano).
+    this.movers.getChildren().forEach((m) => {
+      if (m.active && m.scheggia) m.y = this.terrainTopAt(m.x) - 10;
+    });
+    if (this.locked) { this.player.setVelocityX(0); return; }
+    const now = time;
+    const dt = Math.min(delta || 16.7, 100);   // tetto: se il telefono si impunta, il tempo non salta
+
+    if (this.aggiornaCronometri(now, dt)) return;   // la corsa a tempo puo' finire qui
+
+    if (this.controllaTraguardo(now)) return;       // livello completato: si esce
+
+    const onGround = this.agganciaAlTerreno(now);
+    const onSlime = this.aggiornaAmbiente(now, onGround);
+    this.comandiDelGiocatore(now, onGround, onSlime);
+
+    this.animaPersonaggio(onGround);
+
+    this.aggiornaNemici(now);
+
+    this.aggiornaAbilita(now);
+    this.chiudiFotogramma();
   }
 }
 // Tinte delle varianti ELITE. Fuori dalla classe cosi' le leggono anche i controlli automatici.

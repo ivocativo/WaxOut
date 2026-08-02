@@ -72,8 +72,12 @@ _di cerume menando; EFFETTI SONORI rifatti dall'utente a orecchio col pannello d
 _POSE DI MIRA (avanti, in su, accovacciato, in corsa) con l'arma nella mano._
 _⚠️ Vicolo cieco da non ripetere: attaccare il braccio all'immagine dell'arma — il corpo ne_
 _ha gia' due e ne venivano TRE. Vedi §Posa d'attacco._
+_**✅ REVISIONE DEL CODICE AVVIATA (2026-08-02):** mappato `GameScene.js` e scoperto che il peso_
+_non stava nelle aree ma in DUE funzioni sole (`create()` 465 righe e `update()` 460, il 22% del_
+_file). **`update()` e' gia' stata spezzata: da 460 righe a 27**, nove blocchi con un nome, senza_
+_riscrivere una riga di logica. Piano e verifiche in `ROADMAP.md` §Mappatura._
 _**STATO ORA:** in Estetica resta solo un altro SET DI SFONDO. Restano gli **EASTER EGG** da_
-_scegliere, l'ARENA dedicata dell'assedio, e la MAPPATURA del codice prima della revisione._
+_scegliere, l'ARENA dedicata dell'assedio, e i passi 2-5 della revisione del codice._
 _Poi si va allo STORE._
 
 **NOME: ✅ APPLICATO (2026-07-31).** L'app si chiama **WAXOUT** ("earwax" da solo portava al
@@ -234,10 +238,15 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - `src/state.js` — costanti (`CONFIG`), `newPlayer()`, e le TABELLE: `UNLOCKS` (potenziamenti
   shop), `BLUEPRINTS` (progetti/abilità sbloccabili), `EVOLUTIONS` (fusioni), `MUTATORS`
   (modificatori di livello), `EVENTS` (eventi casuali). `Meta` sta in `src/meta.js` (localStorage).
-- `src/scenes/GameScene.js` — cuore del gioco (~3500 righe): build livello, spawn nemici, IA,
+- `src/scenes/GameScene.js` — cuore del gioco (~4200 righe): build livello, spawn nemici, IA,
   combattimento, abilità, mutatori, tipi di livello, gocce, élite, **eventi casuali**, update loop.
+  **`update()` e' un indice, non un blocco:** 27 righe che chiamano nell'ordine `aggiornaCronometri`
+  → `controllaTraguardo` → `agganciaAlTerreno` → `aggiornaAmbiente` → `comandiDelGiocatore` →
+  `animaPersonaggio` → `aggiornaNemici` → `aggiornaAbilita` → `chiudiFotogramma`. **L'ordine e'
+  significativo** (ogni blocco ha in testa il commento che dice perche' sta li'): per capire dove
+  mettere le mani si legge `update()` e si scende nel blocco giusto.
   **Personaggio animato:** `this.player` (fisica) reso invisibile + `this.heroVisual` (sprite animato che
-  lo segue, scala `HERO_SCALE`, origin `HERO_ORIGIN_Y`, riceve il juice); anim per stato in `update()`.
+  lo segue, scala `HERO_SCALE`, origin `HERO_ORIGIN_Y`, riceve il juice); anim per stato in `animaPersonaggio()`.
 - `src/scenes/UpgradeScene.js` — carte di fine livello (pool `ALL` + evoluzioni + **rarità** + filtro).
   Decide anche dove si va dopo: `VictoryScene` al livello `RUN_LEVELS`, `GameScene` diretta se il
   prossimo è un boss, altrimenti `DoorScene`.
@@ -275,7 +284,7 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - **Combattimento:** attacco unico "intelligente" (mazza da vicino / getto da lontano),
   hit-stop + shake, salto ad altezza variabile + coyote/buffer, accovacciamento, scatto,
   **salto sui nemici** alla Mario (rimbalzo + ricarica salto + danno; `stompEnemy` in GameScene).
-  ⚠️ Lo stomp va rilevato **PRIMA** dell'aggancio al terreno in `update()`, altrimenti lo snap
+  ⚠️ Lo stomp va rilevato **PRIMA** dell'aggancio al terreno (`agganciaAlTerreno`), altrimenti lo snap
   risucchia il PG a terra attraverso il nemico e il contatto non avviene mai.
 - **Movimento:** accelerazione/decelerazione morbida (a terra `MOVE_ACCEL_GROUND` 0.3, in aria
   `MOVE_ACCEL_AIR` 0.15); lo scatto resta istantaneo. **Juice procedurale**: il PG si schiaccia/
@@ -552,7 +561,7 @@ playtest dell'utente sul telefono._
 **🚧 QUASI CHIUSO — ROUND 4 (condotto + terreno) — riparti da QUI.** Piano dettagliato + stato in
 `ROADMAP.md`. Fatto e pushato (fino a `d6e50cd`): soffitto ondulato con stanze ampie + collisione;
 **TERRENO stile Terraria** (colline + cunette) disegnato da `buildTerrain` seguendo `terrainTopAt`;
-PG e nemici ci camminano via **heightmap-snap** (in `update()`: aggancio `body.y` a `terrainTopAt`;
+PG e nemici ci camminano via **heightmap-snap** (in `agganciaAlTerreno`: `body.y` su `terrainTopAt`;
 `e._grounded` sostituisce `blocked.down` nell'IA nemici); **✅ BUG CERUME su terreno RISOLTO**. Da fare:
 - ✅ **BUG CERUME su terreno — RISOLTO 2026-07-20 (`d6e50cd`).** Tutto cio' che "sta sul pavimento"
   ora usa `terrainTopAt(x)` invece della quota fissa 360: cumuli (`buildFloorMound`/`addWaxBlock`),
