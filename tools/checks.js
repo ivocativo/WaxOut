@@ -1013,7 +1013,68 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [27] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [27] POSE DI MIRA (2026-08-02). Sparando a terra il CORPO prende una posa col braccio teso e
+  // l'arma finisce nella MANO disegnata. Le cose che si romperebbero in silenzio:
+  //   a) la posa giusta per ogni caso (avanti / in su / accovacciato / in corsa);
+  //   b) l'arma DENTRO la mano e non a mezz'aria — e' l'unica cosa che si nota davvero;
+  //   c) in aria NIENTE posa di mira: li' deve restare il salto.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsM = g.scene.getScene('GameScene');
+    avanza(gsM, 24);
+    gsM.enemies.getChildren().forEach((e) => { if (e.active) e.destroy(); });
+
+    const prova = (dx, dy, giu, corri) => {
+      gsM.facing = 1;
+      gsM.touch.aimDown = !!giu;
+      gsM.player.setVelocityX(corri ? 220 : 0);
+      gsM.showRangedWeapon(dx, dy);
+      gsM._weaponHideAt = gsM.time.now + 1e9;
+      avanza(gsM, 2);
+      // distanza fra l'arma e la MANO della posa: se la posa non e' agganciata bene, l'arma
+      // resta appesa all'arco della spalla e questa distanza esplode.
+      const t = (gsM._posaMira === 'corsa')
+        ? window.GameScene.MANO.corsa[0] : window.GameScene.MANO[gsM._posaMira] || [0, 0];
+      const mx = gsM.heroVisual.x + t[0], my = gsM.heroVisual.y + t[1];
+      return { posa: gsM._posaMira, tex: gsM.heroVisual.texture.key,
+        scarto: Math.hypot(gsM.heroWeapon.x - mx, gsM.heroWeapon.y - my) };
+    };
+    const a1 = prova(1, 0, false, false);
+    const a2 = prova(0, -1, false, false);
+    const a3 = prova(1, 0, true, false);
+    const a4 = prova(1, 0, false, true);
+    gsM.touch.aimDown = false;
+
+    // in aria la posa NON deve comparire
+    gsM.player.body.reset(gsM.player.x, gsM.player.y - 120);
+    gsM.player.setVelocityY(-200);
+    gsM.showRangedWeapon(1, 0);
+    gsM._weaponHideAt = gsM.time.now + 1e9;
+    avanza(gsM, 2);
+    const inAria = gsM._posaMira;
+
+    const pose = a1.posa === 'avanti' && a2.posa === 'su'
+      && a3.posa === 'accovacciato' && a4.posa === 'corsa';
+    const fogli = a1.tex === 'hero_aim' && a4.tex === 'hero_runaim';
+    const inMano = [a1, a2, a3, a4].every((r) => r.scarto < 12);
+    const ariaPulita = !inAria;
+    if (pose && fogli && inMano && ariaPulita) {
+      ok('pose di mira col braccio teso', 2, 'avanti/su/accovacciato/corsa, arma nella mano '
+        + '(scarto max ' + Math.round(Math.max(a1.scarto, a2.scarto, a3.scarto, a4.scarto))
+        + 'px), in aria resta il salto');
+    } else {
+      ko('pose di mira col braccio teso', 2, 'pose=' + [a1.posa, a2.posa, a3.posa, a4.posa].join('/')
+        + ' fogli=' + fogli + ' inMano=' + inMano + ' inAria=' + inAria
+        + ' scarti=' + [a1, a2, a3, a4].map((r) => Math.round(r.scarto)).join(','));
+    }
+  }
+
+  // [28] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

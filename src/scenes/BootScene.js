@@ -123,6 +123,12 @@ class BootScene extends Phaser.Scene {
     // Rigenerabile: tools\bake_hero_sheet.py "...\crouch move.mp4" ...\hero_crouchwalk_px.png
     //               video:74,78,81,85,88,92,95,99 6 rif=...\crouch\Image35.png alto=50
     heroSheet('hero_crouchwalk', 'hero_crouchwalk_px.png');
+    // POSE DI MIRA (2026-08-02). Tre pose ferme (avanti, in su, accovacciato) e un ciclo di sei
+    // per la corsa. Il braccio e' teso e la MANO E' VUOTA: l'arma ci si infila dentro. E' la
+    // soluzione al vicolo cieco del 01/08, quando avevo attaccato il braccio all'immagine
+    // dell'arma e il personaggio si ritrovava con TRE braccia (il corpo ne ha gia' due).
+    heroSheet('hero_aim', 'hero_aim_px.png');
+    heroSheet('hero_runaim', 'hero_runaim_px.png');
   }
 
   create() {
@@ -174,6 +180,16 @@ class BootScene extends Phaser.Scene {
       this.anims.create({
         key: 'hero_crouchwalk_a', frames: this.anims.generateFrameNumbers('hero_crouchwalk', { start: 0, end: 7 }),
         frameRate: 12, repeat: -1,
+      });
+    }
+    // Corsa mirando: 6 fotogrammi = UN ciclo (due passi). La corsa normale ne ha 25 a 22/s, e
+    // quei 25 contengono quattro passi: due passi durano 12,5 fotogrammi = 0,57s. Per tenere la
+    // stessa andatura, 6 fotogrammi in 0,57s fanno 11 al secondo. Se non combaciasse, correndo e
+    // sparando il passo cambierebbe velocita' rispetto a correndo e basta.
+    if (!this.anims.exists('hero_runaim_a')) {
+      this.anims.create({
+        key: 'hero_runaim_a', frames: this.anims.generateFrameNumbers('hero_runaim', { start: 0, end: 5 }),
+        frameRate: 11, repeat: -1,
       });
     }
 

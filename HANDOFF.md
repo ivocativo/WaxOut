@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 67 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 68 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -154,7 +154,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-67 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+68 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -305,26 +305,31 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   la MANO (cioe' il perno della rotazione) e `scale` 0,5 perche' sono baked a doppia risoluzione.
   (Il vecchio doppione del coton fioc — `GameGfx.showWeaponSwing` attivo insieme al layer — non
   c'e' piu'.)
-- **POSA D'ATTACCO — APERTA, e la scorciatoia NON funziona (provata e buttata il 2026-08-01).**
-  Il problema: l'arma punta la mira ma il BRACCIO del personaggio non la segue, quindi mirando in
-  su l'arma sembra sospesa.
-  ⚠️ **TENTATIVO FALLITO, da non ripetere:** ridisegnare l'arma CON l'avambraccio attaccato e
-  spostare il perno alla spalla. Come meccanica funzionava benissimo — un disegno solo invece di
-  otto pose del corpo, e tutte e otto le direzioni giuste da sole (misurato: avanti 0 gradi,
-  diagonale -45, in su -90, indietro -180). Ma **il corpo del personaggio ha gia' DUE BRACCIA
-  disegnate**, quindi quello dell'arma diventava il TERZO. Se ne e' accorto l'utente giocando; io
-  non l'avevo visto perche' guardavo se il braccio seguiva la mira, non quante braccia c'erano.
-  Il sorgente resta in `art_sources/hero/arm-gun.png` (e senza busto in `arm-gun-tagliato.png`).
-  **Per risolverla davvero servirebbe ridisegnare il personaggio** senza un braccio, cioe'
-  rigenerare tutte e quattro le animazioni da 25 frame — valutazione dell'utente, condivisa: non
-  vale il prezzo adesso. Resta aperta.
-  ✅ **Quello che SI E' TENUTO** del giro: l'arma a distanza sta su un ARCO attorno alla spalla
-  (`BRACCIO_SPALLA/RAGGIO/AVANTI` in GameScene) invece che a un'altezza fissa. Non era estetica:
-  a mira orizzontale — la direzione che si usa quasi sempre — l'arma cadeva DENTRO la sagoma del
-  torso (offset +8 su una semi-larghezza di 17) ed era di fatto invisibile. Ora finisce a +21.
-  ✅ Tenuto anche **`tools/bake_sprite.py`** (scontorna PRIMA, rimpicciolisce DOPO): il vecchio
-  `bake_sprite.ps1` fa il contrario per un limite di GDI+, e sulle riduzioni forti (1304px -> 74)
-  i pixel MAGENTA del fondo entrano nella media e lasciano una frangia viola sul bordo.
+- ✅ **POSA D'ATTACCO — FATTA (2026-08-02).** Sparando a terra il CORPO prende una posa col
+  braccio teso nella direzione di mira, e l'arma finisce nella MANO disegnata.
+  Quattro pose, disegnate dall'utente: **avanti**, **in su**, **accovacciato** (le tre ferme, in
+  `hero_aim_px.png`) e un ciclo di sei per la **corsa** (`hero_runaim_px.png`, ricavato modificando
+  sei fotogrammi presi dalla corsa vera). Le diagonali non hanno una posa loro: sopra i 55 gradi
+  scatta quella in su, sotto quella in avanti (`GameScene.MIRA_SU_OLTRE`). In aria niente posa:
+  resta il salto.
+  **La chiave e' che le pose hanno la MANO VUOTA** e l'arma ci si infila dentro
+  (`GameScene.MANO`, misurato sui fogli baked). E' la soluzione al vicolo cieco del 01/08, quando
+  avevo attaccato il braccio all'immagine dell'arma e il personaggio si ritrovava con TRE braccia.
+  ⚠️ Tre trappole trovate lavorandoci, tutte gia' risolte ma da ricordare se si ri-baka:
+  1. **la posa col braccio ALZATO manda in tilt il metro del casco**: la parte piu' alta della
+     sagoma e' il dito, non la testa, e la misura veniva 97px invece di 271 (scala sbagliata di
+     tre volte). Rimedio: si forza la scala della posa gemella, con la sintassi `file@scala`.
+  2. **l'ansa del tubo e' un buco CHIUSO**: lo scontorno a macchia d'olio non ci arriva e lasciava
+     una macchia nera sulla schiena in quattro fotogrammi su sei. Rimedio: `scontorno=colore`.
+  3. **i colori vanno allineati a quelli del GIOCO, non solo fra loro**: le generazioni nuove
+     tornano piu' accese, e senza `rif=` il personaggio cambiava resa ogni volta che partiva una
+     posa. Rimedio: `rif=<foglio del gioco>` anche nel modo `pose`.
+  I sei fotogrammi della corsa sono stati scelti misurando l'apertura dei piedi: un passo ogni 6
+  fotogrammi, quindi i 25 originali ne contengono quattro, e un ciclo intero sta fra l'1 e il 12.
+  Verificato che la modifica dell'utente ha conservato il passo (correlazione fra le aperture
+  originali e quelle modificate > 0,8) ma portava un 10% di deriva di scala fra un fotogramma e
+  l'altro, corretta dal rig. **11 fotogrammi al secondo** e non 22: i 6 coprono due passi, la
+  corsa normale ne fa 25 per quattro passi — cosi' l'andatura resta la stessa. Controllo [27].
 
 - **Nemici:** blob (cerumino), crust (crosta, corazzata anti-getto), spit (gorgogliante),
   fly (moscerino, picchiata telegrafata), boss (Tappo di Cerume, si infuria a metà vita).

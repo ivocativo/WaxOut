@@ -227,6 +227,7 @@ class GameScene extends Phaser.Scene {
     // L'accovacciamento NON si ripete e si ferma sull'ultimo frame (la posa tenuta): vedi BootScene.
     if (!this.anims.exists('hero_crouch_a')) this.anims.create({ key: 'hero_crouch_a', frames: this.anims.generateFrameNumbers('hero_crouch', { start: 0, end: 5 }), frameRate: 33, repeat: 0 });
     if (!this.anims.exists('hero_crouchwalk_a')) this.anims.create({ key: 'hero_crouchwalk_a', frames: this.anims.generateFrameNumbers('hero_crouchwalk', { start: 0, end: 7 }), frameRate: 12, repeat: -1 });
+    if (!this.anims.exists('hero_runaim_a')) this.anims.create({ key: 'hero_runaim_a', frames: this.anims.generateFrameNumbers('hero_runaim', { start: 0, end: 5 }), frameRate: 11, repeat: -1 });
 
     // ---- ARMA IN MANO (layer separato, INTERCAMBIABILE) ----
     // L'arma e' un "adesivo" distinto sopra il personaggio: a distanza RUOTA verso la mira,
@@ -248,6 +249,7 @@ class GameScene extends Phaser.Scene {
     this.heroWeapon = this.add.sprite(this.player.x, this.player.y, 'sprayer').setDepth(11).setVisible(false);
     this._weaponHideAt = 0;   // istante fino a cui l'arma resta visibile dopo un attacco
     this._weaponMode = null;  // 'ranged' | 'melee'
+    this._posaMira = null;    // posa di mira attiva: 'avanti' | 'su' | 'accovacciato' | 'corsa'
     this._weaponAim = 0;      // angolo di mira corrente (per il posizionamento in update)
 
     this.physics.add.collider(this.player, this.ground);
@@ -2611,6 +2613,20 @@ class GameScene extends Phaser.Scene {
       // l'arma sembra ancora sospesa. Si chiude ridisegnando le due armi CON l'avambraccio
       // attaccato e il perno alla spalla — vedi HANDOFF §Posa d'attacco.
       const a = this._weaponAim;
+      // Se il corpo ha preso una POSA DI MIRA, l'arma va nella MANO disegnata. L'arco della
+      // spalla resta per gli altri casi (in aria, o nei fotogrammi in cui la posa non c'e').
+      const posa = this._posaMira;
+      if (posa) {
+        const t = (posa === 'corsa')
+          ? GameScene.MANO.corsa[(this.heroVisual.anims.currentFrame
+            ? this.heroVisual.anims.currentFrame.index - 1 : 0) % GameScene.MANO.corsa.length]
+          : GameScene.MANO[posa];
+        const verso = this.facing < 0 ? -1 : 1;
+        w.setPosition(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1]);
+        w.setFlipY(this._weaponFlip);
+        w.setRotation(a);
+        return;
+      }
       const raccorcia = this.crouching ? 0.6 : 1;
       // Spostamento in AVANTI costante oltre all'arco: mirando dritto in su o in giu' il coseno
       // e' zero, e senza questo l'arma finirebbe sull'asse del corpo — anzi un filo dietro, per
@@ -3540,6 +3556,14 @@ class GameScene extends Phaser.Scene {
   }
 
   // `text` = stringa gia' formattata (i18n) da mostrare; `secondsLeft` guida SOLO il lampeggio.
+  // Mette una posa di mira FERMA (un solo fotogramma). Va fermata l'animazione in corso, se no
+  // al fotogramma dopo se lo riprende lei e la posa non si vede.
+  posaMira(nome, indice) {
+    this._posaMira = nome;
+    this.heroVisual.anims.stop();
+    this.heroVisual.setTexture('hero_aim', indice);
+  }
+
   // Cronometro dell'assedio scaduto con la quota non ancora raggiunta: una botta e un
   // supplementare. La mercy-invuln va tolta di mezzo prima, se no un colpo preso un attimo
   // prima si mangerebbe la penalita' e sembrerebbe che la regola non funzioni. Lo SCUDO invece
@@ -3921,7 +3945,23 @@ class GameScene extends Phaser.Scene {
     // disegno. Il salto ha la precedenza su tutto e taglia corto la risalita, com'e' giusto.
     const va = this.heroVisual.anims;
     const inTransizione = va.isPlaying && va.currentAnim && va.currentAnim.key === 'hero_crouch_a';
-    if (!onGround) {
+    // POSE DI MIRA (2026-08-02): mentre l'arma a distanza e' in mano, il CORPO prende una posa
+    // col braccio teso nella direzione di mira. Le pose hanno la mano VUOTA e l'arma ci si
+    // infila dentro (vedi GameScene.MANO). Valgono solo A TERRA: in aria resta il salto.
+    const mirando = onGround && this._weaponMode === 'ranged' && this.heroWeapon.visible;
+    this._posaMira = null;
+    if (mirando) {
+      if (this.crouching) {
+        this.posaMira('accovacciato', 2);
+      } else if (_vx > 10) {
+        this._posaMira = 'corsa';
+        va.play('hero_runaim_a', true);
+      } else {
+        const su = Math.abs(this._weaponAim) > GameScene.MIRA_SU_OLTRE
+          && Math.abs(this._weaponAim) < Math.PI - GameScene.MIRA_SU_OLTRE;
+        this.posaMira(su ? 'su' : 'avanti', su ? 1 : 0);
+      }
+    } else if (!onGround) {
       this.heroVisual.anims.play('hero_jump_a', true);
     } else if (this.crouching) {
       if (!this._wasCrouching) {
@@ -4087,4 +4127,18 @@ GameScene.MACCHIE_MAX = 10;
 GameScene.BRACCIO_SPALLA = -16;
 GameScene.BRACCIO_RAGGIO = 13;
 GameScene.BRACCIO_AVANTI = 6;
+// Dove sta la MANO in ogni posa di mira, in pixel rispetto al punto d'appoggio dello sprite
+// (i piedi). Misurati sui fogli baked cercando l'estremita' del braccio teso. Sono il motivo per
+// cui l'arma finisce DENTRO la mano invece che a mezz'aria: quando una posa e' attiva l'arma si
+// aggancia qui, non piu' all'arco della spalla.
+// ⚠️ Se si ri-bakano le pose (tools\bake_hero_sheet.py) questi numeri vanno rimisurati.
+GameScene.MANO = {
+  avanti: [27, -45],
+  su: [0, -63],
+  accovacciato: [23, -34],
+  corsa: [[31, -45], [24, -43], [23, -44], [25, -43], [28, -42], [25, -45]],
+};
+// Oltre questa inclinazione della mira si usa la posa col braccio in su invece di quella in
+// avanti. Le diagonali non hanno una posa loro: si sceglie la piu' vicina.
+GameScene.MIRA_SU_OLTRE = 55 * Math.PI / 180;
 window.GameScene = GameScene;

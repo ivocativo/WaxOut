@@ -247,7 +247,7 @@ def monta_video(frame, numeri, uscita, livelli, rif=None, alto=None):
     return 0
 
 
-def monta_pose(frame, sorgenti, uscita, livelli):
+def monta_pose(frame, sorgenti, uscita, livelli, scale_forzate=None, rif=None):
     """Pose generate SEPARATAMENTE: ognuna rimessa in scala sul CASCO e riallineata su piedi +
     centro del casco, cosi' testa e busto restano fermi e si muovono solo le gambe.
 
@@ -259,10 +259,17 @@ def monta_pose(frame, sorgenti, uscita, livelli):
 
     foglio = Image.new("RGBA", (CELLA * len(frame), CELLA), (0, 0, 0, 0))
     for i, im in enumerate(frame):
-        if i > 0:
-            im = allinea_colore(im, frame[0])   # la prima posa detta la resa a tutte le altre
+        # I colori vanno portati su quelli del GIOCO, non solo resi uguali fra loro: le
+        # generazioni nuove tornano piu' accese, e senza `rif` il personaggio cambierebbe resa
+        # ogni volta che parte una posa di mira. Senza riferimento esterno vale la vecchia regola
+        # (la prima posa detta la resa alle altre).
+        if rif is not None:
+            im = allinea_colore(im, rif)
+        elif i > 0:
+            im = allinea_colore(im, frame[0])
         largo, _ = casco(im)
-        s = casco_rif / largo
+        forzata = scale_forzate[i] if scale_forzate else None
+        s = forzata if forzata else casco_rif / largo
         r = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
         if lut:
             rr, gg, bb, aa = r.split()
@@ -307,11 +314,22 @@ def main():
 
     # riferimento per allineare i colori (facoltativo): rif=<file>
     rif, alto = None, None
+    # Quale scontorno usare. "macchia" (predefinito) parte dai bordi: va bene quando il fondo non
+    # e' uniforme, ma lascia PIENI i buchi CHIUSI. "colore" classifica ogni pixel per somiglianza
+    # col fondo e poi tiene il pezzo piu' grande: gestisce i buchi chiusi, e serve qui perche'
+    # l'ansa del tubo che esce dallo zaino ne e' uno — restava una macchia nera sulla schiena.
+    ritaglio = "macchia"
     for arg in sys.argv[5:]:
         if arg.startswith("rif="):
-            rif = scontorna(Path(arg[4:]))
+            q = Path(arg[4:])
+            # se e' gia' un foglio del gioco ha la trasparenza sua; se e' un sorgente su fondo
+            # nero va scontornato prima di poterne misurare i colori
+            im0 = Image.open(q).convert("RGBA")
+            rif = im0 if (np.array(im0)[:, :, 3] < 250).any() else scontorna(q)
         elif arg.startswith("alto="):
             alto = int(arg[5:])
+        elif arg.startswith("scontorno="):
+            ritaglio = arg[10:]
 
     if modo_video:
         numeri = [int(n) for n in terzo.split(":", 1)[1].split(",")]
@@ -322,20 +340,32 @@ def main():
         return monta_video(leggi_video(video, numeri), numeri, uscita, livelli, rif, alto)
 
     if modo_pose:
-        sorgenti = [Path(p) for p in sys.argv[1].split("|")]
+        # Un file puo' portarsi dietro la SCALA forzata: "percorso@0.0509". Serve quando il metro
+        # del casco non regge: nella posa col braccio ALZATO la parte piu' alta della sagoma e' il
+        # dito, non la testa, e la misura viene 97px invece di 271 (scala sbagliata di tre volte).
+        # In quel caso si prende la scala dalla posa gemella, che e' della stessa generazione.
+        sorgenti, scale_forzate = [], []
+        for voce in sys.argv[1].split("|"):
+            if "@" in voce:
+                perc, sc = voce.rsplit("@", 1)
+                sorgenti.append(Path(perc)); scale_forzate.append(float(sc))
+            else:
+                sorgenti.append(Path(voce)); scale_forzate.append(None)
     else:
         cartella = Path(sys.argv[1])
         sorgenti = [cartella / f"Image{int(n)}.png" for n in terzo.split(",")]
 
+    taglia = ((lambda q: scontorna_registrazione(Image.open(q).convert("RGBA")))
+              if ritaglio == "colore" else scontorna)
     frame = []
     for p in sorgenti:
         if not p.exists():
             print(f"MANCA: {p}")
             return 1
-        frame.append(scontorna(p))
+        frame.append(taglia(p))
 
     if modo_pose:
-        return monta_pose(frame, sorgenti, uscita, livelli)
+        return monta_pose(frame, sorgenti, uscita, livelli, scale_forzate, rif)
 
     # ANCORAGGIO sul PRIMO frame (che dev'essere la posa in piedi). La scala e l'allineamento si
     # RIMISURANO sul risultato invece di fidarsi del calcolo: ridimensionando da 1300px a 62 il
