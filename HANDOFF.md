@@ -6,7 +6,7 @@
 > chiunque lo trovi sta in **`README.md`**. Regola d'oro: ogni informazione ha UNA casa sola,
 > niente sezioni duplicate tra i tre file.
 
-_Ultimo aggiornamento: 2026-07-30 · Ultimo commit pushato: `69244e3`._
+_Ultimo aggiornamento: 2026-08-02 · Ultimo commit pushato: `49a8349`._
 _**Fatti e pushati:** Round 1 e 2 (correzioni playtest, fino a `75df562`); Round 3 AUDIO (synth +_
 _3 atmosfere, boss punk); **APP ANDROID via GitHub Actions**; **Round 4 — CONDOTTO/TERRENO:**_
 _soffitto ondulato + **TERRENO stile Terraria** (colline e cunette) percorso via "mappa di altezze";_
@@ -67,7 +67,13 @@ _Nuovo `tools/bake_hero_sheet.py`. Vedi §Asset nuovi._
 _**✅ ASSEDIO RISOLTO (2026-07-31, idea dell'utente):** non si vince piu' sopravvivendo al_
 _cronometro ma eliminando una QUOTA di nemici. Il cumulo-rifugio non serve piu': fermo non_
 _uccidi. Tempo scaduto = botta + supplementare, non game over. Dettaglio in `ROADMAP.md` §C._
-_**STATO ORA:** restano gli **EASTER EGG** da scegliere e l'ARENA dedicata dell'assedio._
+_**✅ ESTETICA QUASI CHIUSA (2026-08-01/02):** nome **WAXOUT** e ICONA applicati; ci si SPORCA_
+_di cerume menando; EFFETTI SONORI rifatti dall'utente a orecchio col pannello delle manopole;_
+_POSE DI MIRA (avanti, in su, accovacciato, in corsa) con l'arma nella mano._
+_⚠️ Vicolo cieco da non ripetere: attaccare il braccio all'immagine dell'arma — il corpo ne_
+_ha gia' due e ne venivano TRE. Vedi §Posa d'attacco._
+_**STATO ORA:** in Estetica resta solo un altro SET DI SFONDO. Restano gli **EASTER EGG** da_
+_scegliere, l'ARENA dedicata dell'assedio, e la MAPPATURA del codice prima della revisione._
 _Poi si va allo STORE._
 
 **NOME: ✅ APPLICATO (2026-07-31).** L'app si chiama **WAXOUT** ("earwax" da solo portava al
