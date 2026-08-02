@@ -437,6 +437,54 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
   nemici, durata della Corsa). ⚠️ **L'utente non ha ancora MAI vinto una run** → la terza fase del
   boss finale (crollo) e' verificata solo dai controlli automatici, mai vista dal vivo.
 - [ ] **Altri set di sfondo**: procedura pronta, basta che l'utente dica "voglio altri sfondi".
+
+---
+
+# MAPPATURA DI GameScene.js ✅ FATTA (2026-08-02) — base per la revisione
+
+**Perche' prima la mappa.** Rivedere un file da 4.144 righe senza sapere dov'e' il peso vuol
+dire aprirlo dall'inizio e perdersi. Misurato invece che stimato:
+
+| | |
+|---|---|
+| righe | 4.144 (2.834 di codice, **1.036 di commento = 25%**, 274 vuote) |
+| funzioni | 130 |
+| campi di stato sulla scena | 120, toccati 1.128 volte |
+| chiamate a funzioni proprie | 319 |
+
+**LA SCOPERTA: non e' la dimensione delle AREE il problema, sono due SINGOLE funzioni.**
+Un'area da 561 righe divisa in 25 funzioni si legge benissimo. Ma `create()` (465) e `update()`
+(460) sono due funzioni sole, e insieme fanno il **22% del file**. Gli 8 metodi da 60+ righe
+valgono il 40% del totale.
+
+Peso per area (righe): costruzione del livello 561 · combattimento 511 · IA nemici 483 · nascita
+nemici 473 · **create() 465** · **update() 460** · personaggio/armi 330 · eventi e modificatori
+281 · interfaccia e fine partita 272 · cerume 222 · utilita' 40.
+
+**Le giunture** (perche' non si spezza con un taglio netto): `this.player` usato 141 volte,
+`heroVisual` 36, `worldW` 30, `blocks` 29, `enemies` 27, `levelKind` 23, `locked` 20.
+Verso gli altri moduli: `GameState` 74 usi, `CONFIG` 71, `I18n` 34, `Sfx` 33, `GameGfx` 18.
+
+**`update()` e' la piu' pericolosa**: gira 60 volte al secondo e contiene almeno 18 blocchi
+distinti (assedio, corsa, aggancio al terreno, salto sui nemici, accovacciamento, pose di mira,
+movimento, attacco, IA di ogni nemico, proiettili, calamita, juice, macchie, arma in mano).
+Quasi tutti i difetti degli ultimi giorni sono nati li' dentro.
+
+## Ordine della revisione (da fare, 🧠)
+- [ ] **1. Spezzare `update()`** in blocchi con un nome, uno per argomento. NON riscriverla.
+- [ ] **2. Spezzare `create()`**, stessa cura e meno urgenza: e' la porta d'ingresso al gioco.
+- [ ] **3. Portare fuori la costruzione del livello**: 561 righe che non toccano ne' nemici ne'
+  combattimento, il pezzo che si stacca piu' pulito (-14% al file).
+- [ ] **4. Cercare il codice morto** lasciato da nove mesi di sostituzioni. Solo a controlli verdi.
+- [ ] **5. Riesaminare i pezzi grossi**: `spawnEnemy` (237), `bossAI` (169), `damageEnemy` (98).
+
+⚠️ **Si puo' fare senza rompere niente per due motivi, e solo per quelli:** i 68 controlli
+automatici rieseguono il gioco vero, e il 25% del file e' commento con accanto il motivo di ogni
+scelta strana (spesso col bug che l'ha causata). Se un domani questi due appoggi si indebolissero,
+la revisione tornerebbe una scommessa.
+
+---
+
 - [ ] **Revisione completa del codice** 🧠: da fare DOPO che l'estetica si è assestata, con i
   controlli a fare da rete. Conviene prima mappare `GameScene.js` (3300 righe) con un subagente.
 - [ ] **Freeze sul PC allo Start Run**: aperto e depriorizzato (l'utente gioca dal telefono), ma da
