@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 68 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 73 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -72,6 +72,18 @@ _di cerume menando; EFFETTI SONORI rifatti dall'utente a orecchio col pannello d
 _POSE DI MIRA (avanti, in su, accovacciato, in corsa) con l'arma nella mano._
 _⚠️ Vicolo cieco da non ripetere: attaccare il braccio all'immagine dell'arma — il corpo ne_
 _ha gia' due e ne venivano TRE. Vedi §Posa d'attacco._
+_**✅ PLAYTEST ROUND 5 (2026-08-02):** 19 segnalazioni dell'utente, 17 chiuse in giornata._
+_Le tre scoperte che vale la pena ricordare, perche' la causa non era quella che sembrava:_
+_(1) arma che lampeggia, corsa+sparo a scatti e idle+sparo a scatti erano **UN SOLO difetto** —_
+_l'arma restava in mano 220ms fissi mentre le armi sparano ogni 230-640ms;_
+_(2) il rimbalzo sui nemici non era in ritardo, era **bloccato** dal congelamento della fisica_
+_che scatta all'uccisione DOPO che la spinta e' gia' impostata;_
+_(3) le ELITE non potevano funzionare come erano fatte: `setTint` moltiplica, e su arte ambra_
+_non si puo' aggiungere il blu che nel disegno non c'e'._
+_**✅ LE DUE ANIMAZIONI NUOVE SONO FATTE (2026-08-03):** sparo camminando accovacciato_
+_(`hero_crouchaim`, 8 fotogrammi) e colpo corpo a corpo (`hero_melee`, 4 pose). Disegni_
+_dell'utente; cottura, misure e montaggio miei. Tre trappole trovate e chiuse nella lavorazione,_
+_tutte SILENZIOSE (nessun errore, solo un risultato sbagliato) — vedi §Asset nuovi._
 _**✅ REVISIONE DEL CODICE AVVIATA (2026-08-02):** mappato `GameScene.js` e scoperto che il peso_
 _non stava nelle aree ma in DUE funzioni sole (`create()` 465 righe e `update()` 460, il 22% del_
 _file). **`update()` e' gia' stata spezzata: da 460 righe a 27**, nove blocchi con un nome, senza_
@@ -164,7 +176,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-68 controlli in ~3m. Apre il gioco in un browser invisibile (Playwright), inietta
+73 controlli in ~7m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -277,6 +289,15 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
   `cutout_bg.ps1` (sfondo trasparente), `scale_sprite.ps1`, `bake_sheet_pixel.ps1` (pixelate),
   + serve LAN / embed assets. (`gen_hero*.ps1` = esperimento procedurale SCARTATO, file non
   committati, lasciati solo come riferimento.)
+  Script Python: **`bake_hero_sheet.py`** (fogli del PERSONAGGIO, registrati sul rig),
+  `bake_sheet.py` (fogli dei NEMICI), `bake_sprite.py`, `fai_icone.py` (icone Android),
+  `bake_musica.py`, **`estrai_frame_video.py`**, `controlla.py` + `checks.js`, `schermata.py`.
+  ⚠️ **`estrai_frame_video.py` serve quando bisogna far RIDISEGNARE dei fotogrammi**: ritrova nel
+  video i fotogrammi di un'animazione gia' in gioco (confrontando le sagome) e li riesporta
+  grandi e puliti. **NON ritagliare mai i fotogrammi dal foglio gia' lavorato per farli
+  ridisegnare** — provato il 2026-08-02 e bocciato dall'utente («veramente piccole e sgranate»):
+  il foglio e' il punto d'ARRIVO della lavorazione (celle 84x84, tavolozza a sei livelli), quindi
+  ingrandirlo restituisce per forza roba minuscola e sporca. Si torna sempre alla sorgente.
 
 ---
 
@@ -639,11 +660,60 @@ PG e nemici ci camminano via **heightmap-snap** (in `agganciaAlTerreno`: `body.y
   `assets/spritesheets/hero/crouch walk/`, non usate) avevano richiesto un metro inventato
   apposta (il casco), un riallineamento dei colori — saturazione 110 contro 61, si vedeva
   lampeggiare — e restava comunque la testa disegnata piu' grossa.
-  ⚠️ Lo scontorno delle REGISTRAZIONI DI SCHERMO e' un altro mestiere e ha il suo metodo in
-  `scontorna_registrazione()`: il fondo non e' nero ma il grigio dell'interfaccia (~30,31,34)
-  mentre i contorni del personaggio sono quasi neri, la registrazione ha una FILIGRANA che
-  sopravvive, e l'interno dell'ansa del tubo e' un buco CHIUSO che una macchia d'olio dai bordi
-  non raggiunge mai (restava un grumo scuro dietro la schiena).
+  ⚠️⚠️ **LO SCONTORNO DELLE REGISTRAZIONI DI SCHERMO E' IL PUNTO PIU' INSIDIOSO DI TUTTA LA
+  LAVORAZIONE, e il motivo e' controintuitivo: MISURATO il 2026-08-02, il fondo
+  dell'interfaccia sta a (30,30,32) e i CONTORNI del personaggio a (32,33,36). Sono LO STESSO
+  COLORE.** Quindi nessuna soglia puo' separarli: con la tolleranza piu' stretta provata (6),
+  meta' dei pixel scuri del personaggio finiva comunque nel fondo. Le due strade ovvie
+  falliscono per motivi opposti:
+    · classificare per colore BUCA il personaggio (~1000 forellini per fotogramma a risoluzione
+      piena; non si vedevano solo perche' la riduzione a 84x84 li faceva sparire — sono venuti
+      fuori il 2026-08-02 esportando i fotogrammi grandi, e li ha visti l'utente);
+    · il riempimento a macchia d'olio dai bordi non buca ma DILAGA: i contorni interni (fra
+      braccio e busto, fra le gambe) sono una rete continua dello stesso colore del fondo, e la
+      macchia ci viaggia dentro fino al cuore del personaggio.
+  **La strada che funziona** (in `tools/estrai_frame_video.py`, versione buona): non si prova a
+  distinguere il contorno dal fondo — non si puo'. Si ricostruisce la SAGOMA e si dichiara che
+  tutto cio' che ci sta dentro e' personaggio. Pezzo colorato piu' grande (scarta anche la
+  FILIGRANA della registrazione) → si TAPPANO tutti i buchi → si RIAPRONO solo quelli grandi
+  (l'ansa del tubo e il vuoto fra le gambe incrociate, ~9-11k px; i forellini stanno tutti sotto
+  i 100, quindi la soglia a 600 non e' delicata) → si ALLARGA di 2px per riprendersi il contorno
+  esterno. Risultato misurato: da ~1000 buchi a 6-18 per fotogramma, e i rimasti sono quelli veri.
+- ✅ **SPARO CAMMINANDO ACCOVACCIATO + COLPO CORPO A CORPO — FATTI (2026-08-03).**
+  `hero_crouchaim_px.png` (8 fotogrammi, 12/s come la camminata accovacciata: sono gli stessi
+  fotogrammi col braccio diverso, quindi devono scorrere uguale) e `hero_melee_px.png` (4 pose,
+  non si ripete, durata decisa dalla cadenza dell'arma).
+  ⚠️⚠️ **TRE TRAPPOLE, tutte silenziose. Da rileggere prima di cuocere altre pose generate:**
+  1. **Il magenta non si riconosce confrontandolo con (255,0,255).** La compressione della
+     generazione lo restituisce ballerino: misurato, va da (232,5,236) a (239,7,243). Si
+     riconosce dalla FORMA del colore (rosso e blu alti, verde molto piu' basso di entrambi),
+     che nessuna parte del personaggio possiede. Nuovo `scontorno=magenta`.
+  2. **Il metro del casco sbaglia se il personaggio ALZA UN BRACCIO**, perche' misura la fascia
+     alta della sagoma e quella diventa il PUGNO: sulla posa 0 del colpo dava 543px invece di
+     234, e nel foglio la testa finiva 7px piu' a destra che nelle altre — il personaggio
+     sbandava a ogni colpo. Nuovo `casco=colore`, che lo trova dal suo arancione (su quattro
+     pose: 116, 115, 110, 113, cioe' il 5% di scarto).
+     ⚠️ Ma `casco=colore` a sua volta NON va bene per le pose accovacciate col braccio teso: li'
+     il guanto arancione sta proprio all'altezza del casco. Per quelle si aggancia ogni posa
+     all'ALTEZZA del fotogramma corrispondente gia' in gioco (`file@scala`), che e' anche la
+     garanzia che le due animazioni non divergano.
+  3. **L'ordine delle operazioni dentro `monta_pose`.** Allineava i colori PRIMA di misurare, ma
+     il metro nuovo cerca l'arancione e l'allineamento sposta proprio quello: su quattro pose
+     identiche misurava 121, 104, 239, 137, e una usciva alta 28px invece di 60. Ora misura
+     prima e ritocca dopo.
+  **Come sono verificate**, oltre al controllo [32]: casco fermo a y=28-29 su tutti e otto i
+  fotogrammi dello sparo accovacciato, statura 50-51 contro i 49-51 della camminata, e la
+  posizione della MANO misurata in DUE modi indipendenti (punta della sagoma e colore del
+  guanto) che concordano entro 3 pixel.
+  ⚠️ L'arma nel colpo non e' piu' mossa da un tween per conto suo: mano e inclinazione vengono
+  dal FOTOGRAMMA corrente (`GameScene.MANO.mischia` + `MISCHIA_ANGOLO`, ricavati dagli angoli
+  spalla-mano misurati sui disegni), quindi non possono sfasarsi dal corpo.
+  ⚠️ Difetto noto e accettato: nel fotogramma 3 dello sparo accovacciato il braccio e' disegnato
+  PIEGATO invece che teso, quindi per un fotogramma su otto l'arma rientra. Si chiude
+  rigenerando quel disegno, non ritoccando il numero in `MANO.crouchaim`.
+  ⚠️ `tools/bake_hero_sheet.py` ha ancora la versione VECCHIA di `scontorna_registrazione()`.
+  Non e' stata toccata perche' rifarebbe i fogli gia' in gioco, e a 84x84 il difetto non si vede;
+  ma **se un domani si ri-cuoce un foglio dal video, va copiata la versione buona.**
   **12 fotogrammi al secondo non e' un gusto:** accovacciati si va a 99 px/s (220 x 0,45) e il
   passo disegnato copre ~30px, quindi un ciclo vale ~60px di terreno = ~0,6s. Piu' lenta e i
   piedi slittano. Controllo automatico [24], che copre anche il ritorno alla posa ferma — il

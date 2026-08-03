@@ -29,12 +29,26 @@ window.CONFIG = {
   // pickup, incluse le palline lasciate dai nemici morti): scala TUTTO il guadagno passivo,
   // cosi' l'economia si tara da un punto solo. Misurata 2026-07-22 (vedi ROADMAP A.4b): SANA,
   // non toccare i prezzi UNLOCKS/BLUEPRINTS, e' questa l'unica manopola da girare se mai servisse.
-  WAX_GAIN: 0.55,
+  // ⚠️ ABBASSATA da 0,55 a 0,385 (-30%) dopo il playtest del 2026-08-02, su richiesta
+  // dell'utente. Conseguenza da tenere d'occhio: la misura dell'economia (ROADMAP A.4b)
+  // diceva ~6-10 run normali per comprare tutto; con -30% diventano circa 9-14. Restano
+  // dentro la finestra sana per il genere, ma se la progressione risultasse lenta questa
+  // e' la prima manopola da rialzare (una sola, non i dodici prezzi).
+  WAX_GAIN: 0.385,
   // GIRO DI BILANCIAMENTO 2026-07-29 (playtest: "ai livelli alti diventa estenuante pulire il
   // cerume, ci vuole troppo tempo"). Tre manopole invece di ritoccare venti numeri sparsi:
   DANNO_PG: 1.5,          // quanto piu' forte picchia il giocatore (mischia e getto)
   VITA_CERUME: 0.8,       // quanto e' piu' fragile ogni blocco di cerume
   VITA_NEMICI: 0.8,       // quanto sono piu' fragili i nemici
+  // GIRO DEL PLAYTEST ROUND 5 (2026-08-02), chiesto dall'utente.
+  DANNO_NEMICI: 0.7,      // quanto meno male fanno i nemici (contatto e proiettili)
+  // RAFFICA RADIALE (abilita' impilabile, playtest round 5): ogni tot parte una corona di
+  // palline tutt'attorno. Il danno e' RIDOTTO apposta: e' un'arma che spara da sola mentre
+  // pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
+  RADIALE_OGNI: 2600,     // ms fra una raffica e l'altra
+  RADIALE_DANNO: 0.55,    // quanto vale una pallina radiale rispetto a una del getto
+  RADIALE_PER_PESCA: 4,   // quante direzioni aggiunge ogni carta pescata
+  DURATA_CORSA: 0.9,      // -10% al tempo dei livelli CORSA
   // Da questo livello in poi il cerume da pulire cala: un livello lungo il triplo non deve
   // chiedere il triplo del tempo di pulizia, o la parte finale della run diventa una corvee.
   // Quanta vita vale una "pallina" di cura: sia quelle raccolte a terra sia il recupero
@@ -288,6 +302,7 @@ window.GameState = {
       dashStrike: false,     // Scatto Offensivo: lo scatto danneggia i nemici e pulisce il cerume
       corrosive: false,      // Sapone Corrosivo: le palline avvelenano il nemico (danno nel tempo)
       bounce: 0,             // Rimbalzo: le palline rimbalzano N volte (+1 a ogni pesca)
+      radiale: 0,            // Raffica Radiale: quante DIREZIONI tutt'attorno (+4 a ogni pesca)
       // EVOLUZIONI (due abilità collegate si fondono in una versione potenziata):
       evoPierceAll: false,   // Perforante + Ventaglio  -> Lama d'Acqua (perfora tutto + danno)
       evoToxic: false,       // Scoppio + Corrosivo     -> Nube Tossica (lo scoppio avvelena)

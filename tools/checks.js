@@ -502,8 +502,12 @@ window.__earwaxChecks = function (opts) {
       g.scene.start('GameScene');
       passaTick();
       const gs = g.scene.getScene('GameScene');
-      avanza(gs, 40);   // lascia finire la comparsa del boss
-      return { gs, boss: gs.enemies.getChildren().find((e) => e.active && e.kind === 'boss') };
+      // ⚠️ Si aspetta la CONDIZIONE, non un numero fisso di fotogrammi: dal round 5 il boss non
+      // nasce piu' all'istante ma dopo il banner d'apertura (vedi `avvioAl` in GameScene.create),
+      // e un'attesa a occhio si romperebbe di nuovo alla prossima taratura di quel tempo.
+      const trovaBoss = () => gs.enemies.getChildren().find((e) => e.active && e.kind === 'boss' && !e.spawning);
+      for (let i = 0; i < 300 && !trovaBoss(); i++) avanza(gs, 1);
+      return { gs, boss: trovaBoss() };
     };
     // porta il boss a fase "crollo" (20% HP) e fa girare l'IA una volta.
     const forzaFase3 = (gs, boss) => {
@@ -994,6 +998,7 @@ window.__earwaxChecks = function (opts) {
     avanza(gsC, 20);
     gsC.siegeKills = 0;
     gsC.siegeLeftMs = 30;
+    gsC.avvioAl = 0;   // salta il respiro d'apertura: qui si sta provando il tempo SCADUTO
     window.GameState.player.hp = window.GameState.player.maxHp;
     const vitaPrima = window.GameState.player.hp;
     for (let i = 0; i < 6; i++) { t += 16.6; g.loop.step(t); }   // niente god-mode: la botta conta
@@ -1074,7 +1079,264 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [28] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [28] ARMA E COLPI (playtest round 5, 2026-08-02). Tre difetti segnalati insieme, tre cose
+  // che si romperebbero in silenzio:
+  //   a) i colpi devono nascere dall'UGELLO dell'arma disegnata, non dalla pancia del PG;
+  //   b) girandosi mentre l'arma e' ancora in mano, l'arma deve seguire il corpo (prima la mano
+  //      si specchiava e il puntamento no: si vedeva l'arma rivolta dalla parte sbagliata);
+  //   c) l'arma deve restare visibile ALMENO quanto l'intervallo tra un colpo e l'altro, se no
+  //      lampeggia tra un colpo e il successivo e con lei sparisce la posa di mira.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsA = g.scene.getScene('GameScene');
+    avanza(gsA, 24);
+    gsA.enemies.getChildren().forEach((e) => { if (e.active) e.destroy(); });
+
+    // (a) il colpo nasce dalla bocca. Si misura SUBITO dopo lo sparo, prima che la pallina si muova.
+    gsA.facing = 1;
+    gsA.lastShot = -1e9;
+    gsA.shots.getChildren().forEach((s) => { if (s.active) s.destroy(); });
+    gsA.fireJet(1, 0);
+    const bocca = gsA.boccaArma();
+    const pallina = gsA.shots.getChildren().find((s) => s.active);
+    const daBocca = (bocca && pallina) ? Math.hypot(pallina.x - bocca.x, pallina.y - bocca.y) : 999;
+    // e la bocca deve stare DAVANTI al corpo, se no il controllo passerebbe anche con l'arma
+    // ferma sull'ombelico (bocca e pallina coinciderebbero comunque).
+    const boccaAvanti = bocca ? (bocca.x - gsA.player.x) > 10 : false;
+
+    // (c) finestra di visibilita' contro la cadenza di tiro
+    const cadenza = window.GameState.player.shotCooldown;
+    const finestra = gsA._weaponHideAt - gsA.time.now;
+    const nonLampeggia = finestra >= cadenza;
+
+    // (b) ci si gira mentre l'arma e' ancora in mano: deve puntare dall'altra parte
+    const versoPrima = Math.cos(gsA.heroWeapon.rotation);
+    gsA.facing = -1;
+    avanza(gsA, 1);
+    const versoDopo = Math.cos(gsA.heroWeapon.rotation);
+    const seguIlCorpo = versoPrima > 0.5 && versoDopo < -0.5 && gsA.heroWeapon.flipY === true;
+
+    if (daBocca < 2 && boccaAvanti && nonLampeggia && seguIlCorpo) {
+      ok('i colpi partono dalla bocca dell arma', 2, 'scarto ' + daBocca.toFixed(1) + 'px, bocca '
+        + Math.round(bocca.x - gsA.player.x) + 'px avanti al corpo; visibile ' + Math.round(finestra)
+        + 'ms contro cadenza ' + cadenza + 'ms; girandosi l arma segue');
+    } else {
+      ko('i colpi partono dalla bocca dell arma', 2, 'daBocca=' + daBocca.toFixed(1)
+        + ' boccaAvanti=' + boccaAvanti + ' finestra=' + Math.round(finestra) + '/' + cadenza
+        + ' seguIlCorpo=' + seguIlCorpo + ' (cos ' + versoPrima.toFixed(2) + '->' + versoDopo.toFixed(2)
+        + ' flipY=' + gsA.heroWeapon.flipY + ')');
+    }
+  }
+
+  // [29] IL RESPIRO A INIZIO LIVELLO (playtest round 5). Finche' c'e' il banner d'apertura non
+  // deve entrare nient'altro: niente nemici e cronometro fermo. E' una regola facile da
+  // riperdere, perche' basta rimettere una nascita immediata dentro create().
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 13;
+    window.GameState.prossimoLivello = { kind: 'siege', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsR = g.scene.getScene('GameScene');
+    avanza(gsR, 2);
+    // I guardiani delle membrane NON contano: non sono nemici che entrano in scena, sono
+    // arredamento del livello piazzato lungo tutto il condotto, lontano dalla partenza.
+    const assalitori = () => gsR.enemies.getChildren().filter((e) => e.active && !e.guard).length;
+    const subitoNemici = assalitori();
+    const tempoPieno = gsR.siegeLeftMs;
+    const attesa = gsR.avvioAl - gsR.time.now;
+    avanza(gsR, 20);                       // ancora dentro l'attesa (20 fotogrammi = ~330ms)
+    const durante = assalitori();
+    const cronoFermo = gsR.siegeLeftMs === tempoPieno;
+    avanza(gsR, 100);                      // oltre l'attesa
+    const dopo = assalitori();
+    const cronoParte = gsR.siegeLeftMs < tempoPieno;
+
+    if (subitoNemici === 0 && durante === 0 && cronoFermo && dopo > 0 && cronoParte && attesa > 500) {
+      ok('respiro a inizio livello', 13, 'attesa ' + Math.round(attesa) + 'ms: 0 nemici e cronometro '
+        + 'fermo mentre c e il banner, poi ' + dopo + ' nemici e il tempo parte');
+    } else {
+      ko('respiro a inizio livello', 13, 'attesa=' + Math.round(attesa) + ' subito=' + subitoNemici
+        + ' durante=' + durante + ' cronoFermo=' + cronoFermo + ' dopo=' + dopo + ' cronoParte=' + cronoParte);
+    }
+  }
+
+  // [30] NEMICI CHE NON VIBRANO (playtest round 5). Quando il giocatore e' esattamente sopra la
+  // testa di un nemico a terra, quello deve FERMARSI, non sfarfallare a destra e sinistra.
+  // Si misura contando i cambi di segno della velocita' orizzontale: vibrare vuol dire
+  // cambiare verso in continuazione.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsV = g.scene.getScene('GameScene');
+    // ⚠️ Si aspetta la CONDIZIONE, non un numero fisso di fotogrammi. Con l'attesa fissa questo
+    // controllo era BALLERINO: dal round 5 le nascite iniziali partono dopo il banner (~1,2s =
+    // ~72 fotogrammi), quindi a 40 fotogrammi si trovava un nemico solo quando per caso c'era un
+    // GUARDIANO di membrana li' vicino — e i guardiani sono sorteggiati, quindi a volte si' e a
+    // volte no. Passato una volta e fallito quella dopo senza che il gioco fosse cambiato.
+    const trovaNemico = () => gsV.enemies.getChildren()
+      .find((x) => x.active && !x.spawning && x.kind !== 'fly');
+    for (let i = 0; i < 300 && !trovaNemico(); i++) avanza(gsV, 1);
+    const e = trovaNemico();
+    let cambi = 0, fermo = 0, campioni = 0;
+    if (e) {
+      // il giocatore sta esattamente sopra di lui, come stando su una pedana
+      gsV.player.body.reset(e.x, e.y - 150);
+      let segnoPrec = 0;
+      for (let i = 0; i < 40; i++) {
+        gsV.player.body.reset(e.x, e.y - 150);   // resta li' sopra, immobile
+        avanza(gsV, 1);
+        if (!e.active) break;
+        const v = e.body.velocity.x;
+        const segno = Math.abs(v) < 1 ? 0 : Math.sign(v);
+        if (segno !== 0 && segnoPrec !== 0 && segno !== segnoPrec) cambi++;
+        if (segno !== 0) segnoPrec = segno;
+        if (Math.abs(v) < 1) fermo++;
+        campioni++;
+      }
+    }
+    if (e && campioni > 20 && cambi === 0 && fermo > campioni * 0.6) {
+      ok('i nemici non vibrano quando gli stai sopra', 2, fermo + '/' + campioni
+        + ' fotogrammi da fermo, 0 inversioni di verso');
+    } else {
+      ko('i nemici non vibrano quando gli stai sopra', 2, 'nemico=' + !!e + ' campioni=' + campioni
+        + ' inversioni=' + cambi + ' fermo=' + fermo);
+    }
+  }
+
+  // [31] RAFFICA RADIALE (playtest round 5, abilita' nuova). Deve sparare in TUTTE le direzioni
+  // e, impilandola, aggiungerne altre — non raddoppiare i colpi nella stessa direzione.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsRad = g.scene.getScene('GameScene');
+    avanza(gsRad, 24);
+    gsRad.enemies.getChildren().forEach((x) => { if (x.active) x.destroy(); });
+
+    const raffica = (direzioni) => {
+      // ⚠️ `.slice()`: distruggere gli oggetti iterando la lista VIVA del gruppo ne salta uno su
+      // due (la lista si accorcia sotto ai piedi del ciclo). Senza la copia, due palline della
+      // raffica precedente sopravvivevano e il conteggio usciva 10 invece di 8.
+      gsRad.shots.getChildren().slice().forEach((s) => { if (s.active) s.destroy(); });
+      window.GameState.player.radiale = direzioni;
+      gsRad._radialeAl = 0;
+      gsRad.raffichaRadiale(gsRad.time.now, window.GameState.player);
+      const v = gsRad.shots.getChildren().filter((s) => s.active)
+        .map((s) => Math.atan2(s.body.velocity.y, s.body.velocity.x));
+      return v;
+    };
+    const a4 = raffica(4);
+    const a8 = raffica(8);
+    // angoli tutti diversi = direzioni davvero distinte (arrotondati al grado)
+    const distinti = (v) => new Set(v.map((a) => Math.round(a * 180 / Math.PI))).size;
+    const copre = (v) => {   // almeno un colpo per quadrante
+      const q = new Set(v.map((a) => Math.floor(((a + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2))));
+      return q.size === 4;
+    };
+    const cadenza = window.CONFIG.RADIALE_OGNI > 0
+      && gsRad._radialeAl > gsRad.time.now;   // dopo una raffica ci vuole una pausa
+
+    if (a4.length === 4 && a8.length === 8 && distinti(a4) === 4 && distinti(a8) === 8
+        && copre(a4) && copre(a8) && cadenza) {
+      ok('raffica radiale', 2, '4 e 8 direzioni tutte distinte, tutti e quattro i quadranti coperti, '
+        + 'pausa ' + window.CONFIG.RADIALE_OGNI + 'ms');
+    } else {
+      ko('raffica radiale', 2, 'n=' + a4.length + '/' + a8.length + ' distinti=' + distinti(a4)
+        + '/' + distinti(a8) + ' copre=' + copre(a4) + '/' + copre(a8) + ' cadenza=' + cadenza);
+    }
+  }
+
+  // [32] LE DUE ANIMAZIONI NUOVE (2026-08-03): sparo camminando accovacciato, e colpo corpo a
+  // corpo col CORPO che mena invece della sola arma. Le cose che si romperebbero in silenzio:
+  //   a) accovacciato + in movimento + sparo -> il foglio `hero_crouchaim`, non la posa ferma;
+  //   b) accovacciato + FERMO -> deve restare la posa tenuta (se no si perde la distinzione);
+  //   c) il colpo a terra -> il foglio `hero_melee`, e l'arma nella MANO di quel fotogramma;
+  //   d) il colpo ha la precedenza: muoversi a meta' bastonata non deve rimettere la camminata.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 2;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsN = g.scene.getScene('GameScene');
+    avanza(gsN, 24);
+    gsN.enemies.getChildren().slice().forEach((e) => { if (e.active) e.destroy(); });
+
+    // (a) e (b): sparo accovacciato, fermo e in movimento
+    // ⚠️ Non basta scrivere `gsN.crouching = true`: i comandi lo RICALCOLANO a ogni fotogramma
+    // dal tasto premuto, quindi un attimo dopo torna falso e il controllo misura la posa
+    // sbagliata (successo davvero: dava "avanti/hero_aim" invece della posa accovacciata).
+    // Si tiene premuto il comando vero, come farebbe un giocatore.
+    const provaCrouch = (vx) => {
+      gsN.facing = 1;
+      gsN.touch.aimDown = true;           // = tenere giu' il tasto "abbassati"
+      gsN._inMov = vx > 100;
+      // La velocita' va rimessa a ogni fotogramma: l'attrito la spegnerebbe.
+      for (let k = 0; k < 6; k++) {
+        gsN.player.setVelocityX(vx);
+        gsN.showRangedWeapon(1, 0);
+        gsN._weaponHideAt = gsN.time.now + 1e9;
+        avanza(gsN, 1);
+      }
+      return { posa: gsN._posaMira, tex: gsN.heroVisual.texture.key };
+    };
+    const fermo = provaCrouch(0);
+    const cammina = provaCrouch(220);
+    gsN.touch.aimDown = false;
+    gsN.player.setVelocityX(0);
+    gsN._inMov = false;
+    avanza(gsN, 8);
+
+    // (c) e (d): colpo corpo a corpo
+    gsN.lastAttack = -1e9;
+    gsN.lastGroundAt = gsN.time.now;
+    gsN.meleeSwing();
+    avanza(gsN, 1);
+    const colpoTex = gsN.heroVisual.texture.key;
+    // l'arma deve stare nella mano DI QUESTO fotogramma, non a un punto fisso
+    const i = gsN.fotogrammaCorrente() % window.GameScene.MANO.mischia.length;
+    const t = window.GameScene.MANO.mischia[i];
+    const mx = gsN.heroVisual.x + t[0], my = gsN.heroVisual.y + t[1];
+    const inMano = Math.hypot(gsN.heroWeapon.x - mx, gsN.heroWeapon.y - my);
+    // muoversi non deve interrompere il colpo
+    gsN.player.setVelocityX(220);
+    gsN._inMov = true;
+    avanza(gsN, 2);
+    const restaColpo = gsN.heroVisual.texture.key === 'hero_melee';
+    // ...ma quando finisce, si torna alle animazioni normali
+    for (let k = 0; k < 40 && gsN.heroVisual.texture.key === 'hero_melee'; k++) avanza(gsN, 1);
+    const finisce = gsN.heroVisual.texture.key !== 'hero_melee';
+
+    const okCrouch = fermo.posa === 'accovacciato' && fermo.tex === 'hero_aim'
+      && cammina.posa === 'crouchaim' && cammina.tex === 'hero_crouchaim';
+    if (okCrouch && colpoTex === 'hero_melee' && inMano < 3 && restaColpo && finisce) {
+      ok('sparo accovacciato in movimento + colpo col corpo', 2,
+        'fermo=' + fermo.posa + ' in cammino=' + cammina.posa + '; colpo su hero_melee con l arma '
+        + 'nella mano (scarto ' + inMano.toFixed(1) + 'px), non interrotto dal movimento, e finisce');
+    } else {
+      ko('sparo accovacciato in movimento + colpo col corpo', 2,
+        'fermo=' + fermo.posa + '/' + fermo.tex + ' cammina=' + cammina.posa + '/' + cammina.tex
+        + ' colpoTex=' + colpoTex + ' inMano=' + inMano.toFixed(1)
+        + ' restaColpo=' + restaColpo + ' finisce=' + finisce);
+    }
+  }
+
+  // [33] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

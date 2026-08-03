@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (68 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (73 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -437,6 +437,188 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
   nemici, durata della Corsa). ⚠️ **L'utente non ha ancora MAI vinto una run** → la terza fase del
   boss finale (crollo) e' verificata solo dai controlli automatici, mai vista dal vivo.
 - [ ] **Altri set di sfondo**: procedura pronta, basta che l'utente dica "voglio altri sfondi".
+
+---
+
+# BLOCCO F — Playtest round 5 (2026-08-02) 🚧 IN CORSO
+
+Diciannove segnalazioni dell'utente dopo aver giocato l'APK di `3a1a44b`. Raggruppate per
+argomento, non per ordine di arrivo: dentro un gruppo si tocca lo stesso codice, e farle insieme
+costa molto meno che una alla volta.
+
+## F.A — ARMI E PROIETTILI (si vede a ogni singolo colpo → priorita' massima)
+- [x] **A.1 FATTO. I proiettili partono dalla BOCCA dell'arma.** Nuovo `boccaArma()`: prende
+  l'offset della punta misurato sul disegno (`WEAPONS[].bocca`), lo scala, lo specchia e lo
+  RUOTA come l'arma, cosi' la bocca resta la bocca in tutte e otto le direzioni di mira.
+  Verificato dal controllo [28]: scarto 0,0px fra pallina e ugello, ugello 34px davanti al corpo.
+  ~~ Oggi `spawnPellet` li fa nascere
+  a `player.x + nx*18`, cioe' su un cerchietto attorno al CORPO, mentre l'arma e' disegnata in
+  mano da tutt'altra parte: si vede il colpo uscire dalla pancia. Va calcolata la punta dell'arma
+  dalla sua posizione+rotazione reali e fatta nascere li' anche la vampata.
+- [x] **A.2 FATTO, e le cause erano DUE.** (1) `positionWeapon` usava `this.facing` per la mano
+  ma teneva l'angolo congelato allo sparo: girandosi nei decimi in cui l'arma e' ancora in mano,
+  la mano si specchiava e il puntamento no. Ora il verso si rilegge ogni fotogramma e l'arma
+  segue il corpo (angolo specchiato con pi-greco meno theta: stessa altezza, direzione
+  ribaltata). (2) Il verso si deduceva da `nx < 0`, ma mirando dritto in SU nx vale 0, quindi
+  risultava sempre "destra" anche mirando da sinistra. Ora si prende da `facing`, sempre definito.
+  ~~ Sospetto preciso da
+  verificare: l'arma resta a schermo 220ms dopo lo sparo, e in quei 220ms `positionWeapon` la
+  RIMETTE ogni fotogramma usando `this.facing` (dove guardi ORA) mentre la rotazione e' quella
+  congelata al momento dello sparo. Ti giri mentre l'arma e' ancora visibile → la mano si
+  specchia, il puntamento no.
+- [x] **A.3 FATTO.** Scala 0,5 -> 0,72. E la permanenza a schermo non e' piu' fissa (220ms) ma
+  segue la CADENZA dell'arma che hai in mano: vedi B.1/B.2, era la stessa causa.
+  ~~ Oggi `scale: 0.5` e 240ms: si
+  capisce a malapena cosa hai in mano. Ingrandire e allungare la permanenza.
+
+## F.B — ANIMAZIONI ESISTENTI: scatti e colori
+- [x] **B.1 e B.2 RISOLTI, ed erano LO STESSO difetto** (piu' un secondo difetto sotto).
+  CAUSA 1, quella grossa: l'arma restava in mano 220ms FISSI, ma le armi sparano ogni 230-640ms.
+  Nel buco fra un colpo e l'altro l'arma spariva, e con lei la condizione `mirando`, quindi la
+  posa di mira ricadeva su idle/corsa e poi tornava. Ora la finestra e' cadenza + margine.
+  CAUSA 2: la soglia "si sta muovendo" era un valore unico (10). Quando la velocita' ci balla
+  intorno (rinculo, discesa, tasto sfiorato) si alternavano posa ferma e ciclo di corsa, e il
+  ciclo RIPARTIVA ogni volta dal primo disegno. Ora c'e' l'isteresi: `inMovimento()` entra a 45
+  ed esce a 10.
+  Verificato anche che il foglio `hero_runaim` era gia' a posto, cosi' non lo si ri-tocca a
+  vuoto: 6 fotogrammi = due passi, differenze fra fotogrammi consecutivi uniformi (15-20),
+  ampiezza delle gambe 59-30-52-28. Il ciclo non c'entrava.
+  (B.2 sta qui sopra: stessa causa di B.1.)
+- [x] **B.3 FATTO, ma NON toccando i disegni.** Misurato: i due fogli accovacciati stanno a
+  108-110 di luminosita' media contro 80-86 di tutti gli altri.
+  DUE STRADE PROVATE E BUTTATE, da non rifare: (a) riscalare i valori perche' media e
+  dispersione combacino con quelle degli altri fogli — la tavolozza ha SEI soli livelli per
+  canale, l'arrotondamento finale manda a monte la correzione e il verde finiva sotto al rosso,
+  cioe' personaggio VERDE; (b) abbinamento di istogrammi canale per canale — rosso e verde
+  scendevano di un gradino e il blu no, personaggio GRIGIO (88,86,88). Con sei livelli i valori
+  raggiungibili erano 91 o 71 contro un bersaglio di 82: non ci si arriva, punto.
+  SOLUZIONE: `tintaPersonaggio()`, una velatura scura (0xc2c2c2 = 0,76, che e' esattamente il
+  rapporto misurato) applicata a schermo solo nei fotogrammi in cui c'e' uno dei due fogli.
+  Esatta, reversibile, nessun file d'arte toccato.
+
+## F.C — ANIMAZIONI NUOVE ✅ FATTE (2026-08-03)
+Materiale pronto in `assets/spritesheets/hero/da_modificare/` con `ISTRUZIONI.md` e i prompt.
+Da li' in poi e' lavoro mio (cucitura del foglio sul rig, tavolozza a sei livelli, misura della
+posizione della MANO fotogramma per fotogramma per infilarci l'arma, registrazione, controlli).
+
+⚠️ **NON ritagliare i fotogrammi dal foglio gia' lavorato per farli ridisegnare.** Fatto al primo
+tentativo e bocciato dall'utente: «veramente piccole e sgranate». Il foglio e' il PUNTO D'ARRIVO
+della lavorazione — celle 84x84 con la tavolozza ridotta a sei livelli — quindi ingrandirlo
+restituisce per forza un'immagine minuscola e sporca. Si torna sempre alla SORGENTE: il video, o
+le pose a piena risoluzione in `assets/spritesheets/hero/`.
+Nuovo **`tools/estrai_frame_video.py`**: ritrova nel video i fotogrammi di un'animazione gia' in
+gioco e li riesporta grandi, scontornati su magenta. Confronta le SAGOME e non i colori (il
+colore non sopravvive al ridimensionamento e alla posterizzazione, la forma si').
+⚠️ **Secondo giro di correzioni, sempre segnalato dall'utente: "alcune parti magenta dentro il
+personaggio".** Non era un ritaglio storto, era un problema senza soluzione per la strada che si
+stava battendo: MISURATO, il fondo della registrazione sta a (30,30,32) e i contorni del
+personaggio a (32,33,36), cioe' lo stesso colore. Nessuna soglia li separa (con la piu' stretta
+provata si perdeva meta' del personaggio), e la macchia d'olio dai bordi non buca ma dilaga lungo
+i contorni interni. La strada buona non distingue affatto contorno e fondo: ricostruisce la
+SAGOMA (pezzo colorato piu' grande → tappa tutti i buchi → riapri solo quelli grandi → allarga di
+2px per riprendersi il contorno esterno). Da ~1000 buchi a 6-18 per fotogramma, e i rimasti sono
+i due veri. Dettaglio completo in `HANDOFF.md` §camminata accovacciata.
+⚠️ Con la ricerca libera assegnava lo STESSO fotogramma a due celle diverse — una camminata ha
+due mezzi passi che si somigliano molto. Risolto imponendo l'ordine crescente: non e' una
+furbizia, e' un fatto sulla sorgente (un video non torna indietro), e scioglie l'ambiguita' da
+solo. Per la camminata accovacciata sono i fotogrammi **74, 78, 81, 85, 88, 92, 95, 99** del
+video (passo regolare: conferma che l'aggancio e' quello giusto).
+- [x] **C.1 Sparo camminando accovacciato — FATTO (2026-08-03).** Foglio `hero_crouchaim_px.png`,
+  8 fotogrammi, animazione `hero_crouchaim_a` a 12 al secondo — la STESSA andatura della
+  camminata accovacciata, perche' sono gli stessi fotogrammi col braccio diverso: se
+  divergessero, il passo cambierebbe velocita' nel momento in cui apri il fuoco.
+  Verificato: casco fermo a y=28-29 su tutti e otto, statura 50-51 contro i 49-51 della
+  camminata, e la posizione della MANO misurata in due modi indipendenti (punta della sagoma e
+  colore del guanto) che concordano entro 3 pixel.
+  ⚠️ Nel fotogramma 3 il generatore ha disegnato il braccio PIEGATO invece che teso: l'arma lo
+  segue (giusto — sta nella mano disegnata) ma per un fotogramma su otto rientra. Si chiude
+  rigenerando quel disegno, NON ritoccando il numero in `MANO.crouchaim`.
+- [x] **C.2 Colpo corpo a corpo — FATTO (2026-08-03).** Foglio `hero_melee_px.png`, 4 pose
+  (mazza caricata / braccio in alto / colpo in orizzontale / fine corsa in basso), animazione
+  `hero_melee_a` che NON si ripete e la cui DURATA la decide la cadenza dell'arma (col coton
+  fioc rapido, 165ms, una durata fissa sarebbe ancora a meta' quando parte il colpo dopo).
+  ⚠️ L'arma non e' piu' mossa da un tween per conto suo: mano e inclinazione vengono dal
+  FOTOGRAMMA corrente (`MANO.mischia` + `MISCHIA_ANGOLO`, presi dagli angoli spalla-mano
+  misurati sui disegni), quindi non possono sfasarsi rispetto al corpo. Prima si vedeva un
+  bastoncino che ruotava da solo davanti a un personaggio immobile.
+  Il colpo ha la PRECEDENZA sulle altre animazioni: muoversi a meta' bastonata non rimette la
+  camminata. Parte solo a terra e non accovacciato (in aria resta il salto).
+  Controllo automatico [32].
+
+## F.D — NEMICI
+- [x] **D.1 FATTO.** Causa: i nemici inseguono la X del giocatore, e quando gli stai sopra la
+  differenza oscilla attorno allo zero, quindi il segno si ribalta a ogni fotogramma. Nuovo
+  `versoIlGiocatore()` con ZONA MORTA di 16px che restituisce 0 = "sto fermo". E' uno stato
+  STABILE: da fermo il nemico non si sposta, quindi non puo' rientrare in oscillazione da solo.
+  Controllo [30] (conta le inversioni di verso: devono essere zero).
+- [x] **D.2 FATTO.** Aggiunto a `bossAI` il cancello `inQuadro` che il gorgogliante aveva da
+  sempre e al boss mancava. Cammina lo stesso (deve avvicinarsi) ma non sputa, non telegrafa e
+  non evoca sgherri. In piu' il conto alla rovescia dello sputo viene RIMANDATO mentre e' fuori
+  inquadratura: se no il boss entrava in scena scaricando in un colpo solo tutti gli sputi che
+  si era risparmiato.
+- [x] **D.3 RIFATTA.** La chiave non era la forma, era la PROFONDITA': prima tutto stava dietro
+  alla creatura (4,4 contro l'8 dei nemici), quindi a schermo si vedeva un nemico che cresceva
+  DAVANTI al pavimento. Ora ci sono due pezzi: il BUCO scuro che si allarga in ORIZZONTALE
+  (un'apertura che si dilata si legge come un varco, una cupola che si alza no) e il LABBRO, il
+  bordo sollevato, disegnato a profondita' 9,6 cioe' DAVANTI al nemico e dietro al giocatore
+  (10). Finche' un pezzo di terreno copre la parte bassa, l'occhio conclude da solo che sta
+  salendo da sotto. Piu' `schizzoDalBuco()`: pezzetti scagliati in alto a ventaglio che
+  ricadono per gravita' — diverso dallo sbuffo tondo che c'era gia', e sono le due cose insieme
+  a vendere il colpo (la nuvola dice "il pavimento si e' mosso", lo schizzo dice "da sotto").
+- [x] **D.4 FATTO.** Il sospetto scritto qui sopra era giusto, e va oltre: la tinta NON POTEVA
+  funzionare. `setTint` MOLTIPLICA, e l'arte dei nemici e' ambra (tanto rosso, pochissimo blu):
+  moltiplicando non si puo' AGGIUNGERE un colore che nel disegno non c'e', quindi il corazzato
+  "azzurro" usciva marroncino. Provata anche la somma in modalita' ADD: stesso limite, il colore
+  aggiunto e' comunque proporzionale ai pixel di partenza.
+  SOLUZIONE: `creaLavaggioElite()` — una COPIA della creatura riempita di tinta piatta
+  (`setTintFill`) e stesa sopra al 55%. Il colore non dipende piu' da cosa c'era sotto: e'
+  identico su tutti i tipi di nemico, ed e' saturo sul serio. `ELITE_LAVAGGIO` sono i colori che
+  il giocatore vede davvero; `ELITE_TINT` resta come sfumatura di fondo.
+
+## F.E — LEGGIBILITA' E ASSEDIO
+- [x] **E.1 FATTA, ed e' una REGOLA GENERALE del gioco: finche' c'e' un banner a schermo non
+  entra nient'altro.** In `create` c'e' ora `avvioAl`: per 1,2s (1,9 se c'e' anche il banner
+  del modificatore, 2,6 nella corsa dove l'annuncio e' il 3-2-1) non nasce nessun nemico, i
+  cronometri non partono e il contatore non compare. L'attesa NON e' la durata intera del
+  banner (3,1s: il livello sembrerebbe rotto), e' il tempo perche' finisca di entrare e si
+  legga. Controllo [29].
+  In assedio oggi arrivano insieme due banner, il contatore, il cronometro e i nemici. Il
+  giocatore deve avere un secondo per capire cosa deve fare.
+- [x] **E.2 FATTO.** `updateHud()` chiamata PRIMA di `levelComplete()`: da li' in poi `locked` fa
+  uscire subito da update() e l'interfaccia non si ridisegnerebbe mai piu'.
+- [x] **E.3 FATTO, e su OGNI livello, non solo il primo:** il banner d'apertura ora dice
+  "PULISCI L'80% DEL CONDOTTO", con la percentuale LETTA da `cleanGoal` invece che scritta a
+  mano (se un domani si tara la soglia, il cartello si aggiorna da solo). Colta l'occasione
+  anche per l'assedio, che diceva ancora "Falli fuori tutti" invece di dire la quota.
+
+## F.F — BILANCIAMENTO E CONTENUTI
+- [x] **F.1 FATTI**, come tre manopole in `CONFIG` e non come venti numeri sparsi:
+  `DANNO_NEMICI: 0.7`, `DURATA_CORSA: 0.9`, `WAX_GAIN` da 0,55 a 0,385.
+  ⚠️ CONSEGUENZA DA TENERE D'OCCHIO sul −30% al cerume: la misura dell'economia (blocco A.4b)
+  diceva ~6-10 run normali per comprare tutto; con questo taglio diventano ~9-14. Restano dentro
+  la finestra sana per il genere, ma se la progressione risultasse lenta la manopola da rialzare
+  e' `WAX_GAIN`, una sola, non i dodici prezzi.
+  Nota sulla CORSA: il cronometro ora parte al VIA. Prima girava gia' durante il 3-2-1 e lo si
+  compensava sommando 2,6s al totale; col respiro d'apertura (E.1) quella compensazione sarebbe
+  diventata un regalo di 2,6s.
+- [x] **F.2 FATTO senza togliere niente dal gioco.** Dentro la fascia di rarita' la pesca non e'
+  piu' uniforme: ogni carta ha un peso (1 se non scritto). Le 6 carte di corpo a corpo hanno
+  `peso: PESO_MISCHIA` = 0,5, quindi escono la meta' delle volte. Chi vuole giocare di mazza le
+  trova ancora, e c'e' una manopola sola per rimetterle dov'erano.
+- [x] **F.3 FATTO, e il "ritardo" non era un ritardo.** Spinta da 0,72 a 0,95 di un salto vero
+  (cosi' si riesce anche a incatenare due nemici uno dopo l'altro).
+  Ma la sensazione di ritardo veniva da altrove: uccidendo un nemico la fisica si CONGELA 85ms
+  per dare peso al colpo, e nel rimbalzo quel congelamento arriva DOPO che la spinta verso l'alto
+  e' gia' stata impostata — quindi si restava appesi in aria un decimo di secondo e solo dopo si
+  schizzava su. Ora nel rimbalzo il congelamento e' 30ms: l'impatto si sente ancora, l'attesa no.
+  Piu' la soglia di caduta abbassata da 60 a 45 (~15ms guadagnati in cima all'arco del salto;
+  45 e' ancora al sicuro perche' da fermi la velocita' verticale non supera ~18 a 60 fotogrammi
+  al secondo, ~37 a 30).
+- [x] **F.4 FATTO.** Carta `radial` (rara, impilabile): ogni 2,6s parte una corona di palline
+  tutt'attorno, +4 direzioni a ogni pesca. Danno ridotto al 55% APPOSTA — e' un'arma che lavora
+  da sola mentre pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
+  Nel gioco copre l'unico punto debole di un'arma che spara in una direzione sola: i nemici che
+  ti si appiccicano ai fianchi mentre stai mirando altrove. Controllo [31].
 
 ---
 

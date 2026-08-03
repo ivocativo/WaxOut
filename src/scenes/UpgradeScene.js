@@ -22,12 +22,15 @@ class UpgradeScene extends Phaser.Scene {
     // / up_<id>_desc). Per le abilita 'ability' e' un id stabile, tradotto a parte.
     // rarity: comune (stat base) / rara (abilita' che cambia stile) / leggendaria
     // (abilita' da Progetto sbloccato). Decide peso di pesca e colore della carta.
+    // Quanto pesa una carta di CORPO A CORPO rispetto a una qualsiasi altra della stessa fascia.
+    // A 0,5 esce la meta' delle volte. Manopola unica: alzarla rimette il corpo a corpo dov'era.
+    const PESO_MISCHIA = 0.5;
     const ALL = [
-      { id: 'damage', rep: true, rarity: 'common', apply: (s) => { s.damage += 8; } },
+      { id: 'damage', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.damage += 8; } },
       { id: 'hp', rep: true, rarity: 'common', apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
-      { id: 'attspd', rep: true, rarity: 'common', apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
+      { id: 'attspd', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
       { id: 'speed', rep: true, rarity: 'common', apply: (s) => { s.moveSpeed += 30; } },
-      { id: 'range', rep: true, rarity: 'common', apply: (s) => { s.attackRange += 0.4; } },
+      { id: 'range', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.attackRange += 0.4; } },
       // Getto Rapido (round 2, G.2): parallelo di Riflessi ma per il getto a distanza (che
       // prima non aveva NESSUN comune a velocizzarlo).
       { id: 'jetspd', rep: true, rarity: 'common', apply: (s) => { s.shotCooldown = Math.max(120, s.shotCooldown - 40); } },
@@ -40,7 +43,7 @@ class UpgradeScene extends Phaser.Scene {
       // Il Martello e' diventato un'arma dell'ARSENALE (si compra e si sceglie a inizio run), quindi
       // una carta che "ti da' il martello" non avrebbe piu' senso: cambierebbe l'arma che hai
       // scelto tu. Questa invece potenzia il corpo a corpo QUALUNQUE kit tu stia usando.
-      { id: 'heavyhead', rep: false, rarity: 'rare', ability: 'heavyhead', apply: (s) => { s.damage = Math.round(s.damage * 1.3); s.attackRange += 0.15; } },
+      { id: 'heavyhead', rep: false, rarity: 'rare', peso: PESO_MISCHIA, ability: 'heavyhead', apply: (s) => { s.damage = Math.round(s.damage * 1.3); s.attackRange += 0.15; } },
       // Abilità che cambiano lo stile di gioco (una volta sola ciascuna):
       // Ventaglio: ora IMPILABILE — ogni pesca aggiunge una pallina al getto.
       { id: 'spread', rep: false, stack: true, rarity: 'rare', ability: 'spread', apply: (s) => { s.jetPellets += 1; } },
@@ -55,17 +58,21 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'corrosive', rep: false, rarity: 'rare', ability: 'corrosive', apply: (s) => { s.corrosive = true; } },
       // Rimbalzo: IMPILABILE — ogni pesca aggiunge un rimbalzo alle palline.
       { id: 'bounce', rep: false, stack: true, rarity: 'rare', ability: 'bounce', apply: (s) => { s.bounce += 1; } },
+      // Raffica Radiale (playtest round 5, idea dell'utente): IMPILABILE, ma ogni pesca
+      // aggiunge DIREZIONI (4, poi 8, poi 12...) invece di ripetere lo stesso colpo. Cosi'
+      // ogni carta allarga davvero la copertura attorno al personaggio.
+      { id: 'radial', rep: false, stack: true, rarity: 'rare', ability: 'radial', apply: (s) => { s.radiale += window.CONFIG.RADIALE_PER_PESCA; } },
       // Abilità NUOVE sbloccabili dai PROGETTI del negozio (locked: compaiono qui solo
       // dopo essere state sbloccate — vedi window.BLUEPRINTS / ShopScene).
       { id: 'magnet', rep: false, rarity: 'legendary', ability: 'magnet', locked: true, apply: (s) => { s.magnet = true; } },
-      { id: 'blast',  rep: false, rarity: 'legendary', ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
+      { id: 'blast',  rep: false, rarity: 'legendary', peso: PESO_MISCHIA, ability: 'blast',  locked: true, apply: (s) => { s.meleeBlast = true; } },
       { id: 'splash', rep: false, rarity: 'legendary', ability: 'splash', locked: true, apply: (s) => { s.jetSplash = true; } },
       // Bolla-aiutante: IMPILABILE — ogni pesca aggiunge una bolla (richiede il Progetto sbloccato).
       { id: 'companion', rep: false, stack: true, rarity: 'legendary', ability: 'companion', locked: true, apply: (s) => { s.companions += 1; } },
       { id: 'backshot', rep: false, rarity: 'legendary', ability: 'backshot', locked: true, apply: (s) => { s.backShot = true; } },
       { id: 'rage',     rep: false, rarity: 'legendary', ability: 'rage',     locked: true, apply: (s) => { s.rage = true; } },
       { id: 'stunshot', rep: false, rarity: 'legendary', ability: 'stunshot', locked: true, apply: (s) => { s.stunShot = true; } },
-      { id: 'slam',     rep: false, rarity: 'legendary', ability: 'slam',     locked: true, apply: (s) => { s.slam = true; } },
+      { id: 'slam',     rep: false, rarity: 'legendary', peso: PESO_MISCHIA, ability: 'slam',     locked: true, apply: (s) => { s.slam = true; } },
     ];
 
     // Peso di pesca per rarita' (piu' alto = piu' probabile) e stile della carta.
@@ -91,7 +98,15 @@ class UpgradeScene extends Phaser.Scene {
         let tier = tiers[tiers.length - 1];
         for (const t of tiers) { r -= RARITY_WEIGHT[t]; if (r <= 0) { tier = t; break; } }
         const inTier = remaining.filter((u) => u.rarity === tier);
-        const chosen = inTier[Math.floor(Math.random() * inTier.length)];
+        // Dentro la fascia la pesca NON e' piu' uniforme: ogni carta ha un peso (1 se non
+        // scritto). Serve per il CORPO A CORPO, che il playtest del 2026-08-02 ha giudicato
+        // secondario rispetto ai colpi a distanza e che occupava troppo posto nel mazzo: le sue
+        // carte hanno `peso: PESO_MISCHIA` e escono la meta' delle volte. Si abbassano di
+        // frequenza senza toglierle dal gioco — chi vuole giocare di mazza le trova ancora.
+        const pesi = inTier.map((u) => u.peso || 1);
+        let rp = Math.random() * pesi.reduce((a, b) => a + b, 0);
+        let chosen = inTier[inTier.length - 1];
+        for (let i = 0; i < inTier.length; i++) { rp -= pesi[i]; if (rp <= 0) { chosen = inTier[i]; break; } }
         picked.push(remaining.splice(remaining.indexOf(chosen), 1)[0]);
       }
       return picked;

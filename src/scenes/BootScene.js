@@ -129,6 +129,16 @@ class BootScene extends Phaser.Scene {
     // dell'arma e il personaggio si ritrovava con TRE braccia (il corpo ne ha gia' due).
     heroSheet('hero_aim', 'hero_aim_px.png');
     heroSheet('hero_runaim', 'hero_runaim_px.png');
+    // SPARO CAMMINANDO ACCOVACCIATO (2026-08-03). Gli stessi 8 fotogrammi della camminata
+    // accovacciata, ridisegnati col braccio teso: le GAMBE sono identiche, cambia solo il
+    // braccio. E' quello che tiene insieme le due animazioni — se cambiassero anche le gambe,
+    // cominciare a sparare mentre cammini farebbe scattare il passo.
+    heroSheet('hero_crouchaim', 'hero_crouchaim_px.png');
+    // COLPO CORPO A CORPO (2026-08-03). Quattro pose: mazza caricata sopra la spalla, braccio
+    // in alto, colpo in orizzontale, fine corsa in basso. Prima il corpo restava fermo nella
+    // posa di riposo e si muoveva solo l'arma disegnata: si vedeva un bastoncino che ruotava
+    // da solo davanti a un personaggio immobile.
+    heroSheet('hero_melee', 'hero_melee_px.png');
   }
 
   create() {
@@ -190,6 +200,26 @@ class BootScene extends Phaser.Scene {
       this.anims.create({
         key: 'hero_runaim_a', frames: this.anims.generateFrameNumbers('hero_runaim', { start: 0, end: 5 }),
         frameRate: 11, repeat: -1,
+      });
+    }
+    // Sparo camminando accovacciato: 12 al secondo ESATTAMENTE come `hero_crouchwalk_a`, e non e'
+    // una coincidenza — sono gli stessi fotogrammi col braccio diverso, quindi devono scorrere
+    // alla stessa andatura. Se divergessero, il passo cambierebbe velocita' nel momento in cui
+    // apri il fuoco.
+    if (!this.anims.exists('hero_crouchaim_a')) {
+      this.anims.create({
+        key: 'hero_crouchaim_a', frames: this.anims.generateFrameNumbers('hero_crouchaim', { start: 0, end: 7 }),
+        frameRate: 12, repeat: -1,
+      });
+    }
+    // Colpo corpo a corpo: NON si ripete (e' un gesto, non un ciclo) e la durata NON e' fissata
+    // qui — la decide GameScene al momento del colpo, sulla cadenza dell'arma che hai in mano
+    // (vedi meleeSwing). Con un valore fisso, il coton fioc rapido avrebbe l'animazione ancora a
+    // meta' quando parte gia' il colpo successivo.
+    if (!this.anims.exists('hero_melee_a')) {
+      this.anims.create({
+        key: 'hero_melee_a', frames: this.anims.generateFrameNumbers('hero_melee', { start: 0, end: 3 }),
+        frameRate: 16, repeat: 0,
       });
     }
 

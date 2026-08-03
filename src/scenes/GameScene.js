@@ -238,18 +238,25 @@ class GameScene extends Phaser.Scene {
     // `origin` = dove sta la MANO dentro l'immagine (e quindi il perno della rotazione).
     // `scale` porta il disegno alla dimensione a schermo: le immagini nuove sono baked a doppia
     // risoluzione (80x12 e 39x24) e vengono rimpicciolite a meta', cosi' restano nitide.
+    // `bocca` = dove sta la PUNTA che spara, in pixel dell'immagine e rispetto al perno
+    // (misurata sul disegno: l'ultima colonna con pixel opachi). Serve per far partire i
+    // proiettili da li' invece che dalla pancia del personaggio — vedi boccaArma().
     this.WEAPONS = {
-      // Spruzzino: la mano e' sull'impugnatura, in basso a sinistra del corpo.
-      sprayer: { tex: 'sprayer', origin: [0.23, 0.78], scale: 0.5, hand: [8, -2] },
+      // Spruzzino: la mano e' sull'impugnatura, in basso a sinistra del corpo; l'ugello sta
+      // in alto a destra (immagine 39x24, perno a 9,19 → ugello a 38,10).
+      sprayer: { tex: 'sprayer', origin: [0.23, 0.78], scale: 0.5, hand: [8, -2], bocca: [29, -9] },
       // Coton fioc a una punta: la mano e' all'estremita' NUDA del bastoncino, il batuffolo
-      // sporco di cerume e' la parte che colpisce.
-      swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.5, hand: [6, -2] },
+      // sporco di cerume e' la parte che colpisce (immagine 80x12, perno a 5,6 → punta a 79,3).
+      // ⚠️ Scala alzata da 0,5 a 0,72 dopo il playtest: a 0,5 era un filo di 40x6 pixel e il
+      // giocatore non capiva cosa avesse in mano.
+      swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.72, hand: [6, -2], bocca: [74, -3] },
       hammer:  { tex: 'hammer',  origin: [0.22, 0.5],  scale: 0.9, hand: [6, -6] },
     };
     this.heroWeapon = this.add.sprite(this.player.x, this.player.y, 'sprayer').setDepth(11).setVisible(false);
     this._weaponHideAt = 0;   // istante fino a cui l'arma resta visibile dopo un attacco
     this._weaponMode = null;  // 'ranged' | 'melee'
-    this._posaMira = null;    // posa di mira attiva: 'avanti' | 'su' | 'accovacciato' | 'corsa'
+    this._posaMira = null;    // posa di mira attiva: 'avanti' | 'su' | 'accovacciato' | 'corsa' | 'crouchaim'
+    this._mischiaFinoA = 0;   // istante fino a cui gira l'animazione del colpo (ha la precedenza)
     this._weaponAim = 0;      // angolo di mira corrente (per il posizionamento in update)
 
     this.physics.add.collider(this.player, this.ground);
@@ -394,8 +401,7 @@ class GameScene extends Phaser.Scene {
     if (this.levelKind === 'boss') {
       this.maxEnemies = Math.min(2 + Math.floor(lvl / 3), 3);  // il boss + pochi sgherri
       spawnDelay = Math.max(2000, 3200 - lvl * 120);
-      this.spawnEnemy('boss');
-      this.spawnEnemy();
+      this._nasciteIniziali = [['boss'], []];
       // Un banner per ogni boss: e' il primo segnale che questo non e' quello di prima.
       const chiave = this.isFinale ? 'game_boss_finale_in' : (lvl >= 10 ? 'game_boss_regina_in' : 'game_boss_in');
       const colore = this.isFinale ? '#ff5252' : (lvl >= 10 ? '#8fd0ff' : '#ffb04a');
@@ -406,7 +412,7 @@ class GameScene extends Phaser.Scene {
       // Densita' ridotta (giro difficolta' 2026-07-25): l'utente trovava "impossibile fuggire".
       this.maxEnemies = Math.min(3 + Math.floor(lvl * 0.5), 6);
       spawnDelay = Math.max(1050, 1900 - lvl * 100);
-      for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
+      this._nasciteIniziali = new Array(Math.min(3, this.maxEnemies)).fill([]);
       this.showBanner(window.I18n.t('game_swarm_in'), '#9be870');
     } else if (this.levelKind === 'siege') {
       // ASSEDIO: non serve raggiungere il timpano, bisogna ELIMINARE UNA QUOTA di nemici prima
@@ -430,8 +436,8 @@ class GameScene extends Phaser.Scene {
       this.siegeLeftMs = 30000 + lvl * 2000;
       this.siegeQuota = 10 + lvl;
       this.siegeKills = 0;
-      for (let i = 0; i < Math.min(3, this.maxEnemies); i++) this.spawnEnemy();
-      this.showBanner(window.I18n.t('game_siege_in'), '#ff8f5a');
+      this._nasciteIniziali = new Array(Math.min(3, this.maxEnemies)).fill([]);
+      this.showBanner(window.I18n.t('game_siege_in', { q: this.siegeQuota }), '#ff8f5a');
     } else {
       // normal / rush: attraversa fino al timpano (la corsa non chiede pulizia).
       this.maxEnemies = Math.min(2 + Math.floor(lvl / 3), 4);
@@ -442,8 +448,12 @@ class GameScene extends Phaser.Scene {
         // tempo piu' generoso. Da tarare col playtest.
         this.startRushCountdown();
       }
-      for (let i = 0; i < Math.min(2, this.maxEnemies); i++) this.spawnEnemy();
-      if (this.levelKind !== 'rush') this.showBanner(window.I18n.t('game_goal'), '#ffd9a0');
+      this._nasciteIniziali = new Array(Math.min(2, this.maxEnemies)).fill([]);
+      // Quanto bisogna pulire va DETTO all'inizio: prima lo si scopriva solo sbattendo contro
+      // il timpano chiuso a fine livello (segnalato nel playtest).
+      if (this.levelKind !== 'rush') {
+        this.showBanner(window.I18n.t('game_goal', { pct: Math.round(this.cleanGoal * 100) }), '#ffd9a0');
+      }
     }
     this.maxEnemies = Phaser.Math.Clamp(this.maxEnemies + (this.mutMaxEnemies || 0), 1, 12);   // MODIFICATORE "orda"
     // MANOPOLA DI PROVA "densita'" (src/taratura.js): moltiplica il tetto di nemici contemporanei.
@@ -457,9 +467,33 @@ class GameScene extends Phaser.Scene {
     // (l'utente moriva all'istante cliccando "Start Run"). Vedi anche pickGroundX (spawn piu' lontani).
     this.invulnUntil = Math.max(this.invulnUntil, this.time.now + 1400);
 
+    // ==========================================================================================
+    // UN RESPIRO PRIMA CHE COMINCI (playtest round 5). REGOLA GENERALE: finche' c'e' un banner
+    // a schermo non deve entrare nient'altro — il giocatore deve avere il tempo di leggere che
+    // livello e'. Prima arrivavano nello stesso istante due banner, il contatore, il cronometro
+    // e i nemici, e in assedio non si capiva niente.
+    // L'attesa NON e' la durata intera del banner (3,1s: troppo, il livello sembrerebbe rotto):
+    // e' il tempo perche' il banner finisca di entrare e si legga. Col modificatore ce n'e' un
+    // secondo che compare a 700ms, e l'attesa slitta di altrettanto.
+    // In questa finestra: niente nemici, cronometro dell'assedio fermo, contatore e cronometro
+    // non ancora a schermo (vedi updateHud).
+    // La CORSA ha gia' il suo annuncio, il 3-2-1: li' l'attesa e' esattamente quella.
+    const attesa = (this.levelKind === 'rush') ? 2600 : 1200 + (this.mutator ? 700 : 0);
+    this.avvioAl = this.time.now + attesa;
+    this.time.delayedCall(attesa, () => {
+      if (this.locked || !this.scene.isActive()) return;
+      (this._nasciteIniziali || []).forEach((args) => this.spawnEnemy.apply(this, args));
+      this._nasciteIniziali = null;
+    });
+
     this.spawnTimer = this.time.addEvent({
       delay: spawnDelay, loop: true,
-      callback: () => { if (!this.locked && this.nemiciVicini() < this.maxEnemies) this.spawnEnemy(); },
+      // Il controllo sull'orario si fa QUI dentro e non con `startAt` negativo: quello dipende
+      // da un dettaglio interno di Phaser, questo si legge e non puo' sorprendere.
+      callback: () => {
+        if (this.time.now < this.avvioAl) return;
+        if (!this.locked && this.nemiciVicini() < this.maxEnemies) this.spawnEnemy();
+      },
     });
 
     // Annuncio del MODIFICATORE di livello (piu' in basso del banner del tipo, cosi' si vedono
@@ -1623,8 +1657,9 @@ class GameScene extends Phaser.Scene {
     cfg.speed = Math.round(cfg.speed * (this.mutEnemySpeed || 1));
     cfg.hp = Math.max(1, Math.round(cfg.hp * (this.mutEnemyHp || 1) * window.CONFIG.VITA_NEMICI));
     cfg.wax = Math.round(cfg.wax * (this.mutEnemyWax || 1));
-    cfg.dmg = Math.max(1, Math.round(cfg.dmg * (this.mutEnemyDmg || 1)));
-    if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * (this.mutEnemyDmg || 1)));
+    const dannoNem = (this.mutEnemyDmg || 1) * window.CONFIG.DANNO_NEMICI;
+    cfg.dmg = Math.max(1, Math.round(cfg.dmg * dannoNem));
+    if (cfg.projDmg) cfg.projDmg = Math.max(1, Math.round(cfg.projDmg * dannoNem));
 
     // ART (round B.2): gli sprite nemici sono immagini AI, di dimensioni diverse dalle vecchie
     // texture pixel. Ricalcolo scala e hitbox dalla TEXTURE caricata: `dispH` = altezza a schermo
@@ -1797,6 +1832,7 @@ class GameScene extends Phaser.Scene {
       e.elite = elite;
       e.eliteTint = window.GameScene.ELITE_TINT[elite];
       e.setTint(e.eliteTint);
+      this.creaLavaggioElite(e);
     }
 
     // Comparsa animata (la scala finale dipende dal tipo: i PNG nativi vanno ingranditi).
@@ -1825,6 +1861,49 @@ class GameScene extends Phaser.Scene {
     const k = (e && e.bossKind) || (window.GameState.level >= window.CONFIG.RUN_LEVELS ? 'gran'
       : (window.GameState.level >= 10 ? 'regina' : 'tappo'));
     return window.I18n.t('boss_nome_' + k);
+  }
+
+  // LAVAGGIO DI COLORE DELLE ELITE (playtest round 5: "poco riconoscibili, saturazione
+  // disomogenea"). ⚠️ PERCHE' LA SOLA TINTA NON BASTAVA, E NON POTEVA BASTARE: `setTint` in
+  // Phaser MOLTIPLICA il colore dell'immagine, e l'arte dei nemici e' AMBRA — tanto rosso, poco
+  // blu. Moltiplicando non si puo' aggiungere colore che nel disegno non c'e': il "corazzato
+  // azzurro" usciva marroncino. E ogni tipo di nemico partiva da un'ambra diversa, quindi
+  // assorbiva la tinta in modo diverso: ecco da dove veniva la disomogeneita'.
+  // (Provata anche la somma in modalita' ADD, e non risolve: anche li' il colore aggiunto e'
+  // proporzionale ai pixel di partenza, quindi il blu resta quello che non c'era.)
+  // LA SOLUZIONE: una COPIA della creatura resa in tinta piatta (`setTintFill`, cioe' la sua
+  // sagoma riempita di un colore solo) e posata sopra a meta' trasparenza. Il colore cosi' non
+  // dipende piu' da cosa c'era sotto — e' identico su tutti i nemici — e la creatura resta
+  // leggibile perche' il disegno vero traspare comunque.
+  creaLavaggioElite(e) {
+    const col = window.GameScene.ELITE_LAVAGGIO[e.elite];
+    if (!col) return;
+    const a = this.add.sprite(e.x, e.y, e.texture.key, e.frame.name)
+      .setOrigin(e.originX, e.originY)
+      .setDepth(e.depth + 1);
+    a.setTintFill(col);
+    a.setAlpha(GameScene.ELITE_FORZA);
+    e.eliteLavaggio = a;
+    e.once('destroy', () => { if (e.eliteLavaggio) { e.eliteLavaggio.destroy(); e.eliteLavaggio = null; } });
+    this.sincronizzaLavaggioElite(e);
+  }
+
+  // Il lavaggio e' uno sprite a se': deve ricalcare la creatura fotogramma per fotogramma,
+  // altrimenti resta indietro appena il nemico si muove, si ribalta o cambia disegno.
+  sincronizzaLavaggioElite(e) {
+    const a = e.eliteLavaggio;
+    if (!a) return;
+    if (!e.active) { a.setVisible(false); return; }
+    if (a.texture.key !== e.texture.key || a.frame.name !== e.frame.name) {
+      a.setTexture(e.texture.key, e.frame.name);
+      a.setTintFill(window.GameScene.ELITE_LAVAGGIO[e.elite]);   // cambiare texture azzera la tinta
+    }
+    a.setPosition(e.x, e.y);
+    a.setScale(e.scaleX, e.scaleY);
+    a.setFlipX(e.flipX);
+    a.setAngle(e.angle);
+    a.setVisible(e.visible);
+    a.setAlpha(e.alpha * GameScene.ELITE_FORZA);
   }
 
   // Colore "di riposo" di un nemico: dorato se e' il Fuggitivo, il colore della variante se e'
@@ -1972,28 +2051,43 @@ class GameScene extends Phaser.Scene {
     const quotaPer = (s) => groundTop - mezzo * s;   // s = frazione di statura raggiunta
     e.y = quotaPer(0.08);
 
-    // La bolla usa i colori del terreno (GameGfx.CARNE, depth 4.3) cosi' sembra il pavimento che
-    // si solleva, non un cerchio disegnato sopra: stessa crosta, stesso filo di luce sul bordo.
-    // Cresce SOLO VERSO L'ALTO — l'ellisse ha l'origine al centro, quindi mentre la scalo devo
-    // anche alzarla, se no meta' del gonfiore va sottoterra e a schermo sembra un'ombra.
+    // ==========================================================================================
+    // IL BUCO NEL TERRENO (rifatto al playtest round 5: "compare un ovale sopra il terreno, io
+    // vorrei una forma che dia l'idea di qualcosa che esce dal sottosuolo").
+    // Prima era una cupola che si GONFIAVA verso l'alto, e disegnata dietro a tutto: l'occhio la
+    // leggeva come una bolla appoggiata sopra al pavimento, con la creatura che ci cresceva
+    // davanti. Adesso ci sono due pezzi, e sono due pezzi diversi apposta:
+    //   · il BUCO, scuro come il fondo della massa, che si allarga in ORIZZONTALE. Un'apertura
+    //     che si dilata si legge come un varco; una cupola che si alza no.
+    //   · il LABBRO, il bordo sollevato del buco, disegnato DAVANTI ALLA CREATURA (profondita'
+    //     9,6 contro l'8 dei nemici). ⚠️ E' questo il pezzo che fa tutto il lavoro: finche' un
+    //     pezzo di terreno COPRE la parte bassa del nemico, l'occhio conclude da solo che sta
+    //     salendo da sotto. Sta sotto al giocatore (profondita' 10), quindi non lo nasconde mai.
+    // Il labbro e' spostato in giu' di poco rispetto al buco: cosi' del buco resta scoperta la
+    // falce superiore, che e' l'ombra dentro l'apertura.
     const C = window.GameGfx.CARNE;
-    // larghezza presa dalla creatura stessa: il gonfiore e' il buco da cui esce, quindi deve
+    // larghezza presa dalla creatura stessa: il buco e' il varco da cui esce, quindi deve
     // starle attorno. Un valore fisso andava bene per la zanzara e diventava un francobollo
     // sotto al boss.
-    const largo = e.displayWidth * 0.78;
-    const ALTA = 10, MAX = big ? 3.6 : 3.0;
-    const suolo = (s) => groundTop + 4 - (ALTA / 2) * s;   // tiene il fondo appoggiato al terreno
-    const bolla = this.add.ellipse(x, suolo(1), largo, ALTA, C.crosta, 1)
-      .setDepth(4.4).setStrokeStyle(2, C.bordo, 0.7);
-    this.tweens.add({
-      targets: bolla, scaleY: MAX, scaleX: 1.18, y: suolo(MAX),
-      duration: GONFIO, ease: 'Quad.out',
-    });
+    const largo = e.displayWidth * 0.86;
+    const rx = largo / 2, ry = largo * 0.30;
+    // ⚠️ LE PROPORZIONI SONO IL PUNTO, e al primo tentativo erano sbagliate: il labbro era alto
+    // quasi quanto il buco e centrato piu' in basso, quindi lo copriva quasi tutto e a schermo
+    // restava un disco CHIARO sul pavimento invece di un'apertura scura (visto in una schermata
+    // di prova). Adesso il labbro e' basso e spostato in giu': sporge sopra la linea del terreno
+    // quel tanto che basta a coprire i piedi della creatura (e' quello che vende l'uscita da
+    // sotto), e lascia scoperta la falce scura del buco, che e' il buio dentro l'apertura.
+    const buco = this.add.ellipse(x, groundTop + 1, rx * 2, ry * 2, C.profondo, 1)
+      .setDepth(4.4).setScale(0.12, 0.5);
+    const labbro = this.add.ellipse(x, groundTop + 1 + ry * 0.5, rx * 2.04, ry * 1.5, C.crosta, 1)
+      .setDepth(9.6).setStrokeStyle(2, C.bordo, 0.85).setScale(0.12, 0.5);
+    this.tweens.add({ targets: [buco, labbro], scaleX: 1, scaleY: 1, duration: GONFIO, ease: 'Quad.out' });
     this.groundPuff(x, groundTop, big);
+    this.schizzoDalBuco(x, groundTop, big);
     if (big) this.cameras.main.shake(260, 0.010);
 
     this.time.delayedCall(GONFIO, () => {
-      if (!e.active) { bolla.destroy(); return; }
+      if (!e.active) { buco.destroy(); labbro.destroy(); return; }
       e.setVisible(true);
       this.groundPuff(x, groundTop, big);
       if (big) this.cameras.main.shake(200, 0.008);
@@ -2001,9 +2095,13 @@ class GameScene extends Phaser.Scene {
       // SPUNTA. Suonarlo mentre il pavimento si sta ancora gonfiando lo faceva finire 800ms prima
       // che la creatura uscisse, e poi silenzio (difetto nato allungando la comparsa il 30/07).
       window.Sfx.emerge(big);
-      // la bolla si sgonfia mentre il nemico esce: e' lui che ha preso il suo posto
-      this.tweens.add({ targets: bolla, scaleY: 0.2, y: suolo(0.2), alpha: 0, duration: USCITA * 0.6,
-        onComplete: () => bolla.destroy() });
+      this.schizzoDalBuco(x, groundTop, big);
+      // Il buco si richiude DOPO che la creatura e' uscita, non mentre esce: se si chiudesse
+      // subito, la parte bassa del nemico resterebbe scoperta a meta' salita e si tornerebbe a
+      // vedere un nemico che cresce davanti al pavimento.
+      this.tweens.add({ targets: [buco, labbro], scaleX: 0.1, scaleY: 0.35, alpha: 0,
+        delay: USCITA * 0.72, duration: USCITA * 0.45, ease: 'Quad.in',
+        onComplete: () => { buco.destroy(); labbro.destroy(); } });
       // qualche sbuffo lungo la salita, se no il movimento sembra un semplice ingrandimento
       [0.3, 0.62].forEach((q) => this.time.delayedCall(USCITA * q, () => {
         if (e.active) this.groundPuff(e.x, groundTop, false);
@@ -2037,6 +2135,21 @@ class GameScene extends Phaser.Scene {
 
   // Sbuffo dal pavimento e filo di cerume dal soffitto: vedi GameGfx in src/gfx.js.
   groundPuff(x, groundTop, big) { window.GameGfx.groundPuff(this, x, groundTop, big); }
+
+  // Schizzo di terriccio SCAGLIATO IN ALTO dal buco (playtest round 5: "aggiungerei effetti
+  // particellari minimi"). Diverso dallo sbuffo tondo di groundPuff, che si allarga in tutte le
+  // direzioni come una nuvola: qui i pezzi partono verso l'alto a ventaglio e ricadono, cioe' si
+  // muovono come si muoverebbe della materia spinta fuori da sotto. Sono le due cose insieme a
+  // vendere il colpo: la nuvola dice "qualcosa ha smosso il pavimento", lo schizzo dice "da sotto".
+  schizzoDalBuco(x, groundTop, big) {
+    const em = this.add.particles(x, groundTop - 2, 'bit_dirt', {
+      speed: { min: 90, max: 240 },
+      angle: { min: -150, max: -30 },   // ventaglio verso l'alto (in Phaser -90 e' dritto in su)
+      lifespan: 620, scale: { start: 1, end: 0 }, gravityY: 900, emitting: false,
+    }).setDepth(9.4);
+    em.explode(big ? 16 : 8);
+    this.time.delayedCall(900, () => em.destroy());
+  }
   ceilingDrip(x, restY) { window.GameGfx.ceilingDrip(this, x, restY); }
 
   // Una pallina di cerume sputata da un nemico: vola in PARABOLA (cade per gravità)
@@ -2131,9 +2244,17 @@ class GameScene extends Phaser.Scene {
   }
 
   // Crea una singola pallina di getto (usata da fireJet, anche a ventaglio/doppio getto).
-  spawnPellet(nx, ny, oy, p, rageMult) {
+  spawnPellet(nx, ny, oy, p, rageMult, origine) {
     const sp = 580;
-    const s = this.shots.create(this.player.x + nx * 18, this.player.y + oy + ny * 14, 'soap').setDepth(9);
+    // Il colpo nasce dall'UGELLO dell'arma disegnata (vedi boccaArma). Se per qualche motivo
+    // l'arma non e' a schermo si ricade sul vecchio calcolo attorno al corpo, cosi' il getto
+    // parte comunque.
+    // `origine` la passa la raffica radiale: quelle palline nascono dal PERSONAGGIO, non
+    // dall'ugello, perche' partono tutt'attorno e non da dove sta puntando l'arma.
+    const b = origine || this.boccaArma();
+    const ox = b ? b.x : this.player.x + nx * 18;
+    const oyy = b ? b.y : this.player.y + oy + ny * 14;
+    const s = this.shots.create(ox, oyy, 'soap').setDepth(9);
     s.body.setAllowGravity(false);
     s.body.setSize(10, 10, true);
     s.setVelocity(nx * sp, ny * sp);
@@ -2147,7 +2268,7 @@ class GameScene extends Phaser.Scene {
     s.bounceLeft = p.bounce | 0;           // abilità RIMBALZO (rimbalza N volte sui muri/suolo)
     s.bounceGrace = 0;
     if (p.corrosive) s.setTint(0x9be86b);  // pallina verde = corrosiva
-    const flash = this.add.circle(this.player.x + nx * 20, this.player.y + oy + ny * 20, 7, 0xdff3ff, 0.9).setDepth(11);
+    const flash = this.add.circle(ox + nx * 4, oyy + ny * 4, 7, 0xdff3ff, 0.9).setDepth(11);
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 120, ease: 'Quad.out', onComplete: () => flash.destroy() });
     // Quanto vive la pallina = quanto LONTANO arriva il getto: e' una manopola del kit (la Pompa
     // a Vuoto ha gittata corta apposta). Vive di piu' se rimbalza.
@@ -2435,7 +2556,20 @@ class GameScene extends Phaser.Scene {
     // Forma del colpo dal KIT scelto nell'Arsenale (window.ARMI): portata, altezza dell'arco e
     // fermo-immagine sono il carattere dell'arma (martello largo e lento, pinzette corte e rapide).
     const M = window.armaCorrente().mischia;
-    this.showMeleeWeapon(M.tex);            // arma in mano che rotea col colpo
+    // IL CORPO MENA, non solo l'arma (2026-08-03). Prima il personaggio restava nella posa di
+    // riposo e ruotava solo il bastoncino disegnato: sembrava un'arma che si muoveva da sola.
+    // L'animazione parte solo A TERRA e non accovacciato — in aria deve restare il salto e
+    // accovacciato la posa bassa, se no il personaggio si rialzerebbe di colpo per menare.
+    // La DURATA la decide la cadenza dell'arma: col coton fioc rapido (165ms) un'animazione di
+    // durata fissa sarebbe ancora a meta' quando parte gia' il colpo dopo.
+    const aTerra = this.time.now - this.lastGroundAt < 120;
+    this._mischiaFinoA = 0;
+    if (aTerra && !this.crouching) {
+      const durata = Phaser.Math.Clamp((p.attackCooldown || 360) * 0.8, 140, 300);
+      this._mischiaFinoA = this.time.now + durata;
+      this.heroVisual.anims.play({ key: 'hero_melee_a', duration: durata });
+    }
+    this.showMeleeWeapon(M.tex);            // arma in mano, agganciata alla mano disegnata
     const range = M.portata * p.attackRange;
     const halfH = M.altezza;
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
@@ -2569,8 +2703,17 @@ class GameScene extends Phaser.Scene {
     this.tweens.killTweensOf(w);
     w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
     this._weaponMode = 'ranged'; this._weaponCfg = cfg;
-    this._weaponAim = Math.atan2(ny, nx); this._weaponFlip = nx < 0;
-    this._weaponHideAt = this.time.now + 220;
+    this._weaponAim = Math.atan2(ny, nx);
+    // ⚠️ Il verso NON si deduce da nx: mirando dritto in su nx vale 0 e verrebbe sempre "destra"
+    // anche mirando da sinistra. Si prende da dove GUARDA il personaggio, che e' l'unica cosa
+    // sempre definita (bug del playtest: arma rivolta dalla parte opposta al colpo).
+    this._weaponFlip = this.facing < 0;
+    // Quanto resta in mano dopo il colpo. ⚠️ DEVE coprire l'intervallo tra un colpo e l'altro:
+    // era fisso a 220ms mentre le armi sparano ogni 230-640ms, quindi tra un colpo e il
+    // successivo l'arma SPARIVA — e con lei la posa di mira, che ricadeva su idle/corsa. Ecco
+    // da dove venivano i tre difetti segnalati insieme nel playtest: arma che lampeggia,
+    // corsa+sparo a scatti, idle+sparo a scatti.
+    this._weaponHideAt = this.time.now + Math.max(240, (window.GameState.player.shotCooldown || 340) + 90);
     this.positionWeapon();
   }
 
@@ -2586,7 +2729,9 @@ class GameScene extends Phaser.Scene {
     const reachScale = 1 + (window.GameState.player.attackRange - 1) * 0.5;
     w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale * reachScale).setVisible(true);
     this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
-    this._weaponHideAt = this.time.now + 240;
+    // Come per il getto: deve coprire l'intervallo tra una bastonata e l'altra, se no il coton
+    // fioc lampeggia tra un colpo e il successivo (segnalato nel playtest).
+    this._weaponHideAt = this.time.now + Math.max(240, (window.GameState.player.attackCooldown || 360) + 60);
     this.positionWeapon();
     // FlipX (non FlipY, il bug originale) per l'orientamento dei pixel + rotazione "π - θ"
     // (NON la semplice negazione -θ, che sposta l'arco anche in verticale — verificato con
@@ -2612,18 +2757,27 @@ class GameScene extends Phaser.Scene {
       // ⚠️ Resta il limite noto: il BRACCIO disegnato non segue, quindi mirando dritto in su
       // l'arma sembra ancora sospesa. Si chiude ridisegnando le due armi CON l'avambraccio
       // attaccato e il perno alla spalla — vedi HANDOFF §Posa d'attacco.
-      const a = this._weaponAim;
+      // ⚠️ IL VERSO SI RILEGGE OGNI FOTOGRAMMA, non si usa quello congelato allo sparo.
+      // L'arma resta in mano per qualche decimo dopo il colpo, e in quel tempo il giocatore
+      // puo' girarsi: prima la MANO si specchiava (usa `this.facing`) ma il PUNTAMENTO no, e
+      // si vedeva l'arma dal lato sbagliato rivolta dove non stava sparando. Ora se il corpo
+      // si e' girato l'arma lo segue, specchiando l'angolo attorno alla verticale (π - θ:
+      // stessa altezza, direzione ribaltata). Il colpo gia' partito continua per la sua strada,
+      // che e' giusto — quello che si e' girato e' il personaggio.
+      const flipOra = this.facing < 0;
+      const a = (flipOra !== this._weaponFlip) ? (Math.PI - this._weaponAim) : this._weaponAim;
       // Se il corpo ha preso una POSA DI MIRA, l'arma va nella MANO disegnata. L'arco della
       // spalla resta per gli altri casi (in aria, o nei fotogrammi in cui la posa non c'e').
       const posa = this._posaMira;
       if (posa) {
-        const t = (posa === 'corsa')
-          ? GameScene.MANO.corsa[(this.heroVisual.anims.currentFrame
-            ? this.heroVisual.anims.currentFrame.index - 1 : 0) % GameScene.MANO.corsa.length]
-          : GameScene.MANO[posa];
-        const verso = this.facing < 0 ? -1 : 1;
+        // Alcune pose sono un CICLO e hanno una mano per fotogramma (corsa, sparo accovacciato);
+        // le altre sono ferme e ne hanno una sola. Si distinguono da sole: basta guardare se
+        // la voce e' un elenco, invece di tenere due strade separate che possono divergere.
+        const voce = GameScene.MANO[posa];
+        const t = Array.isArray(voce[0]) ? voce[this.fotogrammaCorrente() % voce.length] : voce;
+        const verso = flipOra ? -1 : 1;
         w.setPosition(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1]);
-        w.setFlipY(this._weaponFlip);
+        w.setFlipY(flipOra);
         w.setRotation(a);
         return;
       }
@@ -2631,16 +2785,55 @@ class GameScene extends Phaser.Scene {
       // Spostamento in AVANTI costante oltre all'arco: mirando dritto in su o in giu' il coseno
       // e' zero, e senza questo l'arma finirebbe sull'asse del corpo — anzi un filo dietro, per
       // via del perno dentro l'immagine — invece che dal lato in cui stai guardando.
-      const avanti = (this.facing < 0 ? -1 : 1) * GameScene.BRACCIO_AVANTI;
+      const avanti = (flipOra ? -1 : 1) * GameScene.BRACCIO_AVANTI;
       w.setPosition(this.player.x + avanti + Math.cos(a) * GameScene.BRACCIO_RAGGIO,
         this.player.y + GameScene.BRACCIO_SPALLA * raccorcia + Math.sin(a) * GameScene.BRACCIO_RAGGIO);
-      w.setFlipY(this._weaponFlip);
+      w.setFlipY(flipOra);
       w.setRotation(a);
       return;
     }
-    // Corpo a corpo: resta appesa alla mano, perche' li' e' il TWEEN a disegnare l'arco del colpo.
+    // CORPO A CORPO. Se sta girando l'animazione del colpo, l'arma sta nella MANO DISEGNATA e
+    // punta come punta il braccio: mano e angolo vengono dal fotogramma corrente, quindi non
+    // possono sfasarsi rispetto al corpo. Se l'animazione non c'e' (in aria, accovacciato) resta
+    // il vecchio comportamento: appesa a un punto fisso, con l'arco disegnato dal tween.
+    if (this.heroVisual.texture.key === 'hero_melee') {
+      const i = this.fotogrammaCorrente() % GameScene.MANO.mischia.length;
+      const t = GameScene.MANO.mischia[i];
+      const verso = this.facing < 0 ? -1 : 1;
+      this.tweens.killTweensOf(w);
+      w.setPosition(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1]);
+      const a = GameScene.MISCHIA_ANGOLO[i];
+      w.setFlipX(false);
+      w.setFlipY(verso < 0);
+      w.setRotation(verso < 0 ? Math.PI - a : a);
+      return;
+    }
     const hx = cfg.hand[0] * (this.facing < 0 ? -1 : 1);
     w.setPosition(this.player.x + hx, this.player.y + cfg.hand[1]);
+  }
+
+  // Numero del fotogramma mostrato adesso dal personaggio (0 se non sta girando nessun ciclo).
+  // Phaser conta i fotogrammi da 1, qui servono da 0.
+  fotogrammaCorrente() {
+    const f = this.heroVisual.anims.currentFrame;
+    return f ? f.index - 1 : 0;
+  }
+
+  // DOVE STA LA PUNTA CHE SPARA, in coordinate del mondo. Serve per far nascere i proiettili
+  // dall'ugello dello spruzzino: prima partivano da un cerchietto attorno al CORPO e si vedevano
+  // uscire dalla pancia, mentre l'arma era disegnata in mano da tutt'altra parte (playtest).
+  // Si parte dall'offset misurato sul disegno (`cfg.bocca`, in pixel dell'immagine), lo si
+  // scala, lo si specchia se l'arma e' ribaltata, e infine lo si RUOTA come l'arma: cosi' la
+  // bocca resta la bocca in tutte e otto le direzioni di mira.
+  boccaArma() {
+    const w = this.heroWeapon;
+    const cfg = this._weaponCfg;
+    if (!w || !w.visible || !cfg || !cfg.bocca) return null;
+    const s = cfg.scale;
+    const dx = cfg.bocca[0] * s;
+    const dy = cfg.bocca[1] * s * (w.flipY ? -1 : 1);
+    const c = Math.cos(w.rotation), sn = Math.sin(w.rotation);
+    return { x: w.x + dx * c - dy * sn, y: w.y + dx * sn + dy * c };
   }
 
   damageBlock(b, dmg) {
@@ -2732,6 +2925,11 @@ class GameScene extends Phaser.Scene {
       // ad aspettare che il cronometro finisca.
       if (this.levelKind === 'siege' && !this.locked) {
         this.siegeKills += 1;
+        // ⚠️ L'interfaccia va ridisegnata QUI, non al fotogramma dopo: `levelComplete()` mette
+        // `locked` e da quel momento update() esce subito, quindi il contatore resterebbe
+        // fermo a uno in meno e l'ultimo nemico sembrerebbe non essere mai stato contato
+        // (segnalato nel playtest: "si vede il counter al nemico n-1").
+        this.updateHud();
         if (this.siegeKills >= this.siegeQuota) { this.levelComplete(); return; }
       }
       // Il cerume dei nemici ora si RACCOGLIE (pallina, come le pedane) invece di accreditarsi
@@ -2753,7 +2951,7 @@ class GameScene extends Phaser.Scene {
         this.addWaxPickup(e.x + 22, e.y - 8, true);
       } else {
         this.cameras.main.shake(110, 0.009);
-        this.hitStop(85);
+        this.hitStop(this._rimbalzoInCorso ? 30 : 85);   // vedi stompEnemy: non deve frenare il rimbalzo
         this.burst(e.bitKey, e.x, e.y, 18);
         this.maybeSpeech('kill', 0.18);   // CARATTERE COMICO: commento occasionale (non su OGNI uccisione)
       }
@@ -2784,9 +2982,24 @@ class GameScene extends Phaser.Scene {
   //   lunge (balzo verso il giocatore ~0,32s) -> recupero prima del prossimo affondo.
   // Cosi' lo scontro diventa "leggi e reagisci": puoi schivare (salto/scatto) o
   // colpirlo durante la carica per interromperlo (vedi damageEnemy).
+  // Verso in cui muoversi per raggiungere il giocatore, con una ZONA MORTA attorno allo zero.
+  // ⚠️ SENZA LA ZONA MORTA IL NEMICO VIBRA. Succede ogni volta che il giocatore e' esattamente
+  // sopra la sua testa — tipico quando sei su una rampa o una pedana: la differenza di posizione
+  // orizzontale oscilla attorno allo zero, il segno si ribalta a ogni fotogramma e il nemico
+  // sfarfalla a destra e sinistra invece di fermarsi (segnalato nel playtest).
+  // Restituisce 0 = "sei praticamente sopra di me, sto fermo", che e' uno stato STABILE: da
+  // fermo il nemico non si sposta piu', quindi non puo' rientrare in oscillazione da solo.
+  versoIlGiocatore(e) {
+    const dx = this.player.x - e.x;
+    return (Math.abs(dx) < GameScene.ZONA_MORTA) ? 0 : Math.sign(dx);
+  }
+
   groundEnemyAI(e, now) {
     const dx = this.player.x - e.x;
-    const dir = Math.sign(dx) || (e.lungeDir || 1);
+    const verso = this.versoIlGiocatore(e);
+    // Per il TELEGRAFO dell'affondo serve comunque un verso: se sei sopra la testa si tiene
+    // quello dell'ultimo balzo invece di sceglierne uno a caso.
+    const dir = verso || (e.lungeDir || 1);
 
     if (e.atkState === 'windup') {
       e.setVelocityX(0);
@@ -2827,8 +3040,12 @@ class GameScene extends Phaser.Scene {
     // che ha e' un SALTO), e a schermo si muove cosi' poco fra un balzo e l'altro che una posa
     // ferma non si nota — mentre un ciclo inventato si noterebbe eccome.
     if (e.anims && !e.anims.isPlaying) e.setFrame(0);
-    e.setVelocityX(dir * e.speed);
-    e.setFlipX(dir < 0);
+    if (verso === 0) {
+      e.setVelocityX(0);   // sei sopra di me: mi fermo (e NON tocco il verso in cui guardo,
+      return;              // se no sfarfallerebbe quello al posto del movimento)
+    }
+    e.setVelocityX(verso * e.speed);
+    e.setFlipX(verso < 0);
   }
 
   // IA della PULCE: a differenza del cerumino (un affondo telegrafato solo quando sei vicino),
@@ -2919,6 +3136,16 @@ class GameScene extends Phaser.Scene {
   // tanto. Chiamato dal loop nemici.
   bossAI(e, now) {
     const dir = Math.sign(this.player.x - e.x) || 1;
+    // ⚠️ FUORI INQUADRATURA IL BOSS NON ATTACCA. Il boss nasce lontano e si avvicina: prima
+    // sputava gia' mentre era oltre il bordo dello schermo, e al giocatore arrivavano proiettili
+    // da un nemico che non aveva ancora visto (segnalato nel playtest). Cammina lo stesso — deve
+    // avvicinarsi — ma niente sputi ne' telegrafi finche' non e' entrato.
+    // Il gorgogliante ha da sempre lo stesso cancello (vedi aggiornaNemici): qui mancava.
+    // Il margine e' generoso: l'attacco puo' partire appena il boss spunta, non quando e' gia'
+    // in mezzo allo schermo. Gli attacchi GIA' AVVIATI si lasciano finire (i return qui sotto
+    // stanno prima, cosi' un telegrafo non resta congelato a meta').
+    const cam = this.cameras.main;
+    const inQuadro = e.x > cam.scrollX - 40 && e.x < cam.scrollX + cam.width + 40;
 
     // --- REGINA DELLE CROSTE (boss del 2o tratto): ONDATA DI SCHEGGE.
     // Prima caricava in orizzontale, ma il terreno e' a colline e la carica ci andava a SCATTI
@@ -3016,6 +3243,11 @@ class GameScene extends Phaser.Scene {
     e.setVelocityX(dir * e.speed);
     e.setFlipX(dir < 0);
 
+    // Finche' e' fuori inquadratura il conto alla rovescia dello sputo viene rimandato in
+    // avanti: se lo lasciassimo maturare, il boss entrerebbe in scena scaricando in un colpo
+    // solo tutti gli sputi che si e' "risparmiato" mentre non lo vedevi.
+    if (!inQuadro) { e.nextSpit = now + (e.spitEvery || 1500); e.spitWindupAt = 0; }
+
     const enraged = e.hp <= e.maxHp * 0.5;
     if (enraged && !e._enraged) {                 // passaggio di fase (2a): FURIA
       e._enraged = true;
@@ -3043,7 +3275,7 @@ class GameScene extends Phaser.Scene {
     // Pronto + giocatore abbastanza vicino + boss a terra: parte il telegrafo dello slam.
     // Raggio allargato da 360 a 440 (round 2, D.1): con l'arco piu' verticale il boss deve
     // poter agganciare lo slam anche quando il giocatore lo tiene a distanza col getto.
-    if (now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
+    if (inQuadro && now >= (e.slamReadyAt || 0) && Math.abs(this.player.x - e.x) < 440 &&
         e._grounded) {
       if (e.bossKind === 'regina') {
         e.bossAtk = 'ondatawind';
@@ -3061,7 +3293,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
-    if (now >= (e.nextSpit || 0)) {
+    if (inQuadro && now >= (e.nextSpit || 0)) {
       if (!e.spitWindupAt) e.spitWindupAt = now;
       e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
       if (now - e.spitWindupAt >= 320) {
@@ -3075,7 +3307,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // In furia: evoca uno sgherro ogni tanto (se non ce ne sono già troppi).
-    if (enraged && now >= (e._summonAt || Number.MAX_SAFE_INTEGER)) {
+    if (inQuadro && enraged && now >= (e._summonAt || Number.MAX_SAFE_INTEGER)) {
       // La Regina chiama CROSTE (corazzate come lei): coerente con chi e', e costringe a tenere
       // la mazza in mano anche sugli sgherri invece di ripulirli col getto da lontano.
       if (this.enemies.countActive(true) < 4) this.spawnEnemy(e.bossKind === 'regina' ? 'crust' : 'blob');
@@ -3222,7 +3454,10 @@ class GameScene extends Phaser.Scene {
     this.player.body.y += (e.body.top - this.player.body.bottom);
     this.player.y = this.player.body.center.y;                // lo sprite segue subito, non al frame dopo
     // Spinta del rimbalzo (manopola di prova "rimbalzo": a 1 e' quella normale).
-    const spinta = 0.72 * (window.Taratura ? window.Taratura.v('rimbalzo') : 1);
+    // Alzata da 0,72 a 0,95 dopo il playtest ("rimbalzi troppo poco"): ora saltare in testa a un
+    // nemico ti rimanda su quasi quanto un salto vero, che e' l'altezza che il giocatore si
+    // aspetta e quella che permette di incatenare due nemici uno dopo l'altro.
+    const spinta = 0.95 * (window.Taratura ? window.Taratura.v('rimbalzo') : 1);
     this.player.setVelocityY(-p.jumpVelocity * spinta);       // rimbalzo (e blocca lo snap: vy<0)
     this.jumpsLeft = p.doubleJump ? 2 : 1;                    // puoi risaltare dopo il rimbalzo
     this.canCutJump = true;
@@ -3232,7 +3467,15 @@ class GameScene extends Phaser.Scene {
     // Sui BOSS il rimbalzo funziona lo stesso (prima li si attraversava e sembrava un bug —
     // segnalato sulla Regina), ma il danno e' ridotto: saltargli in testa non deve diventare
     // la scorciatoia per batterli.
+    // ⚠️ IL CONGELAMENTO VA ACCORCIATO, QUI. Uccidendo un nemico la fisica si ferma 85ms per dare
+    // peso al colpo — ma in un rimbalzo quel congelamento arriva DOPO che la spinta verso l'alto
+    // e' gia' stata impostata, quindi il personaggio resta appeso in aria un decimo di secondo e
+    // solo dopo schizza su. E' la causa del "rimbalzo ritardato rispetto all'impatto" segnalato
+    // nel playtest: non era la rilevazione a essere in ritardo, era la partenza a essere bloccata.
+    // Un colpetto piu' breve resta (serve a far sentire l'impatto), ma non si legge piu' come attesa.
+    this._rimbalzoInCorso = true;
     this.damageEnemy(e, Math.max(1, Math.round(p.damage * (e.kind === 'boss' ? 0.35 : 1.1))), true);
+    this._rimbalzoInCorso = false;
   }
 
   hurtPlayer(dmg, sourceX) {
@@ -3284,7 +3527,7 @@ class GameScene extends Phaser.Scene {
     const flash = this.add.circle(x, y, 34, 0xffffff, 0.8).setDepth(23);
     this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 300, ease: 'Quad.out', onComplete: () => flash.destroy() });
     this.heroVisual.setTintFill(0xffe08a);
-    this.time.delayedCall(140, () => { if (this.heroVisual && this.heroVisual.active) this.heroVisual.clearTint(); });
+    this.time.delayedCall(140, () => { if (this.heroVisual && this.heroVisual.active) this.tintaPersonaggio(); });
     this.cameras.main.shake(220, 0.012);
     this.showBanner(window.I18n.t('game_second_life'), '#ffd166');
   }
@@ -3331,7 +3574,7 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: sh, x: x + Math.cos(a) * 46, y: y + Math.sin(a) * 46, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => sh.destroy() });
     }
     this.heroVisual.setTintFill(0xffffff);                  // lampo bianco pieno sul PG
-    this.time.delayedCall(90, () => { if (this.heroVisual && this.heroVisual.active) this.heroVisual.clearTint(); });
+    this.time.delayedCall(90, () => { if (this.heroVisual && this.heroVisual.active) this.tintaPersonaggio(); });
     this.cameras.main.shake(120, 0.008);
   }
 
@@ -3532,8 +3775,12 @@ class GameScene extends Phaser.Scene {
     const steps = ['3', '2', '1', window.I18n.t('rush_go')];
     // MANOPOLA DI PROVA "durataCorsa" (src/taratura.js): a 1 e' il tempo normale.
     const rushTime = Math.round((Math.round(this.worldW / 115) * 1000 + 11000)
+      * window.CONFIG.DURATA_CORSA
       * (window.Taratura ? window.Taratura.v('durataCorsa') : 1));
-    this.rushLeftMs = steps.length * STEP + rushTime;   // il cronometro scade DOPO il VIA
+    // Il conto alla rovescia non consuma piu' cronometro: dal round 5 i cronometri sono FERMI
+    // finche' il livello non e' davvero cominciato (vedi `avvioAl`), quindi il tempo scritto qui
+    // e' tutto e solo tempo di gioco. Prima ci si sommava la durata del 3-2-1 per compensare.
+    this.rushLeftMs = rushTime;
 
     const label = this.add.text(W / 2, H * 0.30, window.I18n.t('rush_countdown_title'), {
       fontFamily: 'monospace', fontSize: '24px', color: '#ffd166', stroke: '#14161f', strokeThickness: 5,
@@ -3685,6 +3932,10 @@ class GameScene extends Phaser.Scene {
   // Cronometri delle modalita' a tempo (assedio e corsa). Restituisce TRUE se il livello e'
   // finito qui dentro: in quel caso update() deve fermarsi subito, senza toccare altro.
   aggiornaCronometri(now, dt) {
+    // Finche' si sta leggendo il banner d'apertura il livello non e' ancora cominciato: nessun
+    // cronometro parte e nessun contatore compare (vedi `avvioAl` in create). Sarebbe ingiusto
+    // consumare secondi di assedio mentre il giocatore sta ancora capendo cosa deve fare.
+    if (this.avvioAl && now < this.avvioAl) return false;
     // ASSEDIO: si vince ELIMINANDO la quota di nemici prima che scada il cronometro.
     if (this.levelKind === 'siege') {
       this.siegeLeftMs = Math.max(0, this.siegeLeftMs - dt);
@@ -3751,7 +4002,11 @@ class GameScene extends Phaser.Scene {
     // il giocatore al suolo (attraverso il nemico) azzerandogli la velocita', quindi dopo lo snap
     // non si distinguerebbe una caduta-sulla-testa da un contatto laterale. Il rimbalzo mette
     // velocita' negativa -> lo snap qui sotto (che aggancia solo con vy >= -1) viene saltato da se'.
-    if (this.player.body.velocity.y > 60) {
+    // Soglia di caduta abbassata da 60 a 45 (playtest): serve solo a escludere il contatto
+    // LATERALE, e da fermi la velocita' verticale non supera ~18 a 60 fotogrammi al secondo
+    // (~37 se il telefono ne fa 30), quindi 45 e' ancora al sicuro. In cambio, atterrando in
+    // cima all'arco del salto il rimbalzo scatta ~15ms prima.
+    if (this.player.body.velocity.y > 45) {
       const pbody = this.player.body;
       // Dove finiranno i piedi DOPO lo snap qui sotto. Serve perche' il nemico non e' solido: se il
       // PG e' gia' entrato nella fascia d'aggancio, lo snap lo porta di colpo alla superficie
@@ -3954,11 +4209,24 @@ class GameScene extends Phaser.Scene {
 
   // Quale animazione o posa mostrare, in base a cosa sta facendo il personaggio. Non tocca
   // la fisica: decide solo cosa si vede.
+  // "Si sta muovendo?" con DUE soglie invece di una (isteresi): si comincia a considerarlo in
+  // movimento sopra i 45, e si smette solo sotto i 10. ⚠️ CON UNA SOGLIA SOLA IL PERSONAGGIO
+  // SFARFALLA: ogni volta che la velocita' balla attorno al valore unico (rinculo di un colpo,
+  // discesa di una collina, un tasto sfiorato) si alterna fra posa ferma e ciclo di corsa, e il
+  // ciclo RIPARTE OGNI VOLTA dal primo disegno. A schermo si legge come un'animazione a scatti —
+  // e' il difetto segnalato nel playtest su corsa+sparo e idle+sparo.
+  inMovimento(vx) {
+    this._inMov = this._inMov ? (vx > 10) : (vx > 45);
+    return this._inMov;
+  }
+
   animaPersonaggio(onGround) {
     const p = window.GameState.player;
+    const now2 = this.time.now;
     // Animazione (sul "vestito" this.heroVisual; la fisica resta sul player invisibile)
     this.heroVisual.setFlipX(this.facing < 0);
     const _vx = Math.abs(this.player.body.velocity.x);
+    const muovendo = this.inMovimento(_vx);
     // ACCOVACCIAMENTO (2026-07-31). Prima si accorciava solo la sagoma INVISIBILE — quella che
     // decide se passi sotto un soffitto basso — e il personaggio a schermo restava dritto: si
     // infilava in pertugi in cui a occhio non ci stava. Ora c'e' il disegno.
@@ -3971,12 +4239,25 @@ class GameScene extends Phaser.Scene {
     // POSE DI MIRA (2026-08-02): mentre l'arma a distanza e' in mano, il CORPO prende una posa
     // col braccio teso nella direzione di mira. Le pose hanno la mano VUOTA e l'arma ci si
     // infila dentro (vedi GameScene.MANO). Valgono solo A TERRA: in aria resta il salto.
+    // IL COLPO CORPO A CORPO HA LA PRECEDENZA su tutto il resto: e' un gesto breve e va lasciato
+    // finire, se no basta muovere un dito perche' il corpo torni a camminare a meta' bastonata.
+    if (this._mischiaFinoA && now2 < this._mischiaFinoA) {
+      this._posaMira = null;
+      this.tintaPersonaggio();   // l'uscita anticipata non deve saltare la velatura
+      return;
+    }
     const mirando = onGround && this._weaponMode === 'ranged' && this.heroWeapon.visible;
     this._posaMira = null;
     if (mirando) {
       if (this.crouching) {
-        this.posaMira('accovacciato', 2);
-      } else if (_vx > 10) {
+        // Accovacciato FERMO: posa tenuta. Accovacciato IN MOVIMENTO: il ciclo col braccio teso.
+        if (muovendo) {
+          this._posaMira = 'crouchaim';
+          va.play('hero_crouchaim_a', true);
+        } else {
+          this.posaMira('accovacciato', 2);
+        }
+      } else if (muovendo) {
         this._posaMira = 'corsa';
         va.play('hero_runaim_a', true);
       } else {
@@ -3990,7 +4271,7 @@ class GameScene extends Phaser.Scene {
       if (!this._wasCrouching) {
         va.play('hero_crouch_a');                      // scende
       } else if (!inTransizione) {                     // finita la discesa: fermo o in cammino
-        if (_vx > 10) {
+        if (muovendo) {
           va.play('hero_crouchwalk_a', true);
         } else if (this.heroVisual.texture.key !== 'hero_crouch') {
           // stava camminando accovacciato e si e' fermato: torna alla posa tenuta. NON si
@@ -4003,7 +4284,7 @@ class GameScene extends Phaser.Scene {
     } else if (this._wasCrouching) {
       va.playReverse('hero_crouch_a');                 // si rialza (anche se stava camminando)
     } else if (!inTransizione) {                       // ...e la risalita si lascia finire
-      if (_vx > 10) {
+      if (muovendo) {
         const key = (_vx > p.moveSpeed * 0.85) ? 'hero_run_a' : 'hero_walk_a';
         this.heroVisual.anims.play(key, true);
       } else {
@@ -4011,6 +4292,26 @@ class GameScene extends Phaser.Scene {
       }
     }
     this._wasCrouching = this.crouching;
+    this.tintaPersonaggio();
+  }
+
+  // VELATURA DELLE POSE ACCOVACCIATE (playtest round 5: "nelle posizioni in crouch il pg ha
+  // colori piu' chiari"). I due fogli dell'accovacciamento sono usciti dal generatore piu'
+  // luminosi degli altri — misurato: 108-110 di luminosita' media contro 80-86 di corsa,
+  // camminata, idle e salto — e a schermo il personaggio si SCHIARIVA ogni volta che si abbassava.
+  // ⚠️ PERCHE' NON SI CORREGGONO I DISEGNI. Provato, e buttato: la tavolozza del personaggio ha
+  // SEI SOLI livelli per canale (i multipli di 51). Ribilanciando i fogli il gradino disponibile
+  // piu' vicino cade sempre lontano dal bersaglio (misurato: si arrivava a 91 o a 71 invece che
+  // a 82), e correggendo i tre canali separatamente il personaggio perdeva anche il colore —
+  // rosso e verde scendevano di un gradino, il blu no, e veniva GRIGIO.
+  // Qui la correzione e' esatta, non tocca nessun file ed e' reversibile: una velatura scura
+  // applicata solo nei fotogrammi in cui a schermo c'e' uno dei due fogli accovacciati.
+  // (La posa di mira accovacciata NON e' in questa lista: sta sul foglio `hero_aim`, che e' gia'
+  // in tono con gli altri.)
+  tintaPersonaggio() {
+    const v = GameScene.VELATURA[this.heroVisual.texture.key];
+    if (v) this.heroVisual.setTint(v);
+    else this.heroVisual.clearTint();
   }
 
   // Intelligenza di tutte le creature vive, piu' il danno da contatto col giocatore.
@@ -4019,6 +4320,7 @@ class GameScene extends Phaser.Scene {
     const pb = this.player.getBounds();
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
+      if (e.eliteLavaggio) this.sincronizzaLavaggioElite(e);   // anche mentre emerge
       if (e.spawning) return;   // mentre emerge/cala è inerte: niente IA, sputi o danno
 
       // TERRENO (round 4): i nemici A TERRA camminano sul profilo `terrainTopAt` come il PG
@@ -4085,9 +4387,10 @@ class GameScene extends Phaser.Scene {
         } else if (e.kind === 'crust') {
           // Crosta (corazzata lenta): avanza camminando verso il giocatore. Niente
           // affondo (è una parete inesorabile), va abbattuta col corpo a corpo.
-          const dir = Math.sign(this.player.x - e.x);
+          // Stessa zona morta del cerumino, se no vibra quando gli stai sopra.
+          const dir = this.versoIlGiocatore(e);
           e.setVelocityX(dir * e.speed);
-          e.setFlipX(dir < 0);
+          if (dir !== 0) e.setFlipX(dir < 0);
         } else if (e.kind === 'flea') {
           this.fleaAI(e, now);     // Pulce: saltella di continuo verso il giocatore
         } else if (e.kind === 'hopper') {
@@ -4106,8 +4409,32 @@ class GameScene extends Phaser.Scene {
 
   // Le abilita' che vivono a ogni fotogramma: bolla compagna, colpi a ricerca, scia dello
   // scatto, alone dello scudo.
+  // ABILITA' RAFFICA RADIALE (impilabile, idea dell'utente al playtest del 2026-08-02): ogni
+  // paio di secondi parte una corona di palline tutt'attorno al personaggio.
+  // A cosa serve nel gioco: copre l'unico punto debole di un'arma che spara in una direzione
+  // sola, cioe' i nemici che ti si appiccicano ai fianchi mentre stai mirando altrove, e
+  // intanto sgretola il cerume che hai intorno senza che tu debba pensarci.
+  // ⚠️ Impilando si aggiungono DIREZIONI (4, poi 8, poi 12...), non colpi nella stessa
+  // direzione: cosi' ogni carta allarga davvero la copertura invece di raddoppiare quello che
+  // avevi gia'. Il danno di ogni pallina e' ridotto apposta (RADIALE_DANNO): e' un'arma che
+  // lavora da sola, se picchiasse quanto il getto renderebbe inutile mirare.
+  raffichaRadiale(now, p) {
+    const n = p.radiale | 0;
+    if (n <= 0 || now < (this._radialeAl || 0)) return;
+    this._radialeAl = now + window.CONFIG.RADIALE_OGNI;
+    const origine = { x: this.player.x, y: this.player.y - 6 };
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      // il 5o parametro di spawnPellet e' il moltiplicatore di danno della pallina
+      this.spawnPellet(Math.cos(a), Math.sin(a), -6, p, window.CONFIG.RADIALE_DANNO, origine);
+    }
+    this.blastFx(46);            // anello: si vede da dove parte la corona
+    window.Sfx.spray();
+  }
+
   aggiornaAbilita(now) {
     const p = window.GameState.player;
+    if (p.radiale) this.raffichaRadiale(now, p);
     if (this.companions.length) this.updateCompanions(now);
     if (p.homing) this.updateHomingShots(now);
     if (p.dashStrike) this.updateDashStrike(now);
@@ -4198,9 +4525,31 @@ class GameScene extends Phaser.Scene {
 // Scelte per MOLTIPLICAZIONE sull'arte ambra dei nemici: il blu-acciaio la raffredda (corazza),
 // il rosso la accende (esplosivo), il viola la sposta di tono senza spegnerla (si sdoppia).
 GameScene.ELITE_TINT = { tank: 0x9fc7e8, boom: 0xff7a4a, split: 0xb79bff };
+// Colori del LAVAGGIO (vedi creaLavaggioElite): questi sono SATURI sul serio, perche' non
+// vengono moltiplicati sul disegno ma stesi sopra. Sono i colori che il giocatore vede davvero.
+GameScene.ELITE_LAVAGGIO = { tank: 0x2f9bff, boom: 0xff2f14, split: 0xa64bff };
+// Quanto copre il lavaggio. Sotto ~0,45 la variante torna a non riconoscersi; sopra ~0,65 la
+// creatura diventa una sagoma piatta e non si capisce piu' che nemico sia.
+GameScene.ELITE_FORZA = 0.55;
 // Quante macchie di cerume al massimo addosso al personaggio. Senza tetto, dopo qualche minuto
 // il PG diventa una palla di cerume che cammina e non si legge piu' nulla.
 GameScene.MACCHIE_MAX = 10;
+// Quanto vicino (in pixel orizzontali) il giocatore deve essere perche' un nemico a terra
+// smetta di inseguirlo e stia fermo. Vedi versoIlGiocatore: e' l'antidoto alla vibrazione.
+GameScene.ZONA_MORTA = 16;
+// Quanto si scurisce il personaggio, foglio per foglio (vedi tintaPersonaggio). Ogni numero e'
+// il rapporto MISURATO fra la luminosita' media dei fogli di riferimento (84) e quella del
+// foglio da correggere: non e' un gusto, e' una divisione.
+//   · i due fogli accovacciati stanno a 108-110  -> 84/109 = 0,77 -> 0xc2c2c2
+//   · i due fogli nuovi stanno a 91              -> 84/91  = 0,92 -> 0xebebeb
+// (Sui nuovi lo scarto e' piccolo e da solo non si noterebbe; si corregge lo stesso perche'
+// costa niente ed evita che il personaggio cambi resa passando da un'animazione all'altra.)
+GameScene.VELATURA = {
+  hero_crouch: 0xc2c2c2,
+  hero_crouchwalk: 0xc2c2c2,
+  hero_crouchaim: 0xebebeb,
+  hero_melee: 0xebebeb,
+};
 // Dove sta la SPALLA rispetto al centro del corpo, e quanto e' lungo il braccio teso: l'arma a
 // distanza si posiziona su quell'arco, nella direzione di mira (vedi positionWeapon).
 GameScene.BRACCIO_SPALLA = -16;
@@ -4216,7 +4565,23 @@ GameScene.MANO = {
   su: [0, -63],
   accovacciato: [23, -34],
   corsa: [[31, -45], [24, -43], [23, -44], [25, -43], [28, -42], [25, -45]],
+  // Sparo camminando accovacciato: una voce per fotogramma, misurata sul foglio in due modi
+  // indipendenti (la punta della sagoma e il colore del guanto) che concordano entro 3 pixel.
+  // ⚠️ Il fotogramma 3 sta piu' indietro degli altri perche' il braccio, in quel disegno, e'
+  // venuto PIEGATO invece che teso. L'arma lo segue — e' giusto cosi', sta nella mano che c'e'
+  // disegnata — ma per un fotogramma su otto si vede rientrare. Si chiude rigenerando quel
+  // disegno, non toccando questo numero.
+  crouchaim: [[23, -32], [20, -32], [20, -31], [12, -25], [26, -33], [31, -33], [28, -31], [28, -34]],
+  // Colpo corpo a corpo: la mano gira in un arco, quindi qui c'e' anche la direzione del braccio
+  // (vedi MISCHIA_ANGOLO) e non solo il punto.
+  mischia: [[-14, -57], [-6, -61], [22, -42], [28, -26]],
 };
+// Verso in cui punta l'ARMA in ogni fotogramma del colpo, in gradi (0 = in avanti, negativo =
+// verso l'alto). Non e' una scelta estetica: sono gli angoli fra la spalla e la mano disegnata
+// in ciascuna posa, cioe' l'inclinazione che il braccio ha davvero. Presi da qui invece che da
+// un'animazione a tempo, l'arma non puo' mai sfasarsi rispetto al corpo — era il difetto della
+// versione precedente, dove il bastoncino ruotava per conto suo davanti a un corpo immobile.
+GameScene.MISCHIA_ANGOLO = [-117, -101, -29, 8].map((g) => g * Math.PI / 180);
 // Oltre questa inclinazione della mira si usa la posa col braccio in su invece di quella in
 // avanti. Le diagonali non hanno una posa loro: si sceglie la piu' vicina.
 GameScene.MIRA_SU_OLTRE = 55 * Math.PI / 180;

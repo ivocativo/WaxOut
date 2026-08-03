@@ -4,6 +4,9 @@
 #     python tools\bake_hero_sheet.py "<file1>|<file2>|..." <uscita.png> pose [livelli]
 #     python tools\bake_hero_sheet.py <video.mp4> <uscita.png> video:<n1,n2,...> [livelli] [rif=<file>]
 #
+# Opzione `scontorno=`: "macchia" (predefinito, fondo nero), "colore" (registrazione di schermo),
+# "magenta" (pose generate dal generatore di immagini, che le restituisce su magenta pieno).
+#
 # Esempi:
 #     python tools\bake_hero_sheet.py "assets\spritesheets\hero\crouch" ^
 #         assets\spritesheets\hero\hero_crouch_px.png 1,17,21,26,30,35 6
@@ -78,6 +81,39 @@ def scontorna_immagine(im):
     return Image.fromarray(a)
 
 
+def scontorna_magenta(im):
+    """Fondo MAGENTA -> trasparente. E' il caso delle pose generate dall'utente col generatore
+    di immagini, che le restituisce su magenta pieno.
+
+    ⚠️ Il magenta NON si riconosce col confronto secco a (255,0,255): la compressione della
+    generazione lo restituisce ballerino — misurato sulle pose dello sparo accovacciato, va da
+    (232,5,236) a (239,7,243). Si riconosce invece dalla FORMA del colore: rosso e blu alti,
+    verde molto piu' basso di entrambi. Nessuna parte del personaggio ci somiglia — l'arancione
+    dei guanti ha il blu basso, il celeste degli occhialini ha il rosso basso, la pelle ha il
+    verde alto — quindi la chiave non lo intacca.
+    Il bordo sfumato (~1 pixel, lo 0,26% dell'immagine) va tolto insieme al fondo: se restasse,
+    il personaggio si porterebbe dietro un alone rosa sopra allo sfondo del gioco.
+    Alla fine si tiene solo il pezzo piu' grande, che scarta eventuali firme o ritagli vaganti.
+    Qui NON serve la ginnastica dei buchi che serve alle registrazioni di schermo: il magenta e'
+    lontanissimo dai colori del personaggio, quindi il vuoto dentro l'ansa del tubo viene
+    riconosciuto come fondo da solo, senza bucare nient'altro.
+    """
+    from scipy import ndimage
+    a = np.array(im)
+    r, g, b = a[:, :, 0].astype(int), a[:, :, 1].astype(int), a[:, :, 2].astype(int)
+    meno = np.minimum(r, b)
+    fondo = ((g < 90) & (r > 130) & (b > 130) & (meno - g > 60)     # magenta pieno
+             | ((g < 150) & (meno - g > 25)))                        # bordo sfumato
+    pezzi, quanti = ndimage.label(~fondo)
+    if quanti > 1:
+        aree = ndimage.sum(np.ones_like(pezzi), pezzi, range(1, quanti + 1))
+        soggetto = pezzi == (int(np.argmax(aree)) + 1)
+    else:
+        soggetto = ~fondo
+    a[:, :, 3] = np.where(soggetto, 255, 0)
+    return Image.fromarray(a)
+
+
 def riquadro(im):
     a = np.array(im)[:, :, 3]
     ys, xs = np.nonzero(a > 40)
@@ -109,6 +145,45 @@ def casco(im):
     return bx.max() - bx.min() + 1, (bx.min() + bx.max()) / 2
 
 
+CASCO_COL_RIF = 6.68   # larghezza della parte ARANCIONE del casco dentro la cella 84x84
+
+
+def casco_colore(im):
+    """Larghezza e centro del casco trovandolo dal COLORE invece che dalla posizione.
+
+    ⚠️ Serve perche' il metro basato sulla fascia alta della sagoma (vedi `casco()`) sbaglia
+    in silenzio ogni volta che il personaggio ALZA UN BRACCIO: la parte piu' alta diventa la
+    mano, e allora sia la scala sia il centro vengono presi dal pugno. Misurato sulle pose del
+    corpo a corpo: la posa con la mazza caricata sopra la spalla dava casco 543px invece di 234,
+    e nel foglio la testa finiva 7 pixel piu' a destra che nelle altre — il personaggio
+    "sbandava" a ogni colpo.
+    Il casco invece si riconosce dal suo arancione, che nel personaggio non ha rivali: i guanti
+    sono dello stesso tono ma stanno piu' in basso, quindi fra le macchie arancioni grandi si
+    prende la piu' ALTA. Misurato su quattro pose diverse: 116, 115, 110, 113 — cioe' il 5% di
+    scarto, contro il 130% del metro vecchio sulla stessa posa.
+
+    CASCO_COL_RIF viene di conseguenza: sui tre fotogrammi in cui il metro vecchio funziona, il
+    casco misura 233px di sagoma e 112,7px di arancione, e il rig vuole 13,8px di sagoma nella
+    cella -> 13,8 x 112,7/233 = 6,68.
+    """
+    from scipy import ndimage
+    a = np.array(im)
+    r, g, b, al = (a[:, :, 0].astype(int), a[:, :, 1].astype(int),
+                   a[:, :, 2].astype(int), a[:, :, 3])
+    # Soglia stretta e verificata a mano: larga prendeva anche i guanti e le cinghie, e la
+    # "macchia arancione piu' alta" finiva per essere un pezzo di bretella.
+    arancio = (al > 40) & (r > 190) & (g > 110) & (g < 200) & (b < 110)
+    pezzi, quanti = ndimage.label(arancio)
+    if quanti == 0:
+        raise SystemExit("non trovo il casco dal colore: nessuna macchia arancione")
+    aree = ndimage.sum(np.ones_like(pezzi), pezzi, range(1, quanti + 1))
+    grandi = [k + 1 for k, x in enumerate(aree) if x > 0.3 * max(aree)]
+    cime = {k: np.nonzero(pezzi == k)[0].min() for k in grandi}
+    k = min(cime, key=cime.get)                     # la macchia arancione piu' in alto = il casco
+    ys, xs = np.nonzero(pezzi == k)
+    return xs.max() - xs.min() + 1, (xs.min() + xs.max()) / 2
+
+
 def allinea_colore(im, rif):
     """Porta i colori di `im` sulle stesse statistiche di `rif` (media e scarto, canale per
     canale, contando solo i pixel opachi).
@@ -138,6 +213,16 @@ def lut_di(livelli):
 
 def scontorna_registrazione(im):
     """Scontorno per i fotogrammi presi da una REGISTRAZIONE DI SCHERMO.
+
+    ⚠️ VERSIONE VECCHIA, CON UN DIFETTO NOTO. Lasciata com'e' perche' i fogli gia' in gioco sono
+    stati cotti con questa e rifarli non porterebbe niente al giocatore: il difetto si vede solo
+    a risoluzione piena, e qui si finisce sempre a 84x84, dove sparisce.
+    IL DIFETTO: il fondo dell'interfaccia sta a (30,30,32) e i CONTORNI del personaggio a
+    (32,33,36) — lo stesso colore. Classificare per colore, come si fa qui sotto, buca il
+    personaggio: ~1000 forellini per fotogramma.
+    **Se serve ri-cuocere un foglio dal video, copiare la versione BUONA** da
+    `tools/estrai_frame_video.py`: li' la sagoma si ricostruisce tappando i buchi e riaprendo
+    solo quelli veri, invece di provare a distinguere due colori identici.
 
     Qui non va bene lo scontorno normale, per due motivi visti sul video dell'accovacciamento:
     1. il fondo non e' nero ma il grigio dell'interfaccia (~30,31,34), mentre i CONTORNI del
@@ -247,7 +332,7 @@ def monta_video(frame, numeri, uscita, livelli, rif=None, alto=None):
     return 0
 
 
-def monta_pose(frame, sorgenti, uscita, livelli, scale_forzate=None, rif=None):
+def monta_pose(frame, sorgenti, uscita, livelli, scale_forzate=None, rif=None, metro="sagoma"):
     """Pose generate SEPARATAMENTE: ognuna rimessa in scala sul CASCO e riallineata su piedi +
     centro del casco, cosi' testa e busto restano fermi e si muovono solo le gambe.
 
@@ -255,29 +340,37 @@ def monta_pose(frame, sorgenti, uscita, livelli, scale_forzate=None, rif=None):
     aprono. Usare l'altezza come metro schiaccerebbe proprio quel movimento — che e' l'unica cosa
     che vogliamo vedere."""
     lut = lut_di(livelli)
-    casco_rif = CASCO_RIF
+    # `metro` sceglie COME si trova il casco: dalla fascia alta della sagoma (va bene finche'
+    # la testa e' il punto piu' alto) o dal suo COLORE (regge anche col braccio alzato).
+    misura = casco_colore if metro == "colore" else casco
+    casco_rif = CASCO_COL_RIF if metro == "colore" else CASCO_RIF
 
     foglio = Image.new("RGBA", (CELLA * len(frame), CELLA), (0, 0, 0, 0))
     for i, im in enumerate(frame):
+        # ⚠️ L'ORDINE DELLE OPERAZIONI CONTA, e sbagliarlo non da' errore: si MISURA PRIMA e si
+        # ritoccano i colori DOPO. Il metro "casco=colore" cerca l'arancione del casco, e
+        # l'allineamento dei colori sposta proprio quell'arancione: fatto prima, la misura
+        # impazziva (su quattro pose identiche dava 121, 104, 239, 137 invece di 116, 115, 110,
+        # 113, e una posa usciva alta 28 pixel invece di 60).
+        largo, _ = misura(im)
+        forzata = scale_forzate[i] if scale_forzate else None
+        s = forzata if forzata else casco_rif / largo
+        r = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+        _, cx = misura(r)                                 # centro del casco DOPO il ridimensionamento
+        _, _, _, piedi = riquadro(r)
         # I colori vanno portati su quelli del GIOCO, non solo resi uguali fra loro: le
         # generazioni nuove tornano piu' accese, e senza `rif` il personaggio cambierebbe resa
         # ogni volta che parte una posa di mira. Senza riferimento esterno vale la vecchia regola
         # (la prima posa detta la resa alle altre).
         if rif is not None:
-            im = allinea_colore(im, rif)
+            r = allinea_colore(r, rif)
         elif i > 0:
-            im = allinea_colore(im, frame[0])
-        largo, _ = casco(im)
-        forzata = scale_forzate[i] if scale_forzate else None
-        s = forzata if forzata else casco_rif / largo
-        r = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+            r = allinea_colore(r, frame[0])
         if lut:
             rr, gg, bb, aa = r.split()
             r = Image.merge("RGBA", (rr.point(lut), gg.point(lut), bb.point(lut), aa))
-        _, cx = casco(r)                                  # centro del casco DOPO il ridimensionamento
-        _, _, _, piedi = riquadro(r)
         foglio.alpha_composite(r, (round(i * CELLA + CELLA / 2 - cx), round(PIEDI_Y - piedi)))
-        print(f"  {sorgenti[i].name[:34]:34s} casco {largo}px -> {round(casco_rif)} (scala {s:.3f})")
+        print(f"  {sorgenti[i].name[:34]:34s} casco {largo}px -> {casco_rif:.1f} (scala {s:.4f})")
 
     uscita.parent.mkdir(parents=True, exist_ok=True)
     foglio.save(uscita)
@@ -318,7 +411,8 @@ def main():
     # e' uniforme, ma lascia PIENI i buchi CHIUSI. "colore" classifica ogni pixel per somiglianza
     # col fondo e poi tiene il pezzo piu' grande: gestisce i buchi chiusi, e serve qui perche'
     # l'ansa del tubo che esce dallo zaino ne e' uno — restava una macchia nera sulla schiena.
-    ritaglio = "macchia"
+    ritaglio = "macchia"   # "colore" = registrazione di schermo, "magenta" = pose generate
+    metro = "sagoma"       # "colore" = trova il casco dall'arancione (regge col braccio alzato)
     for arg in sys.argv[5:]:
         if arg.startswith("rif="):
             q = Path(arg[4:])
@@ -330,6 +424,8 @@ def main():
             alto = int(arg[5:])
         elif arg.startswith("scontorno="):
             ritaglio = arg[10:]
+        elif arg.startswith("casco="):
+            metro = arg[6:]
 
     if modo_video:
         numeri = [int(n) for n in terzo.split(":", 1)[1].split(",")]
@@ -355,8 +451,15 @@ def main():
         cartella = Path(sys.argv[1])
         sorgenti = [cartella / f"Image{int(n)}.png" for n in terzo.split(",")]
 
-    taglia = ((lambda q: scontorna_registrazione(Image.open(q).convert("RGBA")))
-              if ritaglio == "colore" else scontorna)
+    TAGLI = {
+        "colore": lambda q: scontorna_registrazione(Image.open(q).convert("RGBA")),
+        "magenta": lambda q: scontorna_magenta(Image.open(q).convert("RGBA")),
+        "macchia": scontorna,
+    }
+    if ritaglio not in TAGLI:
+        print(f"scontorno sconosciuto: {ritaglio} (disponibili: {', '.join(TAGLI)})")
+        return 2
+    taglia = TAGLI[ritaglio]
     frame = []
     for p in sorgenti:
         if not p.exists():
@@ -365,7 +468,7 @@ def main():
         frame.append(taglia(p))
 
     if modo_pose:
-        return monta_pose(frame, sorgenti, uscita, livelli, scale_forzate, rif)
+        return monta_pose(frame, sorgenti, uscita, livelli, scale_forzate, rif, metro)
 
     # ANCORAGGIO sul PRIMO frame (che dev'essere la posa in piedi). La scala e l'allineamento si
     # RIMISURANO sul risultato invece di fidarsi del calcolo: ridimensionando da 1300px a 62 il
