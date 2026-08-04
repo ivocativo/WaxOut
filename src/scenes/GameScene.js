@@ -249,7 +249,10 @@ class GameScene extends Phaser.Scene {
       // sporco di cerume e' la parte che colpisce (immagine 80x12, perno a 5,6 → punta a 79,3).
       // ⚠️ Scala alzata da 0,5 a 0,72 dopo il playtest: a 0,5 era un filo di 40x6 pixel e il
       // giocatore non capiva cosa avesse in mano.
-      swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.72, hand: [6, -2], bocca: [74, -3] },
+      // ⚠️ `spessore` ingrossa SOLO in altezza (moltiplica la scala verticale). Alzare `scale`
+      // avrebbe reso il bastoncino anche piu' LUNGO, cambiando la portata percepita del colpo:
+      // il playtest chiedeva un coton fioc meno sottile, non uno piu' lungo.
+      swab:    { tex: 'swab',    origin: [0.06, 0.5],  scale: 0.72, spessore: 1.7, hand: [6, -2], bocca: [74, -3] },
       hammer:  { tex: 'hammer',  origin: [0.22, 0.5],  scale: 0.9, hand: [6, -6] },
     };
     this.heroWeapon = this.add.sprite(this.player.x, this.player.y, 'sprayer').setDepth(11).setVisible(false);
@@ -1669,8 +1672,15 @@ class GameScene extends Phaser.Scene {
     // sui vecchi sprite assorbiva l'offset. NB: cfg.scale qui e' la scala RISULTANTE, usata da
     // targetScale/elite-tank/split come prima.
     const ART = {
-      enemy_blob:   { dispH: 40, hbW: 40, hbH: 34 },
-      enemy_crust:  { dispH: 40, hbW: 40, hbH: 34 },
+      // ⚠️ CERUMINO E CROSTA SONO PIU' ALTI DEGLI ALTRI, e non e' un capriccio: sono gli unici due
+      // che si devono poter colpire STANDO IN PIEDI. Dal 2026-08-03 i colpi partono dall'ugello
+      // dell'arma invece che dal centro del corpo, quindi volano a 51px dal suolo invece che a 26:
+      // con i 34px di corpo che avevano prima ci passavano sopra di 12px (segnalato nel playtest).
+      // Alzati quel tanto che basta perche' il colpo prenda, non di piu'. Per tutti gli ALTRI
+      // nemici restare bassi e' voluto: doversi abbassare per colpirli e' parte del gioco
+      // (scelta dell'utente).
+      enemy_blob:   { dispH: 52, hbW: 40, hbH: 46 },
+      enemy_crust:  { dispH: 52, hbW: 40, hbH: 46 },
       enemy_spit:   { dispH: 40, hbW: 30, hbH: 26 },
       // Moscerino: hitbox allargata (26x20 -> 34x28) e sagoma un filo piu' grande. Erano
       // "troppo difficili da colpire" (playtest 2026-07-29): un bersaglio che vola, ondeggia e
@@ -2256,7 +2266,11 @@ class GameScene extends Phaser.Scene {
     const oyy = b ? b.y : this.player.y + oy + ny * 14;
     const s = this.shots.create(ox, oyy, 'soap').setDepth(9);
     s.body.setAllowGravity(false);
-    s.body.setSize(10, 10, true);
+    // Il corpo della pallina e' piu' ALTO di quanto si vede (10x14 contro un disegno di 10):
+    // e' una tolleranza invisibile che fa perdonare qualche pixel di mira in verticale. Serve
+    // insieme all'altezza di cerumino e crosta (vedi ART in spawnEnemy): da sole, o l'una o
+    // l'altra, avrebbero dovuto essere esagerate per far combaciare colpo e bersaglio.
+    s.body.setSize(10, 14, true);
     s.setVelocity(nx * sp, ny * sp);
     s.dmg = Math.round(p.jetDamage * (rageMult || 1));
     // EVOLUZIONE "Lama d'Acqua": perfora TUTTO; altrimenti abilità PERFORANTE normale.
@@ -2565,12 +2579,15 @@ class GameScene extends Phaser.Scene {
     const aTerra = this.time.now - this.lastGroundAt < 120;
     this._mischiaFinoA = 0;
     if (aTerra && !this.crouching) {
-      const durata = Phaser.Math.Clamp((p.attackCooldown || 360) * 0.8, 140, 300);
+      // Si prende quasi tutto l'intervallo fra un colpo e l'altro, e il tetto e' alto: l'animazione
+      // deve avere il tempo di VEDERSI (playtest: "non la si riesce a vedere"). Il minimo resta
+      // perche' con la cadenza piu' rapida del gioco non c'e' spazio per fare di meglio.
+      const durata = Phaser.Math.Clamp((p.attackCooldown || 360) * 0.85, 180, 460);
       this._mischiaFinoA = this.time.now + durata;
       this.heroVisual.anims.play({ key: 'hero_melee_a', duration: durata });
     }
     this.showMeleeWeapon(M.tex);            // arma in mano, agganciata alla mano disegnata
-    const range = M.portata * p.attackRange;
+    const range = M.portata * p.attackRange * window.CONFIG.MISCHIA_PORTATA;
     const halfH = M.altezza;
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
     const ax = this.facing > 0 ? this.player.x + 4 : this.player.x - range - 4;
@@ -2701,7 +2718,8 @@ class GameScene extends Phaser.Scene {
     const cfg = this.WEAPONS[window.armaCorrente().getto.tex] || this.WEAPONS.sprayer;
     const w = this.heroWeapon;
     this.tweens.killTweensOf(w);
-    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale).setVisible(true);
+    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1])
+      .setScale(cfg.scale, cfg.scale * (cfg.spessore || 1)).setVisible(true);
     this._weaponMode = 'ranged'; this._weaponCfg = cfg;
     this._weaponAim = Math.atan2(ny, nx);
     // ⚠️ Il verso NON si deduce da nx: mirando dritto in su nx vale 0 e verrebbe sempre "destra"
@@ -2727,7 +2745,8 @@ class GameScene extends Phaser.Scene {
     // `p.attackRange`, smorzato a meta' (altrimenti dopo tante pescate diventerebbe assurda:
     // e' una carta "comune" ripescabile all'infinito).
     const reachScale = 1 + (window.GameState.player.attackRange - 1) * 0.5;
-    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1]).setScale(cfg.scale * reachScale).setVisible(true);
+    w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1])
+      .setScale(cfg.scale * reachScale, cfg.scale * reachScale * (cfg.spessore || 1)).setVisible(true);
     this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
     // Come per il getto: deve coprire l'intervallo tra una bastonata e l'altra, se no il coton
     // fioc lampeggia tra un colpo e il successivo (segnalato nel playtest).
@@ -2829,9 +2848,11 @@ class GameScene extends Phaser.Scene {
     const w = this.heroWeapon;
     const cfg = this._weaponCfg;
     if (!w || !w.visible || !cfg || !cfg.bocca) return null;
+    // ⚠️ La bocca si scala con la stessa deformazione dell'arma (`spessore` in verticale), se no
+    // ingrossando il coton fioc il colpo smetterebbe di partire dalla punta.
     const s = cfg.scale;
     const dx = cfg.bocca[0] * s;
-    const dy = cfg.bocca[1] * s * (w.flipY ? -1 : 1);
+    const dy = cfg.bocca[1] * s * (cfg.spessore || 1) * (w.flipY ? -1 : 1);
     const c = Math.cos(w.rotation), sn = Math.sin(w.rotation);
     return { x: w.x + dx * c - dy * sn, y: w.y + dx * sn + dy * c };
   }

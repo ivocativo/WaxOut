@@ -14,7 +14,7 @@ _**Round 5 — SFONDO** a 3 strati pittorici a set (`be4eb3c`)._
 _**✅ ESTETICA UNIFICATA (2026-07-21/22):** terreno e soffitto (`50329e1`), pedane (`31f6b3d`) e_
 _pozza scivolosa (`145e0ea`) ridisegnati VIA CODICE come massa di tessuto, in tinta col fondale._
 _Nel codice non resta piu' nessun colore della vecchia palette marrone/senape._
-_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 73 controlli automatici (§sotto)._
+_**✅ RETE DI SICUREZZA:** `python tools\controlla.py` — 74 controlli automatici (§sotto)._
 _**✅ Bug risolti:** cerume sul terreno (`d6e50cd`); cerume e nemici che tornavano al livello piatto_
 _dopo un colpo (`ae6abd4`); **salto morto nelle cunette** (`676cf35`); **pedane ancorate alla quota_
 _fissa** — sepolte nelle colline o irraggiungibili; **nemici che nascevano dentro il cerume** e_
@@ -80,6 +80,12 @@ _(2) il rimbalzo sui nemici non era in ritardo, era **bloccato** dal congelament
 _che scatta all'uccisione DOPO che la spinta e' gia' impostata;_
 _(3) le ELITE non potevano funzionare come erano fatte: `setTint` moltiplica, e su arte ambra_
 _non si puo' aggiungere il blu che nel disegno non c'e'._
+_**✅ TARATURA DOPO IL PRIMO PLAYTEST DEL ROUND 5 (2026-08-03):** coton fioc piu' spesso (+70%_
+_solo in spessore), colpo piu' lento e piu' lungo perche' l'animazione si veda (cadenza ×1,35,_
+_portata ×1,15), e cerumino/crosta alzati._
+_⚠️ **I colpi che passavano sopra i nemici erano un effetto della correzione del mattino:** da_
+_quando partono dall'ugello volano a 51px dal suolo invece che a 26, e i nemici bassi (34px) ci_
+_passavano sotto. Vedi `ROADMAP.md` §Blocco G._
 _**✅ LE DUE ANIMAZIONI NUOVE SONO FATTE (2026-08-03):** sparo camminando accovacciato_
 _(`hero_crouchaim`, 8 fotogrammi) e colpo corpo a corpo (`hero_melee`, 4 pose). Disegni_
 _dell'utente; cottura, misure e montaggio miei. Tre trappole trovate e chiuse nella lavorazione,_
@@ -176,7 +182,7 @@ Lavoro nuovo di questa sessione (logica ok, feel/aspetto da provare):
 ```
 python tools\controlla.py
 ```
-73 controlli in ~7m. Apre il gioco in un browser invisibile (Playwright), inietta
+74 controlli in ~7m. Apre il gioco in un browser invisibile (Playwright), inietta
 `tools/checks.js` ed esce con codice 1 se qualcosa e' rotto. **Ogni controllo nasce da un bug
 realmente successo** (e' annotato nel file quale): cerume sospeso sul terreno, salto morto nelle
 cunette, nemici sotto il pavimento o incastrati nelle membrane, pedane irraggiungibili o sepolte,
@@ -514,10 +520,19 @@ mentre e' sospesa) e la ripresa al ritorno / al primo tocco.
 materiale di passaggio, **non investirci altro tempo** oltre alle correzioni di stabilita'.
 
 ### ✅ APP ANDROID (Capacitor via GitHub Actions) — FATTA (2026-07-18)
+⚠️ **L'APK va messo nella CARTELLA DEL GIOCO e chiamato col nome dell'app** (richiesta
+dell'utente 2026-08-03): in Download non si trova, e `app-debug.apk` — il nome che gli da'
+Gradle, che e' quello del progetto Android e non del gioco — non dice cos'e' ne' permette di
+distinguere due versioni. Il workflow ora lo rinomina LEGGENDO `appName` da
+`capacitor.config.json`, cosi' se un domani l'app cambia nome il file lo segue da solo.
+Il server per il telefono non ha nomi scritti dentro (serve la cartella e basta), quindi il
+cambio non lo tocca.
+
 Il gioco si impacchetta in APK **nel cloud** (nessuno strumento locale): `package.json` +
 `capacitor.config.json` (webDir=www) + workflow `.github/workflows/build-android.yml`. Ciclo: push su
-main → GitHub compila → `gh run download` scarica l'APK → messo in `EarwaxWar.apk` (root, gitignored) →
-l'utente lo prende dal telefono via `GIOCA-SU-TELEFONO.cmd` (`http://<IP>:8123/EarwaxWar.apk`) e lo
+main → GitHub compila → `gh run download` scarica l'APK → messo in **`Waxout.apk`** (nella cartella
+del gioco, gitignored: `.gitignore` ha `*.apk`) →
+l'utente lo prende dal telefono via `GIOCA-SU-TELEFONO.cmd` (`http://<IP>:8123/Waxout.apk`) e lo
 installa. **Larghezza ADATTIVA** (main.js) → niente bande nere ai lati. L'app parte e gira sul telefono.
 Resta: **icona app personalizzata** (ora generica), e la pubblicazione vera sullo store (rimandata).
 

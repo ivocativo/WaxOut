@@ -49,6 +49,11 @@ window.CONFIG = {
   RADIALE_DANNO: 0.55,    // quanto vale una pallina radiale rispetto a una del getto
   RADIALE_PER_PESCA: 4,   // quante direzioni aggiunge ogni carta pescata
   DURATA_CORSA: 0.9,      // -10% al tempo dei livelli CORSA
+  // CORPO A CORPO (playtest 2026-08-03): l'animazione del colpo non si faceva in tempo a
+  // vedere. Il colpo rallenta perche' il gesto abbia il tempo di leggersi, e in cambio
+  // arriva un po' piu' lontano — cosi' il corpo a corpo non ci perde in resa.
+  MISCHIA_CADENZA: 1.35,  // quanto piu' lento e' un colpo (piu' alto = piu' lento)
+  MISCHIA_PORTATA: 1.15,  // quanto piu' lontano arriva, per compensare
   // Da questo livello in poi il cerume da pulire cala: un livello lungo il triplo non deve
   // chiedere il triplo del tempo di pulizia, o la parte finale della run diventa una corvee.
   // Quanta vita vale una "pallina" di cura: sia quelle raccolte a terra sia il recupero
@@ -281,7 +286,7 @@ window.GameState = {
       damage: Math.round((26 + lv('dmg') * U.dmg.per) * M.danno * TD * window.CONFIG.DANNO_PG),
       moveSpeed: 220 + lv('speed') * U.speed.per,
       jumpVelocity: 560,
-      attackCooldown: M.cadenza,   // ms tra una bastonata e l'altra (corpo a corpo automatico)
+      attackCooldown: Math.round(M.cadenza * window.CONFIG.MISCHIA_CADENZA),   // ms tra una bastonata e l'altra
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
       jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno * TD * window.CONFIG.DANNO_PG),  // un po' sotto al corpo a corpo

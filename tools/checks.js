@@ -577,7 +577,12 @@ window.__earwaxChecks = function (opts) {
     avanza(gs, 4);                                     // un attimo per assestarsi a terra
     if (gs.spawnTimer) gs.spawnTimer.remove();          // (di nuovo: avanza potrebbe averlo ricreato? no, ma sicuri)
     gs.platforms.getChildren().forEach((p) => { if (p.active && Math.abs(p.x - e.x) < 100) p.destroy(); });
-    gs.blocks.getChildren().forEach((b) => { if (b.active && Math.abs(b.x - e.x) < 90 && b.y < e.body.top + 10) b.destroy(); });
+    // ⚠️ SI LIBERA TUTTA LA COLONNA, senza legare il criterio all'altezza del nemico. Prima era
+    // `b.y < e.body.top + 10`, e il 2026-08-03 — alzando cerumino e crosta di 12px perche' i colpi
+    // in piedi li prendessero — quel criterio ha smesso di rimuovere i blocchi all'altezza delle
+    // spalle: il giocatore ci atterrava sopra e non arrivava mai alla testa. Il controllo
+    // segnalava "salto sui nemici rotto" mentre il gioco era a posto.
+    gs.blocks.getChildren().forEach((b) => { if (b.active && Math.abs(b.x - e.x) < 90) b.destroy(); });
     const hpNemicoPrima = e.hp;
     window.GameState.player.hp = 100; gs.invulnUntil = 0;   // via il god-mode: il danno deve contare
     gs.player.body.reset(e.x, e.body.top - 50);        // 50px sopra la testa del nemico
@@ -638,8 +643,13 @@ window.__earwaxChecks = function (opts) {
     avanza(gsArm, 12);
     const pArm = window.GameState.player;
     const base = window.ARMI.find((a) => a.id === 'fioc');
+    // ⚠️ La cadenza attesa si RICAVA dalla manopola `MISCHIA_CADENZA` invece di confrontarla col
+    // numero grezzo del kit. Scritta a mano, questo controllo si rompeva a ogni taratura del
+    // corpo a corpo pur essendo il gioco a posto — successo il 2026-08-03, quando il colpo e'
+    // stato rallentato perche' l'animazione si vedesse (486 invece di 360).
+    const cadenzaAttesa = Math.round(base.mischia.cadenza * window.CONFIG.MISCHIA_CADENZA);
     const restaBase = pArm.arma === 'fioc'
-      && pArm.attackCooldown === base.mischia.cadenza
+      && pArm.attackCooldown === cadenzaAttesa
       && pArm.shotLife === base.getto.gittata
       && window.armaCorrente().mischia.portata === base.mischia.portata;
     window.Meta.setArma(armaSalvata || 'fioc');
@@ -1336,7 +1346,59 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [33] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [33] I COLPI IN PIEDI PRENDONO CERUMINO E CROSTA (playtest 2026-08-03). Dal momento in cui i
+  // colpi partono dall'UGELLO invece che dal centro del corpo volano molto piu' in alto (51px dal
+  // suolo invece di 26), e passavano sopra la testa dei nemici bassi. Cerumino e crosta sono stati
+  // alzati apposta perche' si possano colpire stando in piedi; per gli ALTRI restare bassi e'
+  // voluto (ci si deve abbassare — scelta dell'utente), e questo controllo verifica anche quello,
+  // se no basterebbe alzare tutti i nemici per farlo passare e si perderebbe la distinzione.
+  {
+    fermaMeta();
+    window.GameState.reset();
+    window.GameState.level = 3;
+    window.GameState.prossimoLivello = { kind: 'normal', mutator: null, waxMult: 1 };
+    g.scene.start('GameScene');
+    passaTick();
+    const gsH = g.scene.getScene('GameScene');
+    avanza(gsH, 24);
+    gsH.enemies.getChildren().slice().forEach((e) => { if (e.active) e.destroy(); });
+
+    // altezza a cui vola un colpo sparato IN PIEDI con mira orizzontale
+    const suolo = gsH.terrainTopAt(gsH.player.x);
+    gsH.facing = 1;
+    gsH.lastShot = -1e9;
+    gsH.shots.getChildren().slice().forEach((s) => { if (s.active) s.destroy(); });
+    gsH.fireJet(1, 0);
+    const pal = gsH.shots.getChildren().find((s) => s.active);
+    const bordoBasso = pal ? (suolo - pal.y) - pal.body.height / 2 : 999;
+
+    // ⚠️ SI ASPETTA CHE LA COMPARSA SIA FINITA prima di misurare. Scritto senza attesa il
+    // controllo dava numeri assurdi (cerumino 62px invece di 46, gorgogliante 53 invece di 26):
+    // mentre il nemico esce dal terreno il suo disegno viene allungato con un tween, e in questa
+    // build ridimensionare il disegno ridimensiona ANCHE IL CORPO FISICO. Finche' non ha finito
+    // di uscire, la sua altezza non e' quella vera.
+    const cima = {};
+    ['blob', 'crust', 'spit', 'hopper'].forEach((k, i) => {
+      const e = gsH.spawnEnemy(k, { x: gsH.player.x + 300 + i * 80 });
+      if (!e) return;
+      for (let n = 0; n < 300 && e.active && e.spawning; n++) avanza(gsH, 1);
+      if (e.active) cima[k] = (gsH.terrainTopAt(e.x) - e.body.top);
+    });
+    const prende = (k) => cima[k] >= bordoBasso;
+    const bassi = !prende('spit') && !prende('hopper');
+
+    if (prende('blob') && prende('crust') && bassi) {
+      ok('i colpi in piedi prendono cerumino e crosta', 3,
+        'il colpo passa a ' + Math.round(bordoBasso) + 'px dal suolo; cerumino ' + Math.round(cima.blob)
+        + ' e crosta ' + Math.round(cima.crust) + ' lo intercettano, gorgogliante ' + Math.round(cima.spit)
+        + ' e saltatore ' + Math.round(cima.hopper) + ' no (ci si deve abbassare)');
+    } else {
+      ko('i colpi in piedi prendono cerumino e crosta', 3,
+        'bordo basso del colpo=' + Math.round(bordoBasso) + ' cime=' + JSON.stringify(cima));
+    }
+  }
+
+  // [34] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

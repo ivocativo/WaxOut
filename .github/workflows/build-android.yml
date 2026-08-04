@@ -87,9 +87,21 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
+      # Gradle chiama il file "app-debug.apk" e basta: e' il nome del PROGETTO Android, non del
+      # gioco. Sul telefono l'app si chiama gia' Waxout (viene da appName in
+      # capacitor.config.json), ma il file scaricato no, e con quel nome non si capisce cos'e'
+      # ne' si distinguono due versioni finite nella stessa cartella.
+      # Il nome si LEGGE da capacitor.config.json invece di riscriverlo qui: cosi' se un domani
+      # l'app cambia nome, il file lo segue da solo.
+      - name: Dai all'APK il nome dell'app
+        run: |
+          NOME=$(node -p "require('./capacitor.config.json').appName")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$NOME.apk"
+          ls -lh "$NOME.apk"
+
       - name: Carica l'APK come risultato scaricabile
         uses: actions/upload-artifact@v4
         with:
           name: waxout-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: '*.apk'
           if-no-files-found: error

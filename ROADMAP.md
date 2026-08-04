@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (73 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (74 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -619,6 +619,41 @@ video (passo regolare: conferma che l'aggancio e' quello giusto).
   da sola mentre pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
   Nel gioco copre l'unico punto debole di un'arma che spara in una direzione sola: i nemici che
   ti si appiccicano ai fianchi mentre stai mirando altrove. Controllo [31].
+
+# BLOCCO G — Taratura dopo il primo playtest del round 5 (2026-08-03) ✅ FATTO
+
+Tre segnalazioni dopo aver provato l'APK con le 19 correzioni e le due animazioni.
+
+- [x] **Coton fioc troppo sottile.** Nuova manopola `spessore` nelle `WEAPONS`: ingrossa SOLO in
+  verticale (moltiplica la scala Y). Da 8,6 a 14,7 pixel, +70%, lunghezza invariata.
+  ⚠️ Alzare `scale` sarebbe stato piu' ovvio ma sbagliato: avrebbe reso il bastoncino anche piu'
+  LUNGO, cambiando la portata percepita del colpo. E la posizione della BOCCA va scalata con la
+  stessa deformazione, se no ingrossando l'arma il colpo smette di partire dalla punta.
+
+- [x] **L'animazione del colpo non si faceva in tempo a vedere.** Cadenza `×1,35` e portata
+  `×1,15` (manopole `CONFIG.MISCHIA_CADENZA` / `MISCHIA_PORTATA`, non i cinque kit a mano), e il
+  tetto della durata dell'animazione alzato da 300 a 460ms. Col coton fioc: la pausa fra i colpi
+  passa da 360 a 486ms e l'animazione da 288 a 413ms, cioe' usa l'85% dell'intervallo invece del
+  67% con un tetto che la tagliava.
+
+- [x] **I colpi sparati in piedi passavano sopra i nemici.** ⚠️ NON era un difetto vecchio: e' una
+  CONSEGUENZA della correzione del mattino. Da quando i colpi partono dall'ugello invece che dal
+  centro del corpo volano a **51px dal suolo invece che a 26**, e i nemici bassi (34px di corpo)
+  ci passavano sotto. Misurato, non stimato.
+  Rimedio in due pezzi, perche' da solo nessuno dei due bastava senza esagerare:
+  cerumino e crosta da 40 a **52px di disegno** (corpo 34 → 46), e il corpo di collisione della
+  pallina da 10 a 14px di altezza — una tolleranza invisibile, il disegno non cambia.
+  Verificato a misura: in piedi il colpo prende cerumino e crosta, e continua a passare sopra
+  gorgogliante (18px) e saltatore (14px) — per quelli ci si deve abbassare, ed e' voluto
+  (scelta dell'utente). Controllo [33], che verifica ENTRAMBE le cose: senza il secondo pezzo
+  basterebbe alzare tutti i nemici per farlo passare.
+  ⚠️ Effetto collaterale da tenere d'occhio: i due nemici alzati arrivano a 52px contro i 62 del
+  personaggio, cioe' sono cresciuti del 30%. Era il minimo perche' il colpo prendesse davvero.
+
+⚠️ Il controllo [10] ("arsenale chiuso") si e' rotto pur essendo il gioco a posto: confrontava la
+cadenza col numero grezzo del kit. Ora la RICAVA da `MISCHIA_CADENZA`, come gia' fa quello del
+boss con `VITA_NEMICI`. Regola generale: un controllo non deve mai ricopiare a mano un numero che
+il gioco puo' dirgli, se no si rompe a ogni taratura e smette di dire qualcosa.
 
 ---
 
