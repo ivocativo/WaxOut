@@ -695,6 +695,25 @@ e' verificare il principale sospettato e dargli un interruttore.
 - Vale anche come rete per lo store: su un telefono Android sconosciuto lo stesso shader potrebbe
   dare problemi, e un gioco che si blocca all'avvio e' una recensione da una stella.
 
+## ⚠️ Sospeso: una pedana fuori portata, vista UNA volta
+
+Il controllo [4] ("pedane raggiungibili") ha segnalato una pedana a 144px dal miglior appoggio,
+contro i 117 saltabili. **Una volta sola**, il 2026-08-04. Non riprodotto: 70 livelli generati
+apposta, mai; e 3 esecuzioni complete dei controlli dopo, tutte verdi.
+
+Le due ipotesi, e non c'e' prova per scegliere:
+  · il generatore ogni tanto piazza davvero una pedana isolata → difetto del gioco, raro;
+  · il controllo cerca l'appoggio solo entro 175px in ORIZZONTALE, mentre `buildPlatforms`
+    garantisce la raggiungibilita' rispetto al PROPRIO riferimento (che a volte e' una pedana un
+    po' piu' lontana) → difetto del controllo.
+
+⚠️ **NON e' stato reso piu' permissivo per farlo diventare verde**: sarebbe stato facile e
+avrebbe nascosto un possibile difetto vero. Invece adesso, quando riscatta, il controllo cerca
+l'appoggio SENZA limite di distanza e dice quale dei due casi e': "guardando lontano c'e' un
+appoggio a Npx" (finestra troppo stretta) oppure "nessun appoggio a nessuna distanza" (pedana
+davvero isolata). Alla prima occorrenza quell'informazione non c'era, ed e' il motivo per cui non
+si e' potuto decidere.
+
 ## Da fare, in ordine
 
 - [ ] **Build FIRMATA in formato AAB.** Oggi il workflow produce un APK di *debug*: Play vuole un

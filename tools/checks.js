@@ -134,6 +134,7 @@ window.__earwaxChecks = function (opts) {
     const portata = (pl.jumpVelocity * pl.jumpVelocity) / (2 * window.CONFIG.GRAVITY) * 0.82;
     const pedane = gs.platforms.getChildren().filter((p) => p.active);
     let peggiorSalto = 0, pedaneKo = 0, sepolte = 0;
+    const dettaglio = [];
     pedane.forEach((p) => {
       const cima = p.body ? p.body.top : p.y;
       const terreno = gs.terrainTopAt(p.x);
@@ -155,13 +156,36 @@ window.__earwaxChecks = function (opts) {
       });
       const salita = appoggio - cima;
       if (salita > peggiorSalto) peggiorSalto = salita;
-      if (salita > portata + 15) pedaneKo++;              // 15px di tolleranza
+      if (salita > portata + 15) {
+        pedaneKo++;
+        // ⚠️ QUANDO SCATTA, SERVE SAPERE QUALE DELLE DUE COSE E'. Il generatore garantisce che
+        // ogni pedana stia entro un salto dal PROPRIO riferimento, che a volte e' il terreno e a
+        // volte una pedana piu' bassa; questo controllo cerca l'appoggio solo entro 175px in
+        // orizzontale. Se il vero appoggio sta appena oltre, la pedana e' raggiungibile e il
+        // difetto e' nella finestra del controllo; se invece non c'e' nessun appoggio nemmeno
+        // guardando lontano, la pedana e' davvero isolata ed e' un difetto del gioco.
+        // Senza questo dettaglio, l'unica volta che e' scattato (2026-08-04, 1 volta su 2
+        // esecuzioni, e mai piu' in 70 livelli generati apposta) non si e' potuto decidere.
+        let appLontano = terreno, distLontano = -1;
+        const guarda = (q, cimaQ) => {
+          if (cimaQ <= cima) return;
+          if (cimaQ < appLontano) { appLontano = cimaQ; distLontano = Math.round(Math.abs(q.x - p.x)); }
+        };
+        pedane.forEach((q) => { if (q !== p) guarda(q, q.body ? q.body.top : q.y); });
+        gs.blocks.getChildren().forEach((b) => { if (b.active) guarda(b, b.y - B / 2); });
+        dettaglio.push('pedana a x=' + Math.round(p.x)
+          + ': salita ' + Math.round(salita) + 'px cercando entro 175px'
+          + (distLontano >= 0
+              ? '; guardando lontano c e un appoggio a ' + distLontano + 'px che la porta a '
+                + Math.round(appLontano - cima) + 'px -> probabile finestra del controllo troppo stretta'
+              : '; nessun appoggio a nessuna distanza -> pedana davvero isolata, difetto del gioco'));
+      }
     });
     if (pedaneKo === 0 && sepolte === 0) {
       ok('pedane raggiungibili', lv, pedane.length + ' pedane, salita max ' + Math.round(peggiorSalto) + '/' + Math.round(portata) + 'px');
     } else {
       const parti = [];
-      if (pedaneKo) parti.push(pedaneKo + ' oltre la portata del salto (max ' + Math.round(peggiorSalto) + ' contro ' + Math.round(portata) + ')');
+      if (pedaneKo) parti.push(pedaneKo + ' oltre la portata del salto (max ' + Math.round(peggiorSalto) + ' contro ' + Math.round(portata) + ') | ' + dettaglio.join(' | '));
       if (sepolte) parti.push(sepolte + ' sepolte dentro il terreno');
       ko('pedane raggiungibili', lv, parti.join('; '));
     }
@@ -1197,15 +1221,18 @@ window.__earwaxChecks = function (opts) {
     g.scene.start('GameScene');
     passaTick();
     const gsV = g.scene.getScene('GameScene');
-    // ⚠️ Si aspetta la CONDIZIONE, non un numero fisso di fotogrammi. Con l'attesa fissa questo
-    // controllo era BALLERINO: dal round 5 le nascite iniziali partono dopo il banner (~1,2s =
-    // ~72 fotogrammi), quindi a 40 fotogrammi si trovava un nemico solo quando per caso c'era un
-    // GUARDIANO di membrana li' vicino — e i guardiani sono sorteggiati, quindi a volte si' e a
-    // volte no. Passato una volta e fallito quella dopo senza che il gioco fosse cambiato.
-    const trovaNemico = () => gsV.enemies.getChildren()
-      .find((x) => x.active && !x.spawning && x.kind !== 'fly');
-    for (let i = 0; i < 300 && !trovaNemico(); i++) avanza(gsV, 1);
-    const e = trovaNemico();
+    // ⚠️ SI FA NASCERE IL NEMICO CHE SI VUOLE PROVARE, non si prende quello che capita.
+    // Questo controllo e' stato ballerino DUE volte per lo stesso motivo di fondo: dipendeva da
+    // cosa il livello offriva in quel momento. Prima cercava un nemico dopo un numero fisso di
+    // fotogrammi (e ne trovava uno solo se per caso c'era un guardiano li' vicino); poi prendeva
+    // il primo disponibile, e il 2026-08-04 gli e' capitato un tipo con un'IA tutta sua — pulce o
+    // saltatore — che NON usa la zona morta e quindi non sta mai fermo: il controllo segnalava
+    // una vibrazione che non c'era.
+    // La zona morta vale per i nemici che CAMMINANO verso di te (cerumino e crosta): si prova
+    // quella, esplicitamente.
+    gsV.enemies.getChildren().slice().forEach((x) => { if (x.active) x.destroy(); });
+    const e = gsV.spawnEnemy('blob', { x: gsV.player.x + 220 });
+    for (let i = 0; i < 300 && e && e.active && e.spawning; i++) avanza(gsV, 1);
     let cambi = 0, fermo = 0, campioni = 0;
     if (e) {
       // il giocatore sta esattamente sopra di lui, come stando su una pedana

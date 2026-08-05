@@ -1,0 +1,167 @@
+name: Pacchetto per Google Play (AAB firmato)
+
+# ⚠️ SI LANCIA A MANO, dal tab "Actions" del repository (pulsante "Run workflow").
+# NON parte da solo a ogni push: e' il pacchetto che si carica sullo store, non quello di prova.
+# Il giro di tutti i giorni resta l'altro workflow (build-android.yml), che continua a sfornare
+# l'APK di debug con cui si gioca sul telefono.
+#
+# COSA CAMBIA RISPETTO ALL'APK DI PROVA:
+#  1. formato AAB invece di APK — Play non accetta piu' gli APK per le app nuove;
+#  2. FIRMATO con la chiave dell'utente (senza firma, Play rifiuta il file);
+#  3. il PANNELLO DI PROVA e' spento (se no si pubblicherebbe un gioco con vita infinita);
+#  4. ha un numero di versione che cresce da solo (Play rifiuta due caricamenti con lo stesso).
+#
+# ⚠️ SERVONO QUATTRO SEGRETI nel repository (Settings -> Secrets and variables -> Actions).
+# Come si preparano e' scritto in `docs/PUBBLICARE.md`.
+#   KEYSTORE_BASE64   la chiave di firma, convertita in testo
+#   KEYSTORE_PASSWORD la password dell'archivio
+#   KEY_ALIAS         il nome della chiave dentro l'archivio
+#   KEY_PASSWORD      la password della chiave
+# ⚠️ LA CHIAVE DI FIRMA NON SI PUO' PERDERE NE' CAMBIARE: se si perde, quell'app non si puo' piu'
+# aggiornare, mai piu'. Va tenuta in un posto sicuro E in una copia di scorta.
+
+on:
+  workflow_dispatch:
+    inputs:
+      versione:
+        description: "Numero di versione mostrato ai giocatori (es. 1.0.0)"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica il codice
+        uses: actions/checkout@v4
+
+      - name: Prepara Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepara Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prepara Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Installa Capacitor
+        run: npm install
+
+      # Stessa cartella web dell'APK di prova: elenco esplicito, non "copia tutta assets/".
+      - name: Assembla la cartella web (www)
+        run: |
+          rm -rf www
+          mkdir -p www/assets/backgrounds/2 www/assets/spritesheets/hero www/assets/spritesheets/enemies
+          cp index.html www/
+          cp -r vendor src www/
+          cp -r assets/sprites assets/musica www/assets/
+          cp assets/backgrounds/2/bg2_far.jpg assets/backgrounds/2/bg2_mid.png assets/backgrounds/2/bg2_near.png www/assets/backgrounds/2/
+          cp assets/spritesheets/hero/*_px.png www/assets/spritesheets/hero/
+          cp assets/spritesheets/enemies/*.png www/assets/spritesheets/enemies/
+
+      # ⚠️ IL PASSO PIU' IMPORTANTE DI TUTTI. Si spegne il pannello di prova nella COPIA dentro www/,
+      # non nel file del repository: cosi' chi continua a lavorare al gioco se lo ritrova acceso
+      # come sempre, e non c'e' niente da ricordarsi di rimettere a posto dopo.
+      # Il controllo qui sotto NON e' una formalita': se un domani la riga in state.js cambiasse
+      # forma, la sostituzione fallirebbe IN SILENZIO e si pubblicherebbe un gioco con vita
+      # infinita e cerume gratis. Meglio una compilazione che si ferma.
+      - name: Spegni il pannello di prova
+        run: |
+          sed -i 's/PANNELLO_PROVA: true/PANNELLO_PROVA: false/' www/src/state.js
+          if ! grep -q 'PANNELLO_PROVA: false' www/src/state.js; then
+            echo "ERRORE: non sono riuscito a spegnere il pannello di prova in www/src/state.js."
+            echo "La riga cercata era 'PANNELLO_PROVA: true'. Se e' cambiata, va aggiornato questo passo."
+            exit 1
+          fi
+          echo "pannello di prova: spento nel pacchetto"
+          grep -n 'PANNELLO_PROVA' www/src/state.js
+
+      - name: Crea il progetto Android
+        run: npx cap add android
+
+      - name: Metti l'icona dell'app
+        run: cp -r android-res/. android/app/src/main/res/
+
+      # Il numero di versione. `versionCode` deve CRESCERE a ogni caricamento su Play, e non si puo'
+      # mai riusare: si prende il numero progressivo della compilazione, che cresce da solo e non
+      # dipende da nessuno che si ricordi di aggiornarlo. `versionName` e' quello che vedono i
+      # giocatori, e lo si scrive lanciando il workflow.
+      - name: Numero di versione
+        run: |
+          cat >> android/app/build.gradle <<EOF
+
+          android {
+              defaultConfig {
+                  versionCode ${{ github.run_number }}
+                  versionName "${{ inputs.versione }}"
+              }
+          }
+          EOF
+          echo "versionCode=${{ github.run_number }}  versionName=${{ inputs.versione }}"
+
+      # La chiave arriva dai segreti come testo e qui torna file. Non finisce mai nel repository
+      # ne' nei registri della compilazione.
+      - name: Rimetti insieme la chiave di firma
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/waxout.keystore"
+          ls -l "$RUNNER_TEMP/waxout.keystore"
+
+      - name: Aggiungi la firma al progetto
+        run: |
+          cat >> android/app/build.gradle <<'EOF'
+
+          android {
+              signingConfigs {
+                  rilascio {
+                      storeFile file(System.getenv("KEYSTORE_PATH"))
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.rilascio
+                  }
+              }
+          }
+          EOF
+
+      - name: Sincronizza Capacitor
+        run: npx cap sync android
+
+      - name: Compila il pacchetto (AAB firmato)
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/waxout.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      # Controllo finale: che il pacchetto sia DAVVERO firmato. Un AAB non firmato viene rifiutato
+      # da Play con un messaggio poco chiaro; meglio accorgersene qui.
+      - name: Verifica che sia firmato
+        run: |
+          AAB=$(find android -name "*.aab" | head -1)
+          echo "pacchetto: $AAB"
+          unzip -l "$AAB" | grep -qi "META-INF/.*\.RSA\|META-INF/.*\.EC\|META-INF/.*\.DSA" \
+            && echo "firma presente" \
+            || { echo "ERRORE: il pacchetto non risulta firmato"; exit 1; }
+          NOME=$(node -p "require('./capacitor.config.json').appName")
+          cp "$AAB" "$NOME-${{ inputs.versione }}.aab"
+          ls -lh "$NOME-${{ inputs.versione }}.aab"
+
+      - name: Carica il pacchetto
+        uses: actions/upload-artifact@v4
+        with:
+          name: waxout-play
+          path: '*.aab'
+          if-no-files-found: error
