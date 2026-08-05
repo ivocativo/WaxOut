@@ -4,8 +4,8 @@
 // gameplay in GameScene permette di lavorarci in parallelo da due sessioni senza
 // pestarsi i piedi: la sessione "grafica" tocca questo file, quella "gameplay" l'altro.
 //
-// GameScene mantiene piccoli metodi-richiamo di una riga (es. drawWax() ->
-// GameGfx.drawWax(this)) cosi' i punti di chiamata nel gameplay restano invariati.
+// GameScene mantiene piccoli metodi-richiamo di una riga (es. drawBackground() ->
+// GameGfx.drawBackground(this)) cosi' i punti di chiamata nel gameplay restano invariati.
 window.GameGfx = {
 
   // ---------- Sfondo ----------
@@ -552,77 +552,6 @@ window.GameGfx = {
   },
 
   // ---------- Muro di cerume ----------
-
-  // Disegna il muro come UN'UNICA massa di cerume gommosa e lucida, sovrapponendo
-  // blob arrotondati ai blocchi (cosi i bordi si fondono e non si vede piu il reticolo).
-  // Richiamata a ogni colpo per "erodere" la massa col muro.
-  drawWax(scene) {
-    const g = scene.waxGfx;
-    if (!g) return;
-    const C = window.CONFIG.COLORS;
-    const B = window.CONFIG.BLOCK;
-    g.clear();
-    const blocks = scene.blocks.getChildren().filter((b) => b.active);
-    if (!blocks.length) return;
-
-    const occ = new Set(blocks.map((b) => b.col + ',' + b.row));
-    const has = (col, row) => occ.has(col + ',' + row);
-    const PAL = {
-      soft: [C.waxSoft, C.waxSoftLight, C.waxSoftDark],
-      hard: [C.waxHard, C.waxHardLight, C.waxHardDark],
-      dirt: [C.dirt, C.dirtLight, C.dirtDark],
-    };
-
-    // 1) Ombra/base: blob scuri spostati in basso, danno spessore alla massa.
-    blocks.forEach((b) => {
-      g.fillStyle(PAL[b.waxType][2], 1);
-      g.fillCircle(b.x + 2, b.y + 4, B * 0.80);
-    });
-
-    // 2) Gocce che colano dagli sporti (blocco senza nulla sotto).
-    blocks.forEach((b) => {
-      if (b.row > 0 && !has(b.col, b.row - 1) && b.dripLen > 0) {
-        const x = b.x, y0 = b.y + B * 0.40, len = b.dripLen, w = 5;
-        g.fillStyle(PAL[b.waxType][2], 1);
-        g.fillRect(x - w / 2, y0, w, len);
-        g.fillCircle(x, y0 + len, w * 0.9);
-        g.fillStyle(PAL[b.waxType][0], 1);
-        g.fillRect(x - w / 2 + 1, y0, w - 2, len * 0.7);
-      }
-    });
-
-    // 3) Corpo principale a colore pieno; piu scuro dove e danneggiato ("livido").
-    blocks.forEach((b) => {
-      g.fillStyle(PAL[b.waxType][0], 1);
-      g.fillCircle(b.x, b.y, B * 0.76);
-    });
-    blocks.forEach((b) => {
-      const t = Phaser.Math.Clamp(b.hp / b.maxHp, 0, 1);
-      if (t < 0.98) {
-        g.fillStyle(PAL[b.waxType][2], (1 - t) * 0.55);
-        g.fillCircle(b.x, b.y, B * 0.70);
-      }
-    });
-
-    // 4) Riflessi lucidi: bordo superiore e faccia esposta + puntini speculari.
-    blocks.forEach((b) => {
-      const light = PAL[b.waxType][1];
-      if (!has(b.col, b.row + 1)) {           // niente blocco sopra = cresta
-        g.fillStyle(light, 0.6);
-        g.fillEllipse(b.x - 4, b.y - B * 0.34, B * 0.70, B * 0.34);
-      }
-      if (!has(b.col + 1, b.row)) {            // niente blocco a sinistra = faccia verso il giocatore
-        g.fillStyle(light, 0.28);
-        g.fillEllipse(b.x - B * 0.32, b.y, B * 0.26, B * 0.62);
-      }
-    });
-    blocks.forEach((b) => {
-      if (!has(b.col, b.row + 1) && !has(b.col + 1, b.row)) {
-        g.fillStyle(0xffffff, 0.5);
-        g.fillCircle(b.x - B * 0.22, b.y - B * 0.26, 2.6);
-      }
-    });
-  },
 
   // ---------- Effetti / particelle ----------
 

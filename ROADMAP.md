@@ -704,11 +704,68 @@ Quasi tutti i difetti degli ultimi giorni sono nati li' dentro.
   via anche la riga di chiamata di quello dopo.
   Restano solo `now` e `dt` come variabili locali di update(): `p` e `k` sono diventate morte
   e sono state tolte.
-- [ ] **2. Spezzare `create()`**, stessa cura e meno urgenza: e' la porta d'ingresso al gioco.
-- [ ] **3. Portare fuori la costruzione del livello**: 561 righe che non toccano ne' nemici ne'
-  combattimento, il pezzo che si stacca piu' pulito (-14% al file).
-- [ ] **4. Cercare il codice morto** lasciato da nove mesi di sostituzioni. Solo a controlli verdi.
-- [ ] **5. Riesaminare i pezzi grossi**: `spawnEnemy` (237), `bossAI` (169), `damageEnemy` (98).
+- [x] **2. Spezzare `create()` ✅ FATTO (2026-08-04): da 497 righe a 27.** Undici blocchi con un
+  nome, nella sequenza in cui nasce un livello: `preparaStatoDelLivello`, `costruisciIlCondotto`,
+  `creaIlGiocatore`, `collegaGiocatoreETelecamera`, `agganciaLeCollisioni`,
+  `mettiInCampoGuardianiEBolle`, `agganciaProiettiliEGetto`, `preparaComandi`, `popolaDiNemici`,
+  `annunciaIlLivello`, `mostraInterfaccia`. Nessuna riga di logica riscritta: i corpi sono stati
+  SPOSTATI tali e quali (script in `scratchpad/spezza_create.py`).
+  **Verificato** col confronto delle righe di codice prima/dopo: e' sparita UNA sola riga,
+  `const C = window.CONFIG.COLORS`, che era dichiarata e mai usata. Tutto il resto sono aggiunte
+  strutturali (11 intestazioni, 11 chiusure, 11 chiamate, le locali rimesse nei blocchi che le
+  usano). Piu' i 74 controlli automatici.
+  ⚠️ **TERZA TRAPPOLA**, oltre alle due gia' annotate al passo 1: prima di rimettere una
+  variabile locale in cima a un blocco, controllare che il blocco non se la dichiari GIA' da se'.
+  Successo con `gh` in `costruisciIlCondotto`: dichiarata due volte, il file non veniva piu' letto
+  e il gioco non partiva del tutto. I controlli l'hanno preso subito (il banco non riusciva
+  nemmeno ad arrivare al menu), ma a occhio non si vedeva.
+- [x] **3. Costruzione del livello portata fuori ✅ FATTO (2026-08-04).** 22 metodi (terreno,
+  soffitto, cerume, pedane, membrane, pericoli, traguardo) in `src/scenes/game_livello.js`:
+  GameScene.js passa da 4703 a 4200 righe.
+  ⚠️ **NON sono stati riscritti.** La strada ovvia era trasformarli in funzioni che ricevono la
+  scena come primo argomento, come fa `GameGfx` — ma voleva dire riscrivere ogni `this.` di 460
+  righe. Invece sono in un oggetto innestato sul PROTOTIPO
+  (`Object.assign(GameScene.prototype, window.GameLivello)`): dentro di loro `this` e' la scena
+  esattamente come prima, e i corpi sono spostati parola per parola.
+  ⚠️ `game_livello.js` va caricato PRIMA di GameScene.js (vedi `index.html`): se no non c'e'
+  niente da innestare e il gioco parte senza pavimento. La build copia tutta `src/`, quindi li'
+  non serve toccare niente.
+  Lo script (`scratchpad/sposta_livello.py`) conta le PARENTESI invece di tagliare a righe fisse:
+  con 22 metodi indovinare i confini a occhio era una scommessa, e ai passi 1 e 2 li avevo gia'
+  sbagliati due volte. Verificato col confronto delle righe: le 22 "sparite" sono le graffe di
+  chiusura e i 4 metodi scritti su una riga sola, e ricompaiono tutte con la virgola che serve
+  dentro un oggetto.
+- [x] **4. Codice morto ✅ CERCATO E TOLTO (2026-08-04): 73 righe.** Il vecchio disegnatore del
+  cerume `GameGfx.drawWax` (67 righe, sostituito dagli sprite tempo fa) piu' il suo richiamo, e
+  l'aiutante orfano `spazioSopra`.
+  ⚠️ **LA PARTE UTILE E' STATA SCARTARE I FALSI ALLARMI**, non cancellare. Il rilevatore ne
+  segnalava sei: `onPreRender` non e' nemmeno un metodo della scena (sta nella classe dell'effetto
+  grafico, e a chiamarlo e' Phaser), e i tre eventi di livello (fuggitivo dorato, ondata, frana)
+  sono chiamati da `state.js` nella forma `s.startXxx()`, che il rilevatore non riconosceva.
+  Cancellandoli si sarebbero persi tre eventi funzionanti e l'effetto sul cerume.
+  **Regola: un metodo non chiamato non e' morto finche' non si e' guardato CHI potrebbe chiamarlo
+  da fuori** — le tabelle in `state.js` e gli agganci di Phaser non passano da `this.`.
+- [x] **5. Pezzi grossi ✅ RIESAMINATI (2026-08-04): `spawnEnemy` da 242 righe a 93.** E' diventata
+  la catena di passi che gia' era: `schedaDelNemico` (statistiche del tipo, scalate col livello e
+  coi modificatori) -> `misuraDallArte` (scala e hitbox dal disegno) -> `applicaVarianti` (figlio
+  dello sdoppiamento, variante elite) -> `posizioneDiNascita`. Poi si crea lo sprite, gli si
+  attaccano i valori e parte la comparsa.
+  ⚠️ **QUESTO PASSO NON E' UN PURO SPOSTAMENTO** come i primi quattro: i blocchi ricevono e
+  restituiscono `cfg`, quindi le firme sono nuove e il confronto delle righe NON basta piu' a
+  dimostrare che non e' cambiato niente. Serve una rete diversa, ed e' `scratchpad/foto_nemici.py`:
+  fotografa TUTTE le proprieta' di ogni tipo di nemico appena nato (vita, danno, velocita', scala,
+  hitbox, offset, gravita', animazione, variante) col caso pilotato da una sequenza fissa, cosi'
+  due esecuzioni sono confrontabili. Scattata prima e dopo: **225 proprieta' su 10 casi, tutte
+  identiche.** Da riusare per qualunque altra modifica a `spawnEnemy`.
+  Tolta anche una ridondanza trovata leggendo: la gravita' dei volanti veniva spenta due volte
+  (nel ramo `if (cfg.fly)` e subito dopo per tutti). Verificato che `endSpawn` li esclude quando
+  la riaccende, quindi la riga in piu' non serviva.
+  Restano `bossAI` (180) e `comandiDelGiocatore` (108): lunghi, ma ognuno parla di UNA cosa.
+- **[obsoleto] 5. Riesaminare i pezzi grossi.** Classifica aggiornata dopo i passi 1 e 2 (2026-08-04):
+  `spawnEnemy` 242 · `bossAI` 180 · `comandiDelGiocatore` 108 · `popolaDiNemici` 102 ·
+  `damageEnemy` 98 · `aggiornaNemici` 91 · `emergeFromGround` 90 · `constructor` 83 ·
+  `buildPlatforms` 81. In tutto 16 metodi da 60 righe in su, su 175.
+  Le due funzioni-mostro non ci sono piu': restano pezzi lunghi ma ognuno parla di UNA cosa.
 
 ⚠️ **Si puo' fare senza rompere niente per due motivi, e solo per quelli:** i 68 controlli
 automatici rieseguono il gioco vero, e il 25% del file e' commento con accanto il motivo di ogni

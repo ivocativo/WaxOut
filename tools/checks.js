@@ -753,11 +753,15 @@ window.__earwaxChecks = function (opts) {
     // Fermarsi al primo faceva fallire il controllo ogni tanto per "nessuna salita" — un livello
     // generato piatto non e' un difetto del gioco, ed e' esattamente il tipo di intermittenza che
     // toglie fiducia a tutta la suite.
+    // ⚠️ SI SCEGLIE IL PENDIO E POI SI LIBERA LA ZONA, invece di cercare un punto gia' sgombro.
+    // Pretendere che il livello ne offra uno ha reso questo controllo BALLERINO una terza volta
+    // (2026-08-04): il terreno era regolarissimo — misurato su tre livelli di fila, dislivello
+    // 108-144px e pendenza massima 18px — ma in quella generazione i cumuli di cerume coprivano
+    // ogni punto abbastanza ripido, e il controllo diceva "livello troppo piatto" mentre il gioco
+    // era a posto. E' lo stesso rimedio gia' usato nel controllo del salto sui nemici: si toglie
+    // di mezzo cio' che disturba invece di sperare che non ci sia.
     let xr = null, verso = 1, meglio = 0;
-    const sgombro = (x) => !gsR.blocks.getChildren().some((b) => b.active && Math.abs(b.x - x) < 90)
-      && !gsR.enemies.getChildren().some((e) => e.active && Math.abs(e.x - x) < 90);
     for (let x = 200; x < gsR.worldW - 200; x += 4) {
-      if (!sgombro(x)) continue;
       const qui = gsR.terrainTopAt(x);
       const su = qui - gsR.terrainTopAt(x + 16);       // salita andando a destra
       const giu = qui - gsR.terrainTopAt(x - 16);      // salita andando a sinistra
@@ -768,6 +772,10 @@ window.__earwaxChecks = function (opts) {
     if (xr === null) {
       ko("i proiettili rimbalzanti non si piantano nelle colline", 3, "livello troppo piatto: pendenza massima " + meglio + "px su 16");
     } else {
+      // libera la traiettoria: un cumulo o un nemico spappolerebbero il colpo per un motivo
+      // diverso da quello in prova
+      gsR.blocks.getChildren().slice().forEach((b) => { if (b.active && Math.abs(b.x - xr) < 140) b.destroy(); });
+      gsR.enemies.getChildren().slice().forEach((e) => { if (e.active && Math.abs(e.x - xr) < 140) e.destroy(); });
       const sh = gsR.shots.create(xr, gsR.terrainTopAt(xr) - 2, 'soap');
       sh.body.setAllowGravity(false);
       sh.bounceLeft = 2;

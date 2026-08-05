@@ -90,6 +90,15 @@ _**✅ LE DUE ANIMAZIONI NUOVE SONO FATTE (2026-08-03):** sparo camminando accov
 _(`hero_crouchaim`, 8 fotogrammi) e colpo corpo a corpo (`hero_melee`, 4 pose). Disegni_
 _dell'utente; cottura, misure e montaggio miei. Tre trappole trovate e chiuse nella lavorazione,_
 _tutte SILENZIOSE (nessun errore, solo un risultato sbagliato) — vedi §Asset nuovi._
+_**✅ REVISIONE DEL CODICE COMPLETA (2026-08-04), tutti e 5 i passi.** `create()` 497->27,_
+_`update()` 460->27, `spawnEnemy()` 242->93; la costruzione del livello in un file suo_
+_(`game_livello.js`, 548 righe); 73 righe di codice morto tolte. GameScene.js da 4703 a 4230._
+_⚠️ **Le tre trappole dello spezzare una funzione lunga** (una riga sbagliata sul confine finale;_
+_i commenti che si portano via la riga di chiamata del blocco dopo; una variabile locale rimessa_
+_in cima a un blocco che gia' se la dichiarava — quest'ultima non fa nemmeno partire il gioco)._
+_⚠️ **La rete cambia col tipo di modifica:** se si SPOSTA codice basta confrontare le righe_
+_prima/dopo; se si cambiano le firme no, e serve una fotografia dei RISULTATI_
+_(`scratchpad/foto_nemici.py`). Dettagli in `ROADMAP.md` §Mappatura._
 _**✅ REVISIONE DEL CODICE AVVIATA (2026-08-02):** mappato `GameScene.js` e scoperto che il peso_
 _non stava nelle aree ma in DUE funzioni sole (`create()` 465 righe e `update()` 460, il 22% del_
 _file). **`update()` e' gia' stata spezzata: da 460 righe a 27**, nove blocchi con un nome, senza_
@@ -256,8 +265,22 @@ appena spawnato) → filtrare per `x.kind`/`x.swarmling`/`x.fugitive` o distrugg
 - `src/state.js` — costanti (`CONFIG`), `newPlayer()`, e le TABELLE: `UNLOCKS` (potenziamenti
   shop), `BLUEPRINTS` (progetti/abilità sbloccabili), `EVOLUTIONS` (fusioni), `MUTATORS`
   (modificatori di livello), `EVENTS` (eventi casuali). `Meta` sta in `src/meta.js` (localStorage).
-- `src/scenes/GameScene.js` — cuore del gioco (~4200 righe): build livello, spawn nemici, IA,
+- `src/scenes/game_livello.js` — **COME NASCE UN LIVELLO**: terreno, soffitto, cerume, pedane,
+  membrane, pericoli, traguardo. 22 metodi portati fuori da GameScene il 2026-08-04 (548 righe).
+  ⚠️ Sono METODI DELLA SCENA, non funzioni a se': vengono innestati sul prototipo
+  (`Object.assign` in fondo a GameScene.js), quindi dentro `this` E' la scena. E' il motivo per
+  cui si sono potuti spostare parola per parola. **Va caricato PRIMA di GameScene.js.**
+- `src/scenes/GameScene.js` — cuore del gioco (~4200 righe): spawn nemici, IA,
   combattimento, abilità, mutatori, tipi di livello, gocce, élite, **eventi casuali**, update loop.
+  **`create()` e `update()` sono INDICI, non blocchi.** Sono le due funzioni che da sole facevano
+  il 22% del file (497 e 460 righe); dal 2026-08-04 sono di 27 righe l'una e non contengono
+  logica, solo l'elenco ordinato dei passi. Per capire dove mettere le mani si legge l'elenco e
+  si scende nel blocco giusto. In cima a entrambe c'e' il commento che spiega **perche' l'ordine
+  e' quello**, che e' l'unica cosa non ovvia rimasta.
+  `create()` -> `preparaStatoDelLivello` -> `costruisciIlCondotto` -> `creaIlGiocatore` ->
+  `collegaGiocatoreETelecamera` -> `agganciaLeCollisioni` -> `mettiInCampoGuardianiEBolle` ->
+  `agganciaProiettiliEGetto` -> `preparaComandi` -> `popolaDiNemici` -> `annunciaIlLivello` ->
+  `mostraInterfaccia`.
   **`update()` e' un indice, non un blocco:** 27 righe che chiamano nell'ordine `aggiornaCronometri`
   → `controllaTraguardo` → `agganciaAlTerreno` → `aggiornaAmbiente` → `comandiDelGiocatore` →
   `animaPersonaggio` → `aggiornaNemici` → `aggiornaAbilita` → `chiudiFotogramma`. **L'ordine e'
