@@ -9,9 +9,11 @@
 // gioco li legge nei pochi punti dove servono. Un giocatore che non apre mai il pannello ha
 // tutti i valori a 1 e non si accorge di niente.
 //
-// ⚠️ PRIMA DI PUBBLICARE: il pannello va tolto (o nascosto dietro qualcosa di non trovabile) —
-// da' vita infinita e cerume gratis. Il gancio e' il pulsante "TARATURA" in PauseScene/MenuScene
-// e la scena TaraturaScene; togliere quelli basta.
+// ⚠️ PRIMA DI PUBBLICARE: basta mettere `CONFIG.PANNELLO_PROVA = false` in src/state.js. Da li'
+// il pulsante sparisce da menu e pausa, e tutte le manopole tornano al valore normale — god-mode
+// compreso — anche se nel telefono era rimasto salvato qualcosa da una prova precedente.
+// Fatto cosi' invece di cancellare il pannello perche' serve ancora: i numeri del gioco si
+// giudicano solo giocando, e rifarlo da capo a ogni giro di taratura non avrebbe senso.
 window.Taratura = (function () {
   const KEY = 'earwaxwar.taratura.v1';
 
@@ -28,6 +30,13 @@ window.Taratura = (function () {
     rimbalzo:     [1, 0.5, 2, 0.1],    // spinta del salto sui nemici
     fpsCerumino:  [8, 2, 20, 1],       // fotogrammi al secondo della strisciata (NON e' un moltiplicatore)
   };
+
+  // ⚠️ Si legge CONFIG QUI DENTRO e non una volta sola all'avvio: taratura.js viene caricato
+  // PRIMA di state.js (vedi index.html), quindi al momento in cui questo file viene letto
+  // `window.CONFIG` non esiste ancora. Al primo uso vero si', perche' il gioco parte dopo.
+  function acceso() {
+    return !window.CONFIG || window.CONFIG.PANNELLO_PROVA !== false;
+  }
 
   function defaults() {
     const d = {};
@@ -60,8 +69,12 @@ window.Taratura = (function () {
     // manopola sparisce, qui torna il predefinito invece di far diventare NaN mezzo gioco.
     v(id) {
       const c = CAMPI[id];
-      const x = stato[id];
       if (!c) return 1;
+      // Pannello spento (versione da pubblicare): vale il valore normale, qualunque cosa sia
+      // rimasta salvata nel telefono da una prova precedente. Cosi' spegnere l'interruttore
+      // basta davvero: non serve anche ricordarsi di rimettere le manopole a posto.
+      if (!acceso()) return c[0];
+      const x = stato[id];
       return (typeof x === 'number' && isFinite(x)) ? x : c[0];
     },
     set(id, valore) {
@@ -71,12 +84,14 @@ window.Taratura = (function () {
       return stato[id];
     },
     passo(id) { return CAMPI[id] ? CAMPI[id][3] : 0.1; },
-    godmode() { return !!stato.godmode; },
+    godmode() { return acceso() && !!stato.godmode; },
     setGodmode(on) { stato.godmode = !!on; save(); },
     // Vero se qualcosa e' stato toccato: serve solo a mostrare l'avviso "taratura attiva".
     modificata() {
-      return Object.keys(CAMPI).some((k) => this.v(k) !== CAMPI[k][0]) || !!stato.godmode;
+      return acceso() && (Object.keys(CAMPI).some((k) => this.v(k) !== CAMPI[k][0]) || !!stato.godmode);
     },
+    // Lo leggono menu e pausa per decidere se mostrare il pulsante.
+    acceso,
     reset() { stato = defaults(); save(); },
   };
 })();

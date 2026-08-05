@@ -32,7 +32,7 @@ window.GameLivello = {
     // Livello dei globi di cerume + effetto METABALL (fonde i globi in una massa liquida con
     // bordi netti). Regolabile al volo: window.__WAX_THRESH (soglia) / window.__WAX_SPREAD (raggio).
     this.waxLayer = this.add.layer().setDepth(6);
-    if (WaxMetaballFX && this.renderer.pipelines) {
+    if (window.effettoCerumeAcceso() && WaxMetaballFX && this.renderer.pipelines) {
       if (!this.game.__waxPipe) { this.renderer.pipelines.addPostPipeline('WaxMeta', WaxMetaballFX); this.game.__waxPipe = true; }
       this.waxLayer.setPostPipeline('WaxMeta');
     }

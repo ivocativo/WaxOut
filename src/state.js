@@ -35,6 +35,22 @@ window.CONFIG = {
   // dentro la finestra sana per il genere, ma se la progressione risultasse lenta questa
   // e' la prima manopola da rialzare (una sola, non i dodici prezzi).
   WAX_GAIN: 0.385,
+  // ⚠️ INTERRUTTORE DEL PANNELLO DI PROVA. A `false` il pannello delle manopole sparisce dal
+  // menu e dalla pausa, e TUTTE le manopole tornano al loro valore normale — compreso il
+  // god-mode, che resta spento. E' l'unica riga da cambiare per la versione da pubblicare:
+  // il pannello da' vita infinita e cerume gratis, non deve arrivare ai giocatori.
+  // Si spegne QUI e non cancellando il pannello perche' serve ancora a tarare il gioco: i
+  // numeri si giudicano solo giocando, e rifarlo da capo a ogni giro non avrebbe senso.
+  PANNELLO_PROVA: true,
+  // EFFETTO METABALL SUL CERUME: lo shader WebGL che fonde i globi in una massa liquida.
+  // ⚠️ E' il principale sospettato del FREEZE allo Start Run sul PC dell'utente (aperto dal
+  // 2026-07-18, mai riproducibile altrove). Si spegne in due modi:
+  //   · da qui, mettendo `false` — vale per tutti;
+  //   · aggiungendo `?nofx` all'indirizzo del gioco — vale per quella sola apertura, e serve
+  //     a PROVARE in dieci secondi se e' lui il colpevole, senza ricompilare niente.
+  // Senza l'effetto il cerume si vede a globi separati invece che come massa unica: piu'
+  // brutto, ma il gioco funziona identico.
+  EFFETTO_CERUME: true,
   // GIRO DI BILANCIAMENTO 2026-07-29 (playtest: "ai livelli alti diventa estenuante pulire il
   // cerume, ci vuole troppo tempo"). Tre manopole invece di ritoccare venti numeri sparsi:
   DANNO_PG: 1.5,          // quanto piu' forte picchia il giocatore (mischia e getto)
@@ -108,6 +124,17 @@ window.CONFIG = {
     hpGood: 0x4caf50,
     hpBad: 0xe74c3c,
   },
+};
+
+// Vero se l'effetto metaball sul cerume va acceso. Sta qui, e non dentro alla scena, perche' lo
+// deve poter chiedere anche `game_livello.js`, che viene caricato prima.
+// ⚠️ `?nofx` nell'indirizzo lo spegne per quella sola apertura: serve a capire in dieci secondi
+// se e' lui la causa del freeze sul PC, senza ricompilare e senza toccare il codice.
+window.effettoCerumeAcceso = function () {
+  try {
+    if (String(window.location.search).indexOf('nofx') !== -1) return false;
+  } catch (e) { /* niente indirizzo (doppio clic sul file): si prosegue */ }
+  return window.CONFIG.EFFETTO_CERUME !== false;
 };
 
 // Potenziamenti PERMANENTI del negozio (roguelike meta-progression).

@@ -1406,7 +1406,46 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
-  // [34] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
+  // [34] L'INTERRUTTORE DEL PANNELLO DI PROVA (2026-08-04, verso la pubblicazione). Spegnendo
+  // `CONFIG.PANNELLO_PROVA` il pannello deve sparire E tutte le manopole devono tornare al valore
+  // normale, god-mode compreso — anche se nel telefono e' rimasto salvato qualcosa da una prova
+  // precedente. E' l'unica riga che separa la versione di prova da quella pubblicabile: se si
+  // rompesse in silenzio, si pubblicherebbe un gioco con vita infinita e cerume gratis.
+  {
+    const T = window.Taratura;
+    const primaFlag = window.CONFIG.PANNELLO_PROVA;
+    // si sporcano apposta le manopole, come farebbe chi ha giocato col pannello
+    const memoria = {};
+    ['densita', 'vitaPg', 'dannoPg', 'cerume'].forEach((k) => { memoria[k] = T.v(k); T.set(k, 2.5); });
+    const gmPrima = T.godmode();
+    T.setGodmode(true);
+    const sporcoRiconosciuto = T.modificata() && T.godmode() && T.v('densita') !== 1;
+
+    window.CONFIG.PANNELLO_PROVA = false;
+    const neutre = ['densita', 'velNemici', 'dannoNemici', 'vitaNemici', 'vitaPg', 'dannoPg',
+                    'durataCorsa', 'cerume', 'rimbalzo'].every((k) => T.v(k) === 1);
+    const cerumino = T.v('fpsCerumino') === 8;   // questa NON e' un moltiplicatore: torna al suo valore
+    const gmSpento = T.godmode() === false;
+    const nonSegnalaNiente = T.modificata() === false;
+    const spento = T.acceso() === false;
+
+    // si rimette tutto com'era: gli altri controlli non devono ereditare manopole girate
+    window.CONFIG.PANNELLO_PROVA = primaFlag;
+    Object.keys(memoria).forEach((k) => T.set(k, memoria[k]));
+    T.setGodmode(gmPrima);
+
+    if (sporcoRiconosciuto && neutre && cerumino && gmSpento && nonSegnalaNiente && spento) {
+      ok('spegnendo il pannello di prova il gioco torna normale', '-',
+        'manopole girate a 2,5 e god-mode acceso; a interruttore spento tornano tutte a 1 '
+        + '(fpsCerumino a 8) e il god-mode e spento');
+    } else {
+      ko('spegnendo il pannello di prova il gioco torna normale', '-',
+        'sporcoRiconosciuto=' + sporcoRiconosciuto + ' neutre=' + neutre + ' cerumino=' + cerumino
+        + ' gmSpento=' + gmSpento + ' nonSegnalaNiente=' + nonSegnalaNiente + ' spento=' + spento);
+    }
+  }
+
+  // [35] NESSUN ERRORE JAVASCRIPT durante tutta la corsa
   if (erroriJs.length === 0) ok('nessun errore javascript', '-');
   else ko('nessun errore javascript', '-', erroriJs.slice(0, 3).join(' | '));
 

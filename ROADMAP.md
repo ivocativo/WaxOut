@@ -2,7 +2,7 @@
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
 > Stato generale + backlog completo in **`HANDOFF.md`**; descrizione gioco in `README.md`.
-> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (74 controlli);
+> Regole fisse: **prima di ogni commit lanciare `python tools\controlla.py`** (75 controlli);
 > god-mode nei test MA anche ≥1 prova SENZA; i18n EN+IT per ogni stringa nuova (niente accenti,
 > il font pixel non li rende); commit solo su richiesta dell'utente.
 
@@ -654,6 +654,58 @@ Tre segnalazioni dopo aver provato l'APK con le 19 correzioni e le due animazion
 cadenza col numero grezzo del kit. Ora la RICAVA da `MISCHIA_CADENZA`, come gia' fa quello del
 boss con `VITA_NEMICI`. Regola generale: un controllo non deve mai ricopiare a mano un numero che
 il gioco puo' dirgli, se no si rompe a ogni taratura e smette di dire qualcosa.
+
+# BLOCCO H — VERSO LA PUBBLICAZIONE (2026-08-04) 🚧
+
+## Fatto
+
+- [x] **Pannello di prova dietro un interruttore.** `CONFIG.PANNELLO_PROVA` (in `state.js`): a
+  `false` il pulsante sparisce da menu e pausa E tutte le manopole tornano al valore normale,
+  god-mode compreso — anche se nel telefono e' rimasto salvato qualcosa da una prova precedente.
+  ⚠️ NON e' stato cancellato apposta: serve ancora a tarare, e i numeri si giudicano solo giocando.
+  Controllo [34], che sporca le manopole apposta e verifica che spegnendo l'interruttore tornino
+  tutte neutre. E' l'unica riga che separa la versione di prova da quella pubblicabile: se si
+  rompesse in silenzio si pubblicherebbe un gioco con vita infinita e cerume gratis.
+- [x] **Crediti: c'erano gia'.** Verificato a schermo: il pannello "?" del menu mostra la sezione
+  CREDITI coi quattro brani e cita **"Rob Bery (Rob Bery Art)"**, la formula esatta che l'autore
+  chiede (vedi `assets/musica/FONTI.md`). Il vincolo aperto e' chiuso; erano i documenti a essere
+  rimasti indietro.
+- [x] **Informativa sulla privacy scritta** (`docs/privacy.html`, italiano + inglese).
+  Basata su una verifica del codice, non su un modello: l'unico accesso alla rete e' il
+  caricamento dei file musicali LOCALI dell'app; in `localStorage` finiscono solo progressi,
+  lingua e volume; nessun account, nessuna pubblicita', nessuna analitica.
+  ⚠️ Perche' Play la accetti deve stare a un INDIRIZZO PUBBLICO: va acceso GitHub Pages sul
+  repository (Settings → Pages → sorgente `main` cartella `/docs`), e l'indirizzo diventa
+  `https://ivocativo.github.io/earwax-war/privacy.html`. **E' un'azione dell'utente.**
+
+## Freeze sul PC allo Start Run: NON risolto, ma reso PROVABILE
+
+⚠️ Non e' riproducibile nel mio ambiente: succede sul PC dell'utente. Quello che si e' potuto fare
+e' verificare il principale sospettato e dargli un interruttore.
+- Il sospettato e' lo shader WebGL che fonde il cerume (`WaxMetaballFX`). **Verificato che e'
+  davvero attivo** e non fallisce in silenzio — cosa non ovvia, perche' e' definito in
+  `GameScene.js` ma usato da `game_livello.js`, che viene caricato PRIMA (funziona solo perche' il
+  riferimento sta dentro a un metodo, eseguito quando entrambi i file sono gia' stati letti).
+- Nuovo `CONFIG.EFFETTO_CERUME`, e soprattutto **`?nofx` nell'indirizzo**, che lo spegne per quella
+  sola apertura senza ricompilare niente. Verificato: con `?nofx` la pipeline non viene nemmeno
+  registrata.
+- **LA PROVA CHE SERVE, e la deve fare l'utente sul suo PC:** aprire il gioco normalmente e fare
+  Start Run; se si blocca, riaprire con `?nofx` in fondo all'indirizzo e riprovare. Se col `?nofx`
+  non si blocca e' lo shader; se si blocca lo stesso, il sospettato cade.
+- Vale anche come rete per lo store: su un telefono Android sconosciuto lo stesso shader potrebbe
+  dare problemi, e un gioco che si blocca all'avvio e' una recensione da una stella.
+
+## Da fare, in ordine
+
+- [ ] **Build FIRMATA in formato AAB.** Oggi il workflow produce un APK di *debug*: Play vuole un
+  AAB firmato. ⚠️ La chiave di firma la genera e la CUSTODISCE l'utente: se si perde, l'app non si
+  puo' piu' aggiornare. Il workflow dovra' anche mettere `PANNELLO_PROVA: false` da solo, cosi' non
+  ci si puo' dimenticare.
+- [ ] **Materiale della scheda:** immagine di copertina 1024x500 (manca), schermate, descrizione
+  breve e lunga. L'icona 512 c'e' gia'.
+- [ ] Azioni dell'utente: account Play Console (~25 USD una tantum, e la scelta personale/aziendale
+  non si cambia), **12 tester per 14 giorni** se l'account e' personale, questionario sulla
+  classificazione dei contenuti, accensione di GitHub Pages, commercialista se si monetizza.
 
 ---
 
