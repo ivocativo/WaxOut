@@ -39,7 +39,8 @@ obbligatoriamente.
 - Vai su GitHub → il repository → **Settings** → **Pages**
 - Sorgente: **Deploy from a branch**, ramo `main`, cartella **`/docs`** → Save
 - Dopo qualche minuto l'indirizzo sarà:
-  `https://ivocativo.github.io/earwax-war/privacy.html`
+  `https://ivocativo.github.io/WaxOut/privacy.html`
+  ⚠️ L'indirizzo distingue maiuscole e minuscole: è `WaxOut`, non `waxout`.
 - Aprilo e controlla che si veda. È quello che incollerai in Play Console.
 
 ### 3. Metti insieme i 12 tester — **inizia subito**

@@ -91,7 +91,7 @@ _(`hero_crouchaim`, 8 fotogrammi) e colpo corpo a corpo (`hero_melee`, 4 pose). 
 _dell'utente; cottura, misure e montaggio miei. Tre trappole trovate e chiuse nella lavorazione,_
 _tutte SILENZIOSE (nessun errore, solo un risultato sbagliato) — vedi §Asset nuovi._
 _**✅ REVISIONE DEL CODICE COMPLETA (2026-08-04), tutti e 5 i passi.** `create()` 497->27,_
-_`update()` 460->27, `spawnEnemy()` 242->93; la costruzione del livello in un file suo_
+_`update()` 460->27, `spawnEnemy()` 242->93, `bossAI()` 180->60; la costruzione del livello in un file suo_
 _(`game_livello.js`, 548 righe); 73 righe di codice morto tolte. GameScene.js da 4703 a 4230._
 _⚠️ **Le tre trappole dello spezzare una funzione lunga** (una riga sbagliata sul confine finale;_
 _i commenti che si portano via la riga di chiamata del blocco dopo; una variabile locale rimessa_
@@ -135,7 +135,10 @@ telefono + tablet) via Capacitor. Giocabile su PC (tastiera) e telefono (comandi
 
 - **Stack:** JavaScript + **Phaser 3** (in `vendor/`), niente build, gira anche da `file://`
   (script classici `window.*`, no moduli ES). HTML in `index.html`.
-- **Repo:** `C:\Users\ivanf\Claude\code\earwaxwar` · GitHub `ivocativo/earwax-war` (branch `main`).
+- **Repo:** `C:\Users\ivanf\Claude\code\earwaxwar` · GitHub **`ivocativo/WaxOut`** (branch `main`).
+  ⚠️ Rinominata da `earwax-war` il 2026-08-04. La CARTELLA in locale resta `earwaxwar`:
+  cambiarla romperebbe percorsi e scorciatoie senza portare niente a chi gioca. GitHub redirige
+  il vecchio indirizzo, ma il remoto e' stato riallineato al nome nuovo.
 - **Utente:** non tecnico, italiano. Spiegare in modo semplice, confermare prima di passi grossi.
 - **Regola file:** ogni file del gioco va in `code/earwaxwar/` (usare percorsi assoluti; la shell
   parte da `code/`).

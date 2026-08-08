@@ -614,7 +614,14 @@ window.__earwaxChecks = function (opts) {
     // Controlla il danno SOLO nella finestra del rimbalzo (fino a poco dopo lo stacco): un
     // eventuale colpo DOPO, quando il nemico torna e l'invuln e' scaduta, e' un colpo legittimo,
     // non un fallimento dello stomp.
-    let rimbalzoMin = 0, hpDopoRimbalzo = 100, staccoAlRimbalzo = null, testaNemico = null;
+    // ⚠️ La quota della testa si prende SUBITO, prima di far girare anche un solo fotogramma.
+    // Il commento qui sotto spiega che il nemico puo' morire sotto il piede e sparire: vero, ma
+    // registrarla solo DENTRO il ciclo non basta se muore al PRIMO passo — allora non c'e' nessun
+    // valore precedente e la misura resta vuota. Successo il 2026-08-04: il controllo segnalava
+    // un problema mentre il gioco aveva fatto tutto giusto (nemico colpito, rimbalzo avvenuto,
+    // zero danni) e mancava solo il numero da misurare.
+    let rimbalzoMin = 0, hpDopoRimbalzo = 100, staccoAlRimbalzo = null;
+    let testaNemico = e.body ? e.body.top : null;
     for (let i = 0; i < 20; i++) {
       t += 16.6; g.loop.step(t);                       // frame RAW (niente god-mode: il danno conta)
       // Quanto distavano i piedi dalla testa nel frame in cui e' partito il rimbalzo. Nasce da un

@@ -676,7 +676,8 @@ il gioco puo' dirgli, se no si rompe a ogni taratura e smette di dire qualcosa.
   lingua e volume; nessun account, nessuna pubblicita', nessuna analitica.
   ⚠️ Perche' Play la accetti deve stare a un INDIRIZZO PUBBLICO: va acceso GitHub Pages sul
   repository (Settings → Pages → sorgente `main` cartella `/docs`), e l'indirizzo diventa
-  `https://ivocativo.github.io/earwax-war/privacy.html`. **E' un'azione dell'utente.**
+  `https://ivocativo.github.io/WaxOut/privacy.html` (⚠️ maiuscole e minuscole contano).
+  **E' un'azione dell'utente.**
 
 ## Freeze sul PC allo Start Run: NON risolto, ma reso PROVABILE
 
@@ -831,7 +832,35 @@ Quasi tutti i difetti degli ultimi giorni sono nati li' dentro.
   Tolta anche una ridondanza trovata leggendo: la gravita' dei volanti veniva spenta due volte
   (nel ramo `if (cfg.fly)` e subito dopo per tutti). Verificato che `endSpawn` li esclude quando
   la riaccende, quindi la riga in piu' non serviva.
-  Restano `bossAI` (180) e `comandiDelGiocatore` (108): lunghi, ma ognuno parla di UNA cosa.
+  **`bossAI` 180 -> 60 (2026-08-04).** Spezzata nei suoi stati: `bossOnda`, `bossCaricaSalto`,
+  `bossInVolo` (ognuno restituisce TRUE se ha gestito lui il fotogramma), piu' `bossCambioFase`
+  (furia + crollo) e `bossSputo`.
+  ⚠️ Per una MACCHINA A STATI la fotografia dei valori finali non basta: conta la SEQUENZA. Serve
+  una TRACCIA — `scratchpad/traccia_boss.py` guida il boss attraverso tutti i suoi stati con caso
+  pilotato e orologio a passi fissi, e registra 2.505 valori su 63 fotogrammi, prima e dopo ogni
+  chiamata. Prima/dopo il taglio: identici.
+  ⚠️ Costruirla ha richiesto tre correzioni, tutte da ricordare se si rifa':
+  (1) al livello 10 il boss e' la REGINA, che usa l'onda e non il salto — la carica non veniva
+      mai esercitata e la traccia copriva 2 stati su 4;
+  (2) chiamando `bossAI` direttamente la TELECAMERA resta a zero, quindi il boss risulta fuori
+      inquadratura e meta' delle sue mosse non parte (e' voluto: vedi `inQuadro`);
+  (3) un FALSO POSITIVO: il primo confronto segnalava una differenza nel conteggio delle schegge,
+      ma compariva gia' nella fotografia iniziale PRIMA di ogni chiamata — erano le gocce dal
+      soffitto, che nascono a caso. Azzerate e rifatte entrambe le tracce: meglio zero differenze
+      che una differenza spiegata.
+  Trovato e corretto durante il taglio: la condizione "il boss e' nell'inquadratura" finiva sia
+  nel chiamante sia dentro `bossSputo`. Ora sta solo nel chiamante: la stessa regola in due posti
+  prima o poi diverge.
+
+  **`comandiDelGiocatore` (108): ESAMINATA e LASCIATA COM'E', di proposito.** Le cinque sezioni
+  (schiacciata/accovacciamento, movimento, salto, scatto, mira/attacco) parlano tutte della stessa
+  cosa — quello che nasce da un tasto — e sono intrecciate: il movimento legge `left`/`right`, che
+  servono anche alla mira. Spezzarla vorrebbe dire passarsi quei valori fra metodi, e il risultato
+  sarebbe piu' difficile da seguire. Il passo chiedeva di RIESAMINARE, non di spezzare per forza.
+  Trovato leggendola: il comando "giu'" era letto DUE volte con la stessa identica espressione
+  (una per accovacciarsi, una per mirare in basso). Finche' restano uguali non succede niente, ma
+  basta aggiungere un tasto a una sola delle due perche' comincino a rispondere a comandi diversi.
+  Ora e' letto una volta sola.
 - **[obsoleto] 5. Riesaminare i pezzi grossi.** Classifica aggiornata dopo i passi 1 e 2 (2026-08-04):
   `spawnEnemy` 242 · `bossAI` 180 · `comandiDelGiocatore` 108 · `popolaDiNemici` 102 ·
   `damageEnemy` 98 · `aggiornaNemici` 91 · `emergeFromGround` 90 · `constructor` 83 ·

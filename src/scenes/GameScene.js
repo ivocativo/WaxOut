@@ -2764,24 +2764,10 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  // IA del BOSS (Tappo di Cerume): avanza lento e SPUTA con telegrafo (breve carica
-  // lampeggiante prima del lancio), INTERCALATO a un "Balzo + schiacciata" a cooldown
-  // (macchina a stati in e.bossAtk: null|'slamwind'|'slamjump'). A META' VITA si INFURIA:
-  // sputo piu' frequente e a VENTAGLIO (3 vie), slam piu' frequente, evoca un cerumino ogni
-  // tanto. Chiamato dal loop nemici.
-  bossAI(e, now) {
-    const dir = Math.sign(this.player.x - e.x) || 1;
-    // ⚠️ FUORI INQUADRATURA IL BOSS NON ATTACCA. Il boss nasce lontano e si avvicina: prima
-    // sputava gia' mentre era oltre il bordo dello schermo, e al giocatore arrivavano proiettili
-    // da un nemico che non aveva ancora visto (segnalato nel playtest). Cammina lo stesso — deve
-    // avvicinarsi — ma niente sputi ne' telegrafi finche' non e' entrato.
-    // Il gorgogliante ha da sempre lo stesso cancello (vedi aggiornaNemici): qui mancava.
-    // Il margine e' generoso: l'attacco puo' partire appena il boss spunta, non quando e' gia'
-    // in mezzo allo schermo. Gli attacchi GIA' AVVIATI si lasciano finire (i return qui sotto
-    // stanno prima, cosi' un telegrafo non resta congelato a meta').
-    const cam = this.cameras.main;
-    const inQuadro = e.x > cam.scrollX - 40 && e.x < cam.scrollX + cam.width + 40;
-
+  // REGINA DELLE CROSTE: sbatte il guscio a terra e lancia tre schegge che corrono lungo il
+  // profilo del terreno. Restituisce TRUE se ha gestito lei il fotogramma: durante un attacco
+  // il boss non fa nient'altro.
+  bossOnda(e, now) {
     // --- REGINA DELLE CROSTE (boss del 2o tratto): ONDATA DI SCHEGGE.
     // Prima caricava in orizzontale, ma il terreno e' a colline e la carica ci andava a SCATTI
     // (il corpo veniva riagganciato al profilo a ogni dislivello) — bocciata dall'utente
@@ -2805,9 +2791,14 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(i * 150, () => { if (e.active && !this.locked) this.lanciaScheggia(e, verso); });
         }
       }
-      return;
+      return true;
     }
+    return false;
+  }
 
+  // Telegrafo del balzo+schiacciata: fermo, lampeggia, si accovaccia. Alla fine parte il salto.
+  // Restituisce TRUE se ha gestito lei il fotogramma.
+  bossCaricaSalto(e, now, dir) {
     // Balzo+schiacciata IN CORSO: fermo/immobile durante il telegrafo, poi balza verso il
     // giocatore; niente avanzata "normale" ne' sputo finche' non e' finito (gate e.bossAtk).
     if (e.bossAtk === 'slamwind') {
@@ -2849,8 +2840,14 @@ class GameScene extends Phaser.Scene {
         }
         e.slamShadow.setPosition(e.x, this.terrainTopAt(e.x)).setScale(1).setAlpha(0.35).setVisible(true);
       }
-      return;
+      return true;
     }
+    return false;
+  }
+
+  // Boss per aria durante la schiacciata: aggiorna l'ombra a terra (che dice DOVE cadra') e
+  // chiude l'attacco all'atterraggio. Restituisce TRUE se ha gestito lei il fotogramma.
+  bossInVolo(e, now) {
     if (e.bossAtk === 'slamjump') {
       e.setFlipX(e.slamDir < 0);
       // Ombra a terra: segue orizzontalmente, si rimpicciolisce/schiarisce mentre sale (stessa
@@ -2872,18 +2869,14 @@ class GameScene extends Phaser.Scene {
         this.bossSlamFx(e, e.x, e.y);
         e.slamReadyAt = now + (e._collapse ? 2200 : (e._enraged ? 3000 : 4500));
       }
-      return;
+      return true;
     }
+    return false;
+  }
 
-    e.setVelocityX(dir * e.speed);
-    e.setFlipX(dir < 0);
-
-    // Finche' e' fuori inquadratura il conto alla rovescia dello sputo viene rimandato in
-    // avanti: se lo lasciassimo maturare, il boss entrerebbe in scena scaricando in un colpo
-    // solo tutti gli sputi che si e' "risparmiato" mentre non lo vedevi.
-    if (!inQuadro) { e.nextSpit = now + (e.spitEvery || 1500); e.spitWindupAt = 0; }
-
-    const enraged = e.hp <= e.maxHp * 0.5;
+  // I due passaggi di fase del boss: la FURIA a meta' vita (tutti) e il CROLLO del condotto a un
+  // quarto (solo il boss finale). Scattano una volta sola ciascuno.
+  bossCambioFase(e, now, enraged) {
     if (enraged && !e._enraged) {                 // passaggio di fase (2a): FURIA
       e._enraged = true;
       this.cameras.main.shake(200, 0.01);
@@ -2891,7 +2884,6 @@ class GameScene extends Phaser.Scene {
       e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
       e._summonAt = now + 2500;
     }
-
     // FINALE, terza fase a 25% HP (round A, A.2): il condotto CROLLA. Parte la frana di cerume dal
     // soffitto (l'infrastruttura dell'evento 'quake', mai usata sui boss normali) e l'offesa sale
     // ancora — sputo a 5 vie e slam piu' ravvicinato (vedi sotto). Scatta UNA volta sola.
@@ -2906,6 +2898,61 @@ class GameScene extends Phaser.Scene {
       this.scheduleQuakePulse();
       e.spitEvery = Math.max(500, Math.round(e.spitEvery * 0.7));
     }
+  }
+
+  // Sputo col suo telegrafo: lampeggia ~0,32s e poi lancia. Quante palline dipende dalla fase.
+  bossSputo(e, now, enraged) {
+    // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
+    // ⚠️ Il "sta nell'inquadratura" NON si ricontrolla qui: lo verifica gia' chi chiama. Restare
+    // anche qui vorrebbe dire tenere la stessa regola in due posti, e prima o poi divergono.
+    if (now >= (e.nextSpit || 0)) {
+      if (!e.spitWindupAt) e.spitWindupAt = now;
+      e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
+      if (now - e.spitWindupAt >= 320) {
+        this.ripristinaTinta(e);
+        e.spitWindupAt = 0;
+        if (e._collapse) { this.spitAt(e, -240); this.spitAt(e, -120); this.spitAt(e, 0); this.spitAt(e, 120); this.spitAt(e, 240); }  // 5 vie (finale)
+        else if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
+        else this.spitAt(e, 0);
+        e.nextSpit = now + e.spitEvery;
+      }
+    }
+  }
+
+  // IA del BOSS (Tappo di Cerume): avanza lento e SPUTA con telegrafo (breve carica
+  // lampeggiante prima del lancio), INTERCALATO a un "Balzo + schiacciata" a cooldown
+  // (macchina a stati in e.bossAtk: null|'slamwind'|'slamjump'). A META' VITA si INFURIA:
+  // sputo piu' frequente e a VENTAGLIO (3 vie), slam piu' frequente, evoca un cerumino ogni
+  // tanto. Chiamato dal loop nemici.
+  bossAI(e, now) {
+    const dir = Math.sign(this.player.x - e.x) || 1;
+    // ⚠️ FUORI INQUADRATURA IL BOSS NON ATTACCA. Il boss nasce lontano e si avvicina: prima
+    // sputava gia' mentre era oltre il bordo dello schermo, e al giocatore arrivavano proiettili
+    // da un nemico che non aveva ancora visto (segnalato nel playtest). Cammina lo stesso — deve
+    // avvicinarsi — ma niente sputi ne' telegrafi finche' non e' entrato.
+    // Il gorgogliante ha da sempre lo stesso cancello (vedi aggiornaNemici): qui mancava.
+    // Il margine e' generoso: l'attacco puo' partire appena il boss spunta, non quando e' gia'
+    // in mezzo allo schermo. Gli attacchi GIA' AVVIATI si lasciano finire (i return qui sotto
+    // stanno prima, cosi' un telegrafo non resta congelato a meta').
+    const cam = this.cameras.main;
+    const inQuadro = e.x > cam.scrollX - 40 && e.x < cam.scrollX + cam.width + 40;
+
+    if (this.bossOnda(e, now)) return;
+
+    if (this.bossCaricaSalto(e, now, dir)) return;
+    if (this.bossInVolo(e, now)) return;
+
+    e.setVelocityX(dir * e.speed);
+    e.setFlipX(dir < 0);
+
+    // Finche' e' fuori inquadratura il conto alla rovescia dello sputo viene rimandato in
+    // avanti: se lo lasciassimo maturare, il boss entrerebbe in scena scaricando in un colpo
+    // solo tutti gli sputi che si e' "risparmiato" mentre non lo vedevi.
+    if (!inQuadro) { e.nextSpit = now + (e.spitEvery || 1500); e.spitWindupAt = 0; }
+
+    const enraged = e.hp <= e.maxHp * 0.5;
+    this.bossCambioFase(e, now, enraged);
+
 
     // Pronto + giocatore abbastanza vicino + boss a terra: parte il telegrafo dello slam.
     // Raggio allargato da 360 a 440 (round 2, D.1): con l'arco piu' verticale il boss deve
@@ -2927,19 +2974,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Sputo con TELEGRAFO: quando è ora di sputare, lampeggia ~0,32s poi lancia.
-    if (inQuadro && now >= (e.nextSpit || 0)) {
-      if (!e.spitWindupAt) e.spitWindupAt = now;
-      e.setTint((Math.floor(now / 80) % 2) ? 0xffe066 : (e.eliteTint || 0xffffff));
-      if (now - e.spitWindupAt >= 320) {
-        this.ripristinaTinta(e);
-        e.spitWindupAt = 0;
-        if (e._collapse) { this.spitAt(e, -240); this.spitAt(e, -120); this.spitAt(e, 0); this.spitAt(e, 120); this.spitAt(e, 240); }  // 5 vie (finale)
-        else if (enraged) { this.spitAt(e, -150); this.spitAt(e, 0); this.spitAt(e, 150); }  // ventaglio 3 vie
-        else this.spitAt(e, 0);
-        e.nextSpit = now + e.spitEvery;
-      }
-    }
+    if (inQuadro) this.bossSputo(e, now, enraged);
 
     // In furia: evoca uno sgherro ogni tanto (se non ce ne sono già troppi).
     if (inQuadro && enraged && now >= (e._summonAt || Number.MAX_SAFE_INTEGER)) {
@@ -3817,9 +3852,12 @@ class GameScene extends Phaser.Scene {
     // Mira del getto (8 direzioni): orizzontale = verso dove guardi; su/giu coi tasti
     // (frecce su/giu o W/S, oppure pad a schermo). Da fermo si mira dritto su/giu.
     const aimUp = k.UP.isDown || k.W.isDown || this.touch.aimUp;
-    const aimDown = k.DOWN.isDown || k.S.isDown || this.touch.aimDown;
+    // ⚠️ "giu'" e' lo STESSO comando che fa accovacciare (`downHeld`, in cima): era scritto due
+    // volte identico, e due copie della stessa condizione prima o poi divergono — basta che
+    // qualcuno aggiunga un tasto a una sola delle due e mirare in giu' e accovacciarsi
+    // comincerebbero a rispondere a comandi diversi.
     let adx = this.facing, ady = 0;
-    if (aimUp) ady = -1; else if (aimDown) ady = 1;
+    if (aimUp) ady = -1; else if (downHeld) ady = 1;
     if (ady !== 0 && !left && !right) adx = 0;
     // Accovacciato: si spara ORIZZONTALE (basso), non verso il pavimento.
     if (this.crouching) { ady = 0; adx = this.facing; }

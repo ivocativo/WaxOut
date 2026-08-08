@@ -131,7 +131,7 @@ e tablet Android) — l'impacchettamento con **Capacitor** è già funzionante.
 Apri Claude Code **nella cartella `C:\Users\ivanf\Claude\code`** e scrivi qualcosa come
 _"riprendiamo earwax war, da dove eravamo?"_. Il punto della situazione è in **`HANDOFF.md`**
 (inizia da lì), il piano del blocco in corso in **`ROADMAP.md`**. Repository:
-[ivocativo/earwax-war](https://github.com/ivocativo/earwax-war).
+[ivocativo/WaxOut](https://github.com/ivocativo/WaxOut).
 
 ## 📜 Licenza
 
