@@ -23,6 +23,8 @@ package-lock.json
 
 # APK scaricato in locale per l'installazione via WiFi (non versionare)
 *.apk
+# Pacchetto per Google Play: 14MB di roba ricompilabile in due minuti dal workflow.
+*.aab
 
 # ⚠️ CHIAVE DI FIRMA. Non deve MAI finire qui dentro: il repository e' pubblico, e chi ha
 # la chiave (con la password) puo' firmare aggiornamenti a nome dell'autore. Questa riga e'
