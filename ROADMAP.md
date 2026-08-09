@@ -715,6 +715,30 @@ appoggio a Npx" (finestra troppo stretta) oppure "nessun appoggio a nessuna dist
 davvero isolata). Alla prima occorrenza quell'informazione non c'era, ed e' il motivo per cui non
 si e' potuto decidere.
 
+## DA FARE quando parte il test coi 12 tester: leggere le recensioni
+
+Strumento che scarica le recensioni dal canale ufficiale di Google, le raggruppa per argomento e
+produce una lista ragionata di possibili modifiche (difetti veri / richieste di funzionalita' /
+commenti generici, con quante persone dicono la stessa cosa). **Decide sempre l'utente cosa
+implementare**: lo strumento porta il materiale ordinato, non tocca il gioco.
+
+⚠️ **URGENTE PER TEMPISTICA, non per difficolta': il canale ufficiale restituisce solo le
+recensioni degli ULTIMI 7 GIORNI.** Non e' un archivio. Se lo si monta mesi dopo la pubblicazione,
+le recensioni dei primi mesi sono perse per sempre. Va quindi preparato PRIMA o INSIEME alla
+pubblicazione, e fatto girare regolarmente per costruirsi uno storico locale.
+
+Cosa serve: un "account di servizio" creato da Play Console, con permesso di lettura sulle
+recensioni. Ne esce un file con una chiave — stessa regola della chiave di firma: **lo crea e lo
+custodisce l'utente**, non va nel repository (`.gitignore` copre gia' `*.keystore` e `*.jks`;
+aggiungere anche il json quando si sapra' come si chiama).
+
+Momento giusto: quando parte il test chiuso coi 12 tester. Li' arrivano i primi riscontri veri e
+lo strumento e' gia' rodato per quando l'app va pubblica.
+
+⚠️ Da ricordare quando si leggeranno i risultati: chi scrive una recensione e' quasi sempre o
+entusiasta o arrabbiato, chi gioca contento non scrive. Il campione NON e' rappresentativo, e
+"lo dicono in tanti" pesa diversamente da "lo dice uno solo, molto seccato".
+
 ## Da fare, in ordine
 
 - [ ] **Build FIRMATA in formato AAB.** Oggi il workflow produce un APK di *debug*: Play vuole un
