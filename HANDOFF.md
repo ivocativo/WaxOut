@@ -808,8 +808,26 @@ PG e nemici ci camminano via **heightmap-snap** (in `agganciaAlTerreno`: `body.y
   VECCHIO, e ogni prova fatta in anteprima misurava una versione diversa da quella su disco.
   Prima di fidarsi di una misura fatta nel browser, controllare di stare guardando il codice
   giusto (es. `scena.metodo.toString().includes('...')`).
-- **FREEZE PC allo Start Run:** aperto e deprioritizzato (vedi §HOTFIX e Backlog gruppo 5). Non è
-  l'audio; specifico del PC dell'utente. Da chiarire prima di puntare allo store.
+- **✅ FREEZE PC allo Start Run — SPIEGATO 2026-08-09.** Non era un problema di prestazioni:
+  l'utente apriva il gioco **con doppio clic su `index.html`**, cioè da `file://`. Phaser non
+  carica le immagini con un `<img>` ma le scarica come DATI, e Chrome vieta quella strada ai file
+  locali. Misurato sul PC dell'utente: **attesi 34, caricati 10, falliti 24** — passano solo quelli
+  incorporati come data URI (`ASSET_DATA`/`SPRITE_DATA`). Il menu si vedeva perché il suo sfondo è
+  fra quei 10; poi lo Start Run doveva costruire un livello **senza le immagini dei nemici, delle
+  armi e del timpano**. Ecco perché non si è mai riprodotto: dappertutto il gioco è stato aperto
+  via server.
+  **Controprova:** stessa macchina, stesso Chrome, via `localhost` e con l'effetto sul cerume
+  ACCESO — 105 secondi di partita, 3445 fotogrammi, un solo scatto da 301ms, zero errori.
+  L'effetto metaball, sospettato numero uno per settimane, è scagionato.
+  **Cosa si è fatto:** da `file://` il gioco ora lo DICE, con il rimedio
+  (`GIOCA-SU-TELEFONO.cmd` → `localhost:8123`) invece di uno schermo colorato.
+  **Cosa NON si è fatto, di proposito:** incorporare tutte le immagini per far funzionare
+  `file://`. Gonfierebbe il codice e allungherebbe l'avvio per una modalità che non serve a
+  nessuno — l'APK non usa `file://`. Da rivedere solo se un domani servisse una versione da
+  chiavetta, senza server.
+  ⚠️ **Lezione di metodo:** per settimane si è cercato un difetto di PRESTAZIONI perché la parola
+  usata era "freeze". Era invece roba che mancava. Il salto avanti è arrivato quando si è smesso
+  di chiedere "quanto va lento" e si è chiesto "che cosa è arrivato".
 - **Volanti vs pedane (`00ec955`):** pedane solide anche ai moscerini; se in playtest si "incastrano",
   limitare la collisione alla sola picchiata. I volanti NON collidono col cerume (`notFlyer` sul
   collider blocks) — decidere insieme (regola fisica coerente).

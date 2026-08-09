@@ -440,7 +440,7 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
 
 ---
 
-# BLOCCO G — Playtest round 6 (2026-08-09) ✅ FATTO, in attesa di ricollaudo
+# BLOCCO G — Playtest round 6 (2026-08-09) ✅ CHIUSO, ricollaudato dall'utente
 
 Cinque segnalazioni dopo una run completa. Due di queste avevano la **stessa causa**, e sotto a
 una terza c'era un difetto molto piu' grosso di quello segnalato.
@@ -477,8 +477,11 @@ una terza c'era un difetto molto piu' grosso di quello segnalato.
   non manda l'intestazione e non da' errore: ci vuole `AddHeader`. Le prove in anteprima
   misuravano codice vecchio.
 
-**Da ricollaudare col playtest:** la cadenza del corpo a corpo (cursore "mischia" del pannello),
-ora che l'animazione esiste davvero.
+**Ricollaudato dall'utente il 2026-08-09: "funziona tutto".** Resta aperta una sola domanda, non
+un difetto: `MISCHIA_CADENZA` e' rimasta a 1,35, cioe' il valore scelto per rimediare a
+un'animazione che in realta' non veniva caricata. L'utente non ha segnalato che il colpo sia
+lento, quindi si lascia com'e' — ma se un domani il corpo a corpo dovesse sembrare fiacco, quello
+e' il primo numero da guardare, e il cursore "mischia" del pannello lo prova senza ricompilare.
 
 ---
 

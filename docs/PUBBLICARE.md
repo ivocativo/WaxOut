@@ -124,17 +124,21 @@ Alla fine trovi da scaricare un file `Waxout-1.0.0.aab`: è quello che si carica
 
 ---
 
-## Il difetto ancora aperto
+## Il difetto che era rimasto aperto — chiuso il 2026-08-09
 
-Il **blocco allo Start Run sul PC** non è risolto: non si riproduce fuori dal tuo computer.
-Prima di pubblicare vale la pena chiudere il dubbio, ed è una prova da due minuti:
+Il **blocco allo Start Run sul PC** era una falsa pista, e la causa vera è banale: **il gioco non
+si apre con doppio clic su `index.html`**.
 
-1. apri il gioco sul PC e fai Start Run — se si blocca, prosegui;
-2. riapri lo stesso indirizzo aggiungendo **`?nofx`** in fondo, e riprova.
+Aperto così, il browser impedisce al gioco di caricare le immagini — è una regola di sicurezza di
+Chrome sui file locali, non un difetto del gioco. Misurato sul tuo PC: su 34 file ne arrivavano
+**10**. Il menu si vedeva perché il suo sfondo è fra quei 10; poi lo Start Run doveva costruire un
+livello senza le immagini dei nemici, delle armi e del timpano.
 
-Se col `?nofx` **non** si blocca, il colpevole è l'effetto grafico sul cerume e sappiamo dove
-mettere le mani. Se si blocca lo stesso, quel sospetto cade e si cerca altrove.
+**Come aprire il gioco sul PC:** doppio clic su `GIOCA-SU-TELEFONO.cmd`, poi `http://localhost:8123`
+nel browser. Provato così sulla tua macchina: una partita intera senza un intoppo.
 
-Sul telefono il gioco ha sempre funzionato, quindi non è un ostacolo alla pubblicazione — ma è
-meglio saperlo prima che dopo, perché lo stesso effetto potrebbe dare problemi su qualche
-telefono Android che non abbiamo mai provato.
+Se un domani lo riaprissi per sbaglio col doppio clic, il gioco ora te lo dice a schermo e ti
+ricorda come fare, invece di restare vuoto.
+
+**Per la pubblicazione non cambia niente:** l'app Android non usa quel meccanismo, e sul telefono
+il gioco ha sempre funzionato.

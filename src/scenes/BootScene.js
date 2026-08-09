@@ -149,6 +149,12 @@ class BootScene extends Phaser.Scene {
     // posa di riposo e si muoveva solo l'arma disegnata: si vedeva un bastoncino che ruotava
     // da solo davanti a un personaggio immobile.
     heroSheet('hero_melee', 'hero_melee_px.png');
+    // Chi non ce l'ha fatta, con l'indirizzo per esteso. Serve quando lo schermo resta vuoto:
+    // e' l'unico modo per sapere SE il problema e' che i file non arrivano, e quali.
+    this.load.on('loaderror', (f) => {
+      if (!window.__falliti) window.__falliti = [];
+      if (window.__falliti.length < 12) window.__falliti.push(f.key + ' → ' + (f.src || f.url || '?'));
+    });
     this.load.on('complete', () => this.verificaCaricamento());
   }
 

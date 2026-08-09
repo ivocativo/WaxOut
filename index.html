@@ -30,6 +30,33 @@
 <body>
   <div id="game"></div>
 
+  <!-- SCHERMATA NERA PARLANTE. Se qualcosa esplode prima che il gioco disegni, senza questo si
+       vede solo una pagina vuota e l'errore resta nella console del browser, che chi gioca non
+       apre mai. Qui l'errore finisce A SCHERMO, leggibile e fotografabile.
+       ⚠️ Va PRIMA di ogni altro script, se no non intercetta gli errori di quelli che lo
+       precedono — ed e' proprio all'inizio che si rompe quasi sempre (un file che manca, un
+       file caricato nell'ordine sbagliato). -->
+  <script>
+    (function () {
+      // Qui si RACCOGLIE soltanto. Chi decide se mostrare qualcosa e' il controllo in fondo alla
+      // pagina, e lo fa solo se il gioco NON e' partito.
+      // ⚠️ Non si mostra niente subito, per quanto l'errore sembri grave: un asset che non si
+      // carica genera un errore ma il gioco spesso va avanti lo stesso, e una schermata piena
+      // NASCONDEREBBE UN GIOCO CHE FUNZIONA. Meglio tacere e guardare il risultato.
+      window.__errori = [];
+      window.addEventListener('error', function (e) {
+        // Un file che non si carica da' un evento SULL'ELEMENTO (senza messaggio), non un errore
+        // di codice: e' il caso piu' comune da file:// e va raccontato in modo diverso.
+        if (e && e.target && e.target.src) { window.__errori.push('file non caricato: ' + e.target.src); return; }
+        window.__errori.push(String((e && e.message) || 'errore sconosciuto')
+          + (e && e.filename ? '  (' + e.filename + ' riga ' + e.lineno + ')' : ''));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        window.__errori.push('operazione fallita: ' + String(e && e.reason));
+      });
+    })();
+  </script>
+
   <!-- Libreria Phaser (locale, funziona offline) -->
   <script src="vendor/phaser.min.js"></script>
 
@@ -58,5 +85,90 @@
   <script src="src/scenes/ArmiScene.js"></script>
   <script src="src/scenes/TaraturaScene.js"></script>
   <script src="src/main.js"></script>
+
+  <!-- QUALE FILE SI E' ROTTO. Da file:// Chrome considera ogni file un'origine diversa e
+       CENSURA i dettagli degli errori: al gestore qui sopra arriva solo "Script error.", senza
+       nome del file ne' riga. Questo controllo aggira la censura senza chiedere niente al
+       browser — guarda semplicemente quali "firme" mancano all'appello. Ogni file del gioco ne
+       lascia una (una variabile globale): se manca, quel file non e' arrivato in fondo.
+       ⚠️ Inline, non in un file a parte: gli errori degli script inline NON vengono censurati,
+       ed e' l'unico posto da cui si puo' raccontare cos'e' successo. -->
+  <script>
+    (function () {
+      var firme = [
+        ['vendor/phaser.min.js', 'Phaser'], ['src/sprites_data.js', 'SPRITE_DATA'],
+        ['src/assets_data.js', 'ASSET_DATA'], ['src/sfx.js', 'Sfx'], ['src/meta.js', 'Meta'],
+        ['src/i18n.js', 'I18n'], ['src/taratura.js', 'Taratura'], ['src/state.js', 'CONFIG'],
+        ['src/touch.js', 'TouchControls'], ['src/pixelart.js', 'PixelArt'], ['src/gfx.js', 'GameGfx'],
+        ['src/scenes/BootScene.js', 'BootScene'], ['src/scenes/MenuScene.js', 'MenuScene'],
+        ['src/scenes/game_livello.js', 'GameLivello'], ['src/scenes/GameScene.js', 'GameScene'],
+        ['src/scenes/UpgradeScene.js', 'UpgradeScene'], ['src/scenes/DoorScene.js', 'DoorScene'],
+        ['src/scenes/VictoryScene.js', 'VictoryScene'], ['src/scenes/PauseScene.js', 'PauseScene'],
+        ['src/scenes/ShopScene.js', 'ShopScene'], ['src/scenes/ArmiScene.js', 'ArmiScene'],
+        ['src/scenes/TaraturaScene.js', 'TaraturaScene'], ['src/main.js', 'game'],
+      ];
+      setTimeout(function () {
+        // ⚠️ NON BASTA CHIEDERE "esiste window.game". Da file:// si e' visto un caso peggiore e
+        // piu' silenzioso: il gioco parte, la tela viene creata, e resta uno schermo di un solo
+        // colore perche' nessuna scena riesce a disegnarci sopra. `window.game` c'era, e questo
+        // controllo taceva. La domanda giusta e': c'e' una scena VIVA oltre a quella d'avvio?
+        var g = window.game;
+        var vive = (g && g.scene && g.scene.scenes)
+          ? g.scene.scenes.filter(function (s) { return s.scene.isActive() && s.scene.key !== 'BootScene'; })
+          : [];
+        if (vive.length) return;                           // il gioco e' partito davvero: niente da dire
+        var rotti = [];
+        for (var i = 0; i < firme.length; i++) if (!window[firme[i][1]]) rotti.push(firme[i][0]);
+        var d = document.createElement('div');
+        d.setAttribute('style', 'position:fixed;inset:0;z-index:100000;background:#1a120c;'
+          + 'color:#ffd9a7;font:13px/1.6 monospace;padding:18px;overflow:auto;white-space:pre-wrap');
+        var err = window.__errori || [];
+        var falliti = window.__falliti || [];
+        // Stato del caricamento: dice se il gioco e' fermo perche' i file non arrivano.
+        var car = '(non disponibile)';
+        try {
+          var L = g.scene.getScene('BootScene').load;
+          car = 'attesi ' + L.totalToLoad + ' · caricati ' + L.totalComplete
+              + ' · falliti ' + L.totalFailed + ' · ancora in coda ' + L.list.size;
+        } catch (e) {}
+        // IL CASO PIU' COMUNE HA UNA SPIEGAZIONE SUA. Aperto con doppio clic (file://), Chrome
+        // vieta a Phaser di scaricare le immagini: le carica come DATI, non come <img>, e da un
+        // file locale quella strada e' chiusa per sicurezza. Risultato: il gioco parte e resta
+        // uno schermo vuoto. Chi gioca non ha modo di indovinarlo, quindi va detto — con il
+        // rimedio, non solo con la diagnosi.
+        // ⚠️ E' quasi certamente anche la spiegazione del "freeze allo Start Run sul PC" rimasto
+        // aperto per settimane: il menu si vede (il suo sfondo e' fra i pochi incorporati), poi
+        // il livello va costruito senza le immagini dei nemici e delle armi.
+        // ⚠️ ...ma MAI dentro all'app Android: li' un "usa GIOCA-SU-TELEFONO.cmd" sarebbe un
+        // consiglio senza senso. Capacitor lascia la sua firma su window, e non si e' voluto
+        // dipendere dallo schema che usa (non e' fissato in capacitor.config.json: vale il
+        // valore di fabbrica, che e' una cosa che puo' cambiare con una versione della libreria).
+        var daFile = location.protocol === 'file:' && !window.Capacitor;
+        d.textContent = (daFile
+            ? 'WAXOUT NON SI APRE CON DOPPIO CLIC\n\n'
+              + 'Aperto cosi\', il browser impedisce al gioco di caricare le immagini:\n'
+              + 'e\' una regola di sicurezza di Chrome sui file locali, non un difetto\n'
+              + 'del gioco.\n\n'
+              + 'COME APRIRLO: doppio clic su GIOCA-SU-TELEFONO.cmd (nella cartella del\n'
+              + 'gioco), poi apri  http://localhost:8123  nel browser.\n\n'
+              + '--- dettagli tecnici ---\n'
+            : 'WAXOUT NON E\' PARTITO\n\n')
+          + (rotti.length
+              ? 'File di codice che non sono arrivati in fondo:\n  ' + rotti.join('\n  ')
+                + '\n\nIl PRIMO della lista e\' quello da guardare: gli altri probabilmente\n'
+                + 'mancano solo perche\' dipendono da lui.'
+              : 'Il codice e\' tutto a posto: il gioco si e\' avviato ma nessuna scena\n'
+                + 'riesce a disegnare. Guarda le due righe qui sotto.')
+          + '\n\nCaricamento immagini e suoni: ' + car
+          + '\n\nNon si sono caricati (' + falliti.length + '):\n  '
+          + (falliti.length ? falliti.join('\n  ') : '(nessuno)')
+          + '\n\nErrori raccolti (' + err.length + '):\n  '
+          + (err.length ? err.join('\n  ') : '(nessuno)')
+          + '\n\nIndirizzo: ' + location.href
+          + '\n\nFotografa questa schermata.';
+        (document.body || document.documentElement).appendChild(d);
+      }, 4000);   // largo: da file:// il caricamento e' piu' lento, e un falso allarme sarebbe peggio
+    })();
+  </script>
 </body>
 </html>
