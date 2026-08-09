@@ -790,6 +790,24 @@ PG e nemici ci camminano via **heightmap-snap** (in `agganciaAlTerreno`: `body.y
 ---
 
 ## RISCHI / punti aperti da tenere d'occhio
+- **⚠️ ASSET OLTRE IL 32° NON SI CARICANO (scoperto 2026-08-09, risolto).** Phaser scarica al
+  massimo `maxParallelDownloads` file (di fabbrica **32**) e quando quei 32 finiscono insieme si
+  dichiara concluso: i file oltre restano in coda **per sempre, senza errore e senza fallimento**.
+  Il gioco aveva 34 file e girava da giorni **senza `hero_melee` e `hero_crouchaim`** — le due
+  animazioni aggiunte per ultime. Da fuori si vedeva solo "l'animazione del coton fioc non si
+  riesce a vedere", e la si era curata rallentando il colpo (`MISCHIA_CADENZA: 1.35`): una cura
+  per un difetto che non era quello. Ora `maxParallelDownloads = 256` e soprattutto c'è
+  **`BootScene.verificaCaricamento()`**, che a fine caricamento controlla che le texture di
+  `BootScene.TEXTURE_ATTESE` esistano davvero e lo urla a schermo col pannello di prova acceso.
+  **Regola generale che se ne ricava:** "nessun errore" non vuol dire "tutto caricato" — quando
+  si aggiunge un asset, si verifica il RISULTATO (la texture c'è?), non il percorso (la riga
+  di `load` c'è?).
+- **⚠️ `tools/serve.ps1` serviva JavaScript dalla cache (risolto 2026-08-09).** L'intestazione
+  `Cache-Control: no-store` era impostata con `Headers.Add`, che **non dà errore ma non manda
+  niente**: ci vuole `AddHeader`. Effetto: dopo ogni modifica il browser rieseguiva il codice
+  VECCHIO, e ogni prova fatta in anteprima misurava una versione diversa da quella su disco.
+  Prima di fidarsi di una misura fatta nel browser, controllare di stare guardando il codice
+  giusto (es. `scena.metodo.toString().includes('...')`).
 - **FREEZE PC allo Start Run:** aperto e deprioritizzato (vedi §HOTFIX e Backlog gruppo 5). Non è
   l'audio; specifico del PC dell'utente. Da chiarire prima di puntare allo store.
 - **Volanti vs pedane (`00ec955`):** pedane solide anche ai moscerini; se in playtest si "incastrano",

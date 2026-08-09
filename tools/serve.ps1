@@ -26,7 +26,13 @@ while ($listener.IsListening) {
       $ct = $mime[$ext]; if (-not $ct) { $ct = 'application/octet-stream' }
       $bytes = [System.IO.File]::ReadAllBytes($path)
       $ctx.Response.ContentType = $ct
-      $ctx.Response.Headers.Add('Cache-Control', 'no-store')
+      # ATTENZIONE: AddHeader, NON Headers.Add. Con Headers.Add l'intestazione veniva accettata
+      # senza errori ma NON arrivava al browser (verificato leggendo la risposta: cache-control
+      # nullo). Il risultato era che dopo ogni modifica il browser continuava a far girare il
+      # JavaScript vecchio: le prove fatte in anteprima misuravano una versione diversa da
+      # quella sul disco, e ci si accorge solo quando i numeri non tornano.
+      $ctx.Response.AddHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      $ctx.Response.AddHeader('Pragma', 'no-cache')
       $ctx.Response.ContentLength64 = $bytes.Length
       $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
     } else {

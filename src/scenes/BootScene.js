@@ -7,6 +7,16 @@ class BootScene extends Phaser.Scene {
   // cosi' si caricano anche aprendo index.html da file:// (i browser bloccano i PNG
   // esterni in locale). Fallback al file su disco se i dati incorporati mancano.
   preload() {
+    // ⚠️ QUANTI FILE PHASER SCARICA INSIEME. Il valore di fabbrica e' 32, e NON e' solo un limite
+    // di parallelismo: quando i 32 finiscono tutti nello stesso momento il caricatore si dichiara
+    // finito e i file oltre il 32esimo restano in coda PER SEMPRE, senza errori e senza fallimenti
+    // (misurato: daCaricare 34, fatti 32, falliti 0, rimasti in lista hero_crouchaim e hero_melee).
+    // E' cosi' che il gioco ha girato per giorni senza l'immagine del colpo corpo a corpo e senza
+    // quella dello sparo accovacciato: le due animazioni aggiunte per ultime, cioe' proprio quelle
+    // in fondo alla coda. Da fuori si vedeva solo che "l'animazione del coton fioc non si vede".
+    // Il numero alto serve a stare larghi; il controllo qui sotto (verificaCaricamento) e' quello
+    // che impedisce al problema di tornare in silenzio se un giorno i file diventassero 300.
+    this.load.maxParallelDownloads = 256;
     const D = window.SPRITE_DATA || {};
     const img = (key, name, file) => this.load.image(key, D[name] || ('assets/sprites/' + file));
     img('player_a', 'hero_idle', 'hero_idle.png');
@@ -139,6 +149,29 @@ class BootScene extends Phaser.Scene {
     // posa di riposo e si muoveva solo l'arma disegnata: si vedeva un bastoncino che ruotava
     // da solo davanti a un personaggio immobile.
     heroSheet('hero_melee', 'hero_melee_px.png');
+    this.load.on('complete', () => this.verificaCaricamento());
+  }
+
+  // CONTROLLO DI FINE CARICAMENTO. Non da' per scontato che "nessun errore" voglia dire
+  // "tutto caricato": il caso che ci e' costato piu' caro non produceva nessun errore, i file
+  // restavano semplicemente in coda (vedi maxParallelDownloads sopra). Qui si guarda il
+  // risultato — le immagini ci sono davvero? — invece del percorso.
+  // Nel pannello di prova acceso lo urla anche a schermo, se no un console.error non lo vede
+  // nessuno: e' esattamente quello che e' successo per giorni.
+  verificaCaricamento() {
+    const L = this.load;
+    const mancanti = [];
+    for (const k of BootScene.TEXTURE_ATTESE) if (!this.textures.exists(k)) mancanti.push(k);
+    const inCoda = L.list.size;
+    if (!mancanti.length && !inCoda) return;
+    const msg = 'CARICAMENTO INCOMPLETO — mancano: ' + (mancanti.join(', ') || '(nessuna)')
+      + ' | rimasti in coda: ' + inCoda
+      + ' | attesi ' + L.totalToLoad + ', caricati ' + L.totalComplete + ', falliti ' + L.totalFailed;
+    console.error(msg);
+    if (window.CONFIG && window.CONFIG.PANNELLO_PROVA) {
+      this.add.text(8, 8, msg, { fontSize: '13px', color: '#ff5555', backgroundColor: '#000',
+        wordWrap: { width: 900 } }).setDepth(9999).setScrollFactor(0);
+    }
   }
 
   create() {
@@ -286,4 +319,13 @@ class BootScene extends Phaser.Scene {
     this.scene.start('MenuScene');
   }
 }
+// Le immagini senza le quali il gioco e' visibilmente rotto. Non e' l'elenco completo di quello
+// che si carica: e' l'elenco di quello che, se manca, deve fermare tutto invece di passare
+// inosservato. I fogli del personaggio ci sono tutti perche' e' li' che il problema si e'
+// presentato — un'animazione che manca non da' errore, semplicemente non parte.
+BootScene.TEXTURE_ATTESE = [
+  'hero_walk', 'hero_run', 'hero_idle', 'hero_jump', 'hero_crouch', 'hero_crouchwalk',
+  'hero_aim', 'hero_runaim', 'hero_crouchaim', 'hero_melee',
+  'swab', 'sprayer', 'eardrum', 'bg_flesh_px',
+];
 window.BootScene = BootScene;

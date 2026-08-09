@@ -440,6 +440,48 @@ caratteri, niente emoji, niente maiuscole tutte tranne il marchio.
 
 ---
 
+# BLOCCO G — Playtest round 6 (2026-08-09) ✅ FATTO, in attesa di ricollaudo
+
+Cinque segnalazioni dopo una run completa. Due di queste avevano la **stessa causa**, e sotto a
+una terza c'era un difetto molto piu' grosso di quello segnalato.
+
+- [x] **G.0 IL DIFETTO SOTTO I DIFETTI: due animazioni non esistevano.** Phaser scarica al massimo
+  `maxParallelDownloads` file (di fabbrica **32**); il gioco ne ha 34 e gli ultimi due restavano
+  in coda **per sempre, senza errore e senza fallimento** (misurato: attesi 34, caricati 32,
+  falliti 0). Erano `hero_melee` e `hero_crouchaim`, cioe' le due animazioni aggiunte per ultime.
+  Il colpo corpo a corpo si vedeva come un bastoncino che ruota davanti a un corpo immobile.
+  ⚠️ **Da qui la lezione**: il 2026-08-08 la segnalazione "l'animazione del coton fioc non si
+  riesce a vedere" era stata curata rallentando il colpo del 35% (`MISCHIA_CADENZA: 1.35`) —
+  cura giusta per un difetto che non era quello. **Quel numero e' da rileggere col playtest.**
+  Ora `maxParallelDownloads = 256`, piu' `BootScene.verificaCaricamento()` (urla a schermo se una
+  texture attesa manca) e il controllo automatico [35], che guarda il RISULTATO e non il percorso.
+- [x] **G.1 L'arma scivolava di 6,8px verso sinistra** ("la pistola e' troppo in basso", "ogni
+  tanto compare rivolta male": stessa causa). Il ribaltamento di Phaser gira attorno alla META'
+  dell'immagine, non attorno al perno; col perno sull'impugnatura l'arma si spostava di due volte
+  quella distanza, e lo scarto ruotava con la mira. Nuovo `armaAlPunto()` che lo annulla; anche
+  `boccaArma()` ora parte dal perno. Controllo automatico [36]: scarto 0,00px in quattro direzioni.
+  ⚠️ Misurato con `getBounds()`: i conti del gioco erano gia' specchiati esatti, lo scarto
+  nasceva **dopo**, nel disegno — un controllo che rifa' i conti a mano non lo avrebbe visto.
+- [x] **G.2 Il colpo arrivava prima dell'animazione.** Il danno era immediato; ora `meleeSwing`
+  fa il gesto e `meleeImpatto` arriva a meta' animazione, quando il braccio e' davvero avanti.
+  Portata e direzione si leggono in quel momento, non quando premi.
+- [x] **G.3 Finestra del rimbalzo da 4 a 24 pixel** (misurati sul gioco: da 38 a 60 sopra il
+  suolo, su un nemico alto 46) e spinta da 0,95 a **1,15**. La finestra si era ristretta da sola
+  quando cerumino e crosta sono stati alzati a 46: le due condizioni si sovrapponevano appena.
+  Ora dipende da `RIMBALZO_TOLLERANZA`, non dall'altezza del nemico.
+- [x] **G.4 Le macchie di cerume seguono la posa.** Prima uno schiacciamento fisso di 0,82 acceso
+  dal solo accovacciarsi: niente per salto e bastonata, e scattava di colpo mentre la discesa
+  dura sei fotogrammi. Ora `misuraAltezzeDisegnate()` legge all'avvio l'altezza vera di ogni
+  fotogramma dai fogli — **misurata, non scritta a mano**, cosi' non resta indietro a un ri-bake.
+- [x] **G.5 (trovato per strada) `tools/serve.ps1` serviva JavaScript dalla cache.** `Headers.Add`
+  non manda l'intestazione e non da' errore: ci vuole `AddHeader`. Le prove in anteprima
+  misuravano codice vecchio.
+
+**Da ricollaudare col playtest:** la cadenza del corpo a corpo (cursore "mischia" del pannello),
+ora che l'animazione esiste davvero.
+
+---
+
 # BLOCCO F — Playtest round 5 (2026-08-02) 🚧 IN CORSO
 
 Diciannove segnalazioni dell'utente dopo aver giocato l'APK di `3a1a44b`. Raggruppate per

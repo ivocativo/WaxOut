@@ -68,6 +68,12 @@ window.CONFIG = {
   // CORPO A CORPO (playtest 2026-08-03): l'animazione del colpo non si faceva in tempo a
   // vedere. Il colpo rallenta perche' il gesto abbia il tempo di leggersi, e in cambio
   // arriva un po' piu' lontano — cosi' il corpo a corpo non ci perde in resa.
+  // ⚠️ RILEGGERE QUESTO NUMERO DOPO IL PROSSIMO PLAYTEST. Il 2026-08-09 si e' scoperto che
+  // l'animazione del colpo NON ESISTEVA: il suo foglio (hero_melee) era il 33esimo file da
+  // caricare e Phaser ne scaricava 32, quindi restava in coda per sempre senza dare errore.
+  // Il gesto non "si faceva in tempo a vedere" perche' non c'era proprio. Il rallentamento qui
+  // sotto e' nato per rimediare a un difetto che non era quello, e ora potrebbe far sembrare il
+  // corpo a corpo fiacco senza motivo. Si prova da subito col cursore "mischia" del pannello.
   MISCHIA_CADENZA: 1.35,  // quanto piu' lento e' un colpo (piu' alto = piu' lento)
   MISCHIA_PORTATA: 1.15,  // quanto piu' lontano arriva, per compensare
   // Da questo livello in poi il cerume da pulire cala: un livello lungo il triplo non deve

@@ -964,7 +964,12 @@ window.__earwaxChecks = function (opts) {
         // molto meno di quanto sembrasse (4 macchie in 260 bastonate).
         gsS.doMelee(gsS.time.now, muro);
         colpi++;
-        avanza(gsS, 2);
+        // ⚠️ IL COLPO NON ARRIVA NELL'ISTANTE IN CUI SI PICCHIA. Dal 2026-08-09 il danno (e con
+        // lui lo schizzo che ti sporca) parte a meta' animazione, cioe' quando il braccio e'
+        // davvero avanti — vedi meleeSwing/meleeImpatto. Con due soli fotogrammi qui il
+        // controllo guardava PRIMA che il colpo fosse arrivato e non vedeva nessuna macchia.
+        // 16 fotogrammi (~265ms) coprono anche l'animazione piu' lunga possibile (460ms / 2).
+        avanza(gsS, 16);
       }
     }
     const siSporca = gsS.macchie.length > 0;
@@ -1438,6 +1443,65 @@ window.__earwaxChecks = function (opts) {
       ko('i colpi in piedi prendono cerumino e crosta', 3,
         'bordo basso del colpo=' + Math.round(bordoBasso) + ' cime=' + JSON.stringify(cima));
     }
+  }
+
+  // [35] TUTTE LE IMMAGINI SONO DAVVERO CARICATE (2026-08-09). E' il controllo che sarebbe
+  // servito: Phaser scarica al massimo `maxParallelDownloads` file (di fabbrica 32) e quelli
+  // oltre restano in coda PER SEMPRE, senza errore e senza fallimento. Il gioco ne aveva 34 e
+  // girava senza le due animazioni aggiunte per ultime — il colpo corpo a corpo e lo sparo
+  // accovacciato — e da fuori sembrava solo che "l'animazione non si vedesse".
+  // ⚠️ Si guarda il RISULTATO (la texture esiste?), non il percorso (la riga di load c'e'?):
+  // il difetto stava tutto nello spazio fra le due domande.
+  {
+    const boot = g.scene.getScene('BootScene');
+    const attese = window.BootScene.TEXTURE_ATTESE;
+    const mancanti = attese.filter((k) => !g.textures.exists(k));
+    const inCoda = boot ? boot.load.list.size : 0;
+    // e le animazioni che ne nascono devono avere davvero i loro fotogrammi
+    const animeVuote = [['hero_melee_a', 4], ['hero_crouchaim_a', 8], ['hero_runaim_a', 6]]
+      .filter(([k, n]) => !g.anims.exists(k) || g.anims.get(k).frames.length !== n)
+      .map(([k]) => k);
+    if (!mancanti.length && !inCoda && !animeVuote.length) {
+      ok('tutte le immagini sono caricate', '-', attese.length + ' texture attese presenti, '
+        + (boot ? boot.load.totalComplete : '?') + '/' + (boot ? boot.load.totalToLoad : '?')
+        + ' file caricati, animazioni con tutti i fotogrammi');
+    } else {
+      ko('tutte le immagini sono caricate', '-', 'mancanti=[' + mancanti.join(',') + ']'
+        + ' rimasti in coda=' + inCoda + ' animazioni vuote=[' + animeVuote.join(',') + ']');
+    }
+  }
+
+  // [36] L'ARMA E' AGGANCIATA ALLA MANO NEI DUE VERSI (2026-08-09). Il ribaltamento di Phaser
+  // non gira attorno al PERNO dell'immagine ma attorno alla sua META': col perno sull'impugnatura
+  // (in basso) l'arma rivolta a sinistra scivolava 6,8 pixel piu' in basso, su 12 di altezza
+  // disegnata. Erano i due difetti segnalati insieme al playtest ("verso sinistra la pistola e'
+  // troppo in basso", "ogni tanto compare rivolta male").
+  // ⚠️ SI MISURA getBounds(), NON I CONTI DEL GIOCO. Il calcolo della posizione era gia'
+  // specchiato in modo esatto: lo scarto nasceva dopo, nel disegno. Un controllo che rifa' i
+  // conti a mano non lo vedrebbe.
+  {
+    const gs = avviaLivello(2);
+    const scarti = [];
+    for (const d of [[1, 0], [0, -1], [1, -1], [1, 1]]) {
+      const m = (verso) => {
+        gs.facing = verso;
+        gs._posaMira = 'corsa';
+        gs.heroVisual.anims.play('hero_runaim_a', true);
+        gs.heroVisual.setPosition(gs.player.x, gs.player.body.bottom);
+        const n = Math.hypot(d[0], d[1]) || 1;
+        gs.showRangedWeapon(verso * d[0] / n, d[1] / n);
+        gs.positionWeapon();
+        const b = gs.heroWeapon.getBounds();
+        return { cx: (b.left + b.right) / 2 - gs.heroVisual.x, cy: (b.top + b.bottom) / 2 - gs.heroVisual.y };
+      };
+      const D = m(1), S = m(-1);
+      scarti.push(Math.abs(S.cy - D.cy), Math.abs(S.cx + D.cx));
+    }
+    const peggio = Math.max(...scarti);
+    if (peggio < 1) ok('l arma e agganciata alla mano nei due versi', 2,
+      'quattro direzioni di mira, scarto massimo fra destra e sinistra ' + peggio.toFixed(2) + 'px');
+    else ko('l arma e agganciata alla mano nei due versi', 2,
+      'scarto massimo ' + peggio.toFixed(2) + 'px fra il disegno a destra e quello a sinistra');
   }
 
   // [34] L'INTERRUTTORE DEL PANNELLO DI PROVA (2026-08-04, verso la pubblicazione). Spegnendo

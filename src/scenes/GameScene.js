@@ -240,6 +240,7 @@ class GameScene extends Phaser.Scene {
     // riparte puliti: il livello nuovo e' gia' il momento in cui si tira il fiato e si recupera
     // un po' di vita, ed e' il posto naturale anche per ripulirsi.
     this.macchie = [];
+    this.misuraAltezzeDisegnate();   // quanto e' alto ogni fotogramma: serve alle macchie
     if (!this.anims.exists('hero_walk_a')) this.anims.create({ key: 'hero_walk_a', frames: this.anims.generateFrameNumbers('hero_walk', { start: 0, end: 24 }), frameRate: 18, repeat: -1 });
     if (!this.anims.exists('hero_run_a'))  this.anims.create({ key: 'hero_run_a',  frames: this.anims.generateFrameNumbers('hero_run',  { start: 0, end: 24 }), frameRate: 22, repeat: -1 });
     if (!this.anims.exists('hero_idle_a')) this.anims.create({ key: 'hero_idle_a', frames: this.anims.generateFrameNumbers('hero_idle', { start: 0, end: 24 }), frameRate: 10, repeat: -1 });
@@ -2201,6 +2202,31 @@ class GameScene extends Phaser.Scene {
       this.heroVisual.anims.play({ key: 'hero_melee_a', duration: durata });
     }
     this.showMeleeWeapon(M.tex);            // arma in mano, agganciata alla mano disegnata
+    // IL COLPO ARRIVA QUANDO IL BRACCIO E' AVANTI, non quando premi (playtest: "alle volte il
+    // colpo arriva prima che l'animazione sia ripartita"). Il danno era immediato mentre il
+    // disegno era ancora nella fase di carica: si vedeva il nemico incassare prima che il
+    // bastoncino si muovesse. L'attesa e' mezza animazione, cioe' il fotogramma in cui il braccio
+    // passa in avanti (MISCHIA_ANGOLO: i primi due sono alto-indietro, il terzo e' gia' teso).
+    // Senza animazione — in aria o accovacciato — resta l'arco disegnato dal tween, 150ms: si usa
+    // la sua meta'. ⚠️ Il ritardo e' sempre meno di meta' cadenza, quindi non puo' accavallarsi
+    // col colpo successivo.
+    const ritardo = this._mischiaFinoA ? Math.round((this._mischiaFinoA - this.time.now) * 0.5) : 75;
+    this._colpoNumero = (this._colpoNumero || 0) + 1;
+    const mio = this._colpoNumero;
+    this.time.delayedCall(ritardo, () => {
+      // Se nel frattempo e' partita un'altra bastonata, o il livello e' finito, questo colpo
+      // non esiste piu'.
+      if (this._colpoNumero !== mio || !this.scene.isActive() || !this.player || !this.player.active) return;
+      this.meleeImpatto(M);
+    });
+  }
+
+  // La parte che FA MALE della bastonata, staccata dal gesto: rettangolo di danno, onda d'urto,
+  // fermo-immagine e schizzo. Sta a se' perche' arriva mezza animazione dopo il gesto (vedi
+  // meleeSwing) — e perche' cosi' portata e direzione si leggono nell'istante in cui il braccio
+  // e' davvero avanti, non in quello in cui hai premuto.
+  meleeImpatto(M) {
+    const p = window.GameState.player;
     const range = M.portata * p.attackRange * window.CONFIG.MISCHIA_PORTATA;
     const halfH = M.altezza;
     const cy = this.crouching ? 16 : 0;   // accovacciato: colpo più in basso (nemici bassi)
@@ -2281,13 +2307,67 @@ class GameScene extends Phaser.Scene {
     this.posizionaMacchie();
   }
 
+  // ALTEZZA DAVVERO DISEGNATA di ogni fotogramma del personaggio, misurata una volta sola
+  // all'avvio leggendo i pixel dei fogli: per ogni fotogramma, quanto sta sopra i piedi la riga
+  // piu' alta che non e' trasparente. Serve alle macchie di cerume (vedi posizionaMacchie).
+  // ⚠️ MISURATA, NON SCRITTA A MANO. Una tabella di numeri andrebbe rifatta a ogni ri-bake dei
+  // fogli e prima o poi resterebbe indietro in silenzio — come gia' avvisa il commento di MANO.
+  // Costa una lettura per foglio all'avvio (nove in tutto) e niente durante il gioco.
+  misuraAltezzeDisegnate() {
+    this.ALTEZZE = {};
+    const cv = document.createElement('canvas');
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    const piedi = Math.round(84 * this.HERO_ORIGIN_Y);   // riga dei piedi dentro la cella
+    for (const key of GameScene.FOGLI_PG) {
+      const tex = this.textures.get(key);
+      if (!tex || !tex.source[0] || !tex.source[0].image) continue;
+      const img = tex.source[0].image;
+      cv.width = img.width; cv.height = img.height;
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.drawImage(img, 0, 0);
+      let dati;
+      try { dati = g.getImageData(0, 0, cv.width, cv.height).data; } catch (e) { continue; }
+      // ⚠️ I FOTOGRAMMI SI CHIEDONO A PHASER, non si deducono dalla larghezza: i fogli grandi
+      // sono griglie 5x5 (420x420, 25 fotogrammi), non una riga sola. Dedurli dalla larghezza
+      // ne faceva leggere 5 su 25, e solo quelli della prima riga.
+      const nomi = tex.getFrameNames().sort((a, b) => (+a) - (+b));
+      const alt = [];
+      for (const nome of nomi) {
+        const fr = tex.frames[nome];
+        let cima = fr.cutY + fr.height;
+        for (let y = fr.cutY; y < fr.cutY + fr.height && cima > fr.cutY + fr.height - 1; y++) {
+          for (let x = fr.cutX; x < fr.cutX + fr.width; x++) {
+            if (dati[((y * img.width) + x) * 4 + 3] > 40) { cima = y; break; }
+          }
+        }
+        alt.push(Math.max(1, (fr.cutY + piedi) - cima));
+      }
+      this.ALTEZZE[key] = alt;
+    }
+    // Statura di riferimento: il personaggio in piedi fermo. Tutto il resto si misura rispetto a lui.
+    const idle = this.ALTEZZE.hero_idle;
+    this.ALTEZZA_BASE = (idle && idle[0]) || 62;
+  }
+
+  // Quanto e' alto ADESSO il personaggio disegnato, rispetto a quando sta in piedi (1 = in piedi).
+  compressionePG() {
+    const a = this.ALTEZZE && this.ALTEZZE[this.heroVisual.texture.key];
+    if (!a) return 1;
+    return (a[this.fotogrammaCorrente() % a.length] || this.ALTEZZA_BASE) / this.ALTEZZA_BASE;
+  }
+
   // Le macchie seguono il corpo. Due accorgimenti: si specchiano col verso (una macchia sul petto
-  // resta sul petto anche girandosi) e si ALZANO quando ci si accovaccia — il disegno accovacciato
-  // e' 51px invece di 62, quindi senza correzione le macchie del busto resterebbero per aria.
+  // resta sul petto anche girandosi) e si SCHIACCIANO insieme al disegno.
+  // ⚠️ Prima lo schiacciamento era un unico numero (0,82) acceso dal solo accovacciarsi. Da li'
+  // veniva il "lo sporco fluttua quando il personaggio cambia posizione" del playtest, per due
+  // motivi insieme: valeva SOLO per l'accovacciarsi (non per il salto, la bastonata o il cammino
+  // accovacciato, che pure cambiano statura), e scattava di colpo mentre il disegno ci mette sei
+  // fotogrammi a scendere — le macchie arrivavano giu' prima del corpo. Ora segue il fotogramma
+  // che c'e' davvero a schermo, quindi non puo' sfasarsi.
   posizionaMacchie() {
     if (!this.macchie.length) return;
     const v = this.facing < 0 ? -1 : 1;
-    const compressione = this.crouching ? 0.82 : 1;
+    const compressione = this.compressionePG();
     for (let i = 0; i < this.macchie.length; i++) {
       const m = this.macchie[i];
       m.setPosition(this.heroVisual.x + m.ox * v, this.heroVisual.y + m.oy * compressione);
@@ -2365,15 +2445,44 @@ class GameScene extends Phaser.Scene {
     // Come per il getto: deve coprire l'intervallo tra una bastonata e l'altra, se no il coton
     // fioc lampeggia tra un colpo e il successivo (segnalato nel playtest).
     this._weaponHideAt = this.time.now + Math.max(240, (window.GameState.player.attackCooldown || 360) + 60);
-    this.positionWeapon();
     // FlipX (non FlipY, il bug originale) per l'orientamento dei pixel + rotazione "π - θ"
     // (NON la semplice negazione -θ, che sposta l'arco anche in verticale — verificato con
     // getBounds(): solo π-θ da' un mirror pulito, stessa Y, X specchiata attorno al giocatore).
+    // ⚠️ Ribaltamento e angolo vanno messi PRIMA di posizionare: da quando la posizione compensa
+    // lo scarto del ribaltamento (vedi armaAlPunto) dipende da tutti e due, e nell'ordine
+    // sbagliato il primo fotogramma del colpo usciva agganciato male.
     w.setFlipX(this._weaponFlip);
     w.setFlipY(false);
     const mirror = (theta) => this._weaponFlip ? (Math.PI - theta) : theta;
     w.rotation = mirror(-1.1);                                  // parte alto-indietro
+    this.positionWeapon();
     this.tweens.add({ targets: w, rotation: mirror(0.7), duration: 150, ease: 'Quad.out' });  // fino a basso-avanti
+  }
+
+  // Aggancia l'arma a un punto del mondo, ruotata di `a` e (se serve) specchiata.
+  // ⚠️ IL RIBALTAMENTO DI PHASER NON GIRA ATTORNO AL PERNO, MA ATTORNO ALLA META' DELL'IMMAGINE.
+  // Se il perno non sta in mezzo — e non ci sta mai, e' l'IMPUGNATURA e sta in un angolo — l'arma
+  // ribaltata scivola di DUE VOLTE la distanza fra il perno e il centro. Sullo spruzzino sono
+  // 6,8 pixel verso il basso su 12 di altezza disegnata: piu' di mezz'arma. E' la causa dei due
+  // difetti segnalati insieme nel playtest ("verso sinistra la pistola e' troppo in basso" e
+  // "ogni tanto compare rivolta male"): l'arma si stacca dalla mano solo in un verso, e ruotando
+  // la mira lo scarto gira con lei, quindi a volte esce di lato e a volte sopra.
+  // ⚠️ Misurato con getBounds() di Phaser, non con i propri conti: il calcolo della posizione era
+  // gia' specchiato in modo esatto (perno a -31/+31, stessa altezza), lo scarto nasceva DOPO,
+  // nel disegno. Un controllo che rifa' i conti a mano non lo puo' vedere.
+  armaAlPunto(x, y, a, fY, fX) {
+    const w = this.heroWeapon;
+    w.setFlipY(!!fY); w.setFlipX(!!fX); w.setRotation(a);
+    // Distanza perno->centro dell'immagine, raddoppiata (e' di la' che il ribaltamento la manda).
+    const cx = fX ? (0.5 - w.originX) * w.width * w.scaleX * 2 : 0;
+    const cy = fY ? (0.5 - w.originY) * w.height * w.scaleY * 2 : 0;
+    // Va tolta nel verso in cui l'arma e' ruotata, non in quello dello schermo.
+    const c = Math.cos(a), s = Math.sin(a);
+    w.setPosition(x - (cx * c - cy * s), y - (cx * s + cy * c));
+    // Dove sta il PERNO adesso. Non coincide piu' con w.x/w.y (li' c'e' la compensazione), e
+    // boccaArma deve partire da qui: se leggesse w.x i colpi nascerebbero spostati dello stesso
+    // scarto che abbiamo appena tolto al disegno.
+    this._armaPerno = { x, y };
   }
 
   // Posiziona l'arma alla mano (la segue ogni frame finche' visibile). L'angolo lo impostano
@@ -2409,9 +2518,7 @@ class GameScene extends Phaser.Scene {
         const voce = GameScene.MANO[posa];
         const t = Array.isArray(voce[0]) ? voce[this.fotogrammaCorrente() % voce.length] : voce;
         const verso = flipOra ? -1 : 1;
-        w.setPosition(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1]);
-        w.setFlipY(flipOra);
-        w.setRotation(a);
+        this.armaAlPunto(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1], a, flipOra, false);
         return;
       }
       const raccorcia = this.crouching ? 0.6 : 1;
@@ -2419,10 +2526,9 @@ class GameScene extends Phaser.Scene {
       // e' zero, e senza questo l'arma finirebbe sull'asse del corpo — anzi un filo dietro, per
       // via del perno dentro l'immagine — invece che dal lato in cui stai guardando.
       const avanti = (flipOra ? -1 : 1) * GameScene.BRACCIO_AVANTI;
-      w.setPosition(this.player.x + avanti + Math.cos(a) * GameScene.BRACCIO_RAGGIO,
-        this.player.y + GameScene.BRACCIO_SPALLA * raccorcia + Math.sin(a) * GameScene.BRACCIO_RAGGIO);
-      w.setFlipY(flipOra);
-      w.setRotation(a);
+      this.armaAlPunto(this.player.x + avanti + Math.cos(a) * GameScene.BRACCIO_RAGGIO,
+        this.player.y + GameScene.BRACCIO_SPALLA * raccorcia + Math.sin(a) * GameScene.BRACCIO_RAGGIO,
+        a, flipOra, false);
       return;
     }
     // CORPO A CORPO. Se sta girando l'animazione del colpo, l'arma sta nella MANO DISEGNATA e
@@ -2434,15 +2540,15 @@ class GameScene extends Phaser.Scene {
       const t = GameScene.MANO.mischia[i];
       const verso = this.facing < 0 ? -1 : 1;
       this.tweens.killTweensOf(w);
-      w.setPosition(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1]);
       const a = GameScene.MISCHIA_ANGOLO[i];
-      w.setFlipX(false);
-      w.setFlipY(verso < 0);
-      w.setRotation(verso < 0 ? Math.PI - a : a);
+      this.armaAlPunto(this.heroVisual.x + t[0] * verso, this.heroVisual.y + t[1],
+        verso < 0 ? Math.PI - a : a, verso < 0, false);
       return;
     }
     const hx = cfg.hand[0] * (this.facing < 0 ? -1 : 1);
-    w.setPosition(this.player.x + hx, this.player.y + cfg.hand[1]);
+    // Anche qui l'aggancio passa da armaAlPunto: la rotazione la sta muovendo il tween dell'arco,
+    // e lo scarto del ribaltamento gira con lei, quindi va ricalcolato a ogni fotogramma.
+    this.armaAlPunto(this.player.x + hx, this.player.y + cfg.hand[1], w.rotation, w.flipY, w.flipX);
   }
 
   // Numero del fotogramma mostrato adesso dal personaggio (0 se non sta girando nessun ciclo).
@@ -2465,10 +2571,13 @@ class GameScene extends Phaser.Scene {
     // ⚠️ La bocca si scala con la stessa deformazione dell'arma (`spessore` in verticale), se no
     // ingrossando il coton fioc il colpo smetterebbe di partire dalla punta.
     const s = cfg.scale;
-    const dx = cfg.bocca[0] * s;
+    const dx = cfg.bocca[0] * s * (w.flipX ? -1 : 1);
     const dy = cfg.bocca[1] * s * (cfg.spessore || 1) * (w.flipY ? -1 : 1);
     const c = Math.cos(w.rotation), sn = Math.sin(w.rotation);
-    return { x: w.x + dx * c - dy * sn, y: w.y + dx * sn + dy * c };
+    // ⚠️ Si parte dal PERNO (vedi armaAlPunto), non da w.x: quello e' spostato apposta per
+    // annullare lo scarto del ribaltamento di Phaser.
+    const p = this._armaPerno || { x: w.x, y: w.y };
+    return { x: p.x + dx * c - dy * sn, y: p.y + dx * sn + dy * c };
   }
 
   damageBlock(b, dmg) {
@@ -3124,10 +3233,10 @@ class GameScene extends Phaser.Scene {
     this.player.body.y += (e.body.top - this.player.body.bottom);
     this.player.y = this.player.body.center.y;                // lo sprite segue subito, non al frame dopo
     // Spinta del rimbalzo (manopola di prova "rimbalzo": a 1 e' quella normale).
-    // Alzata da 0,72 a 0,95 dopo il playtest ("rimbalzi troppo poco"): ora saltare in testa a un
-    // nemico ti rimanda su quasi quanto un salto vero, che e' l'altezza che il giocatore si
-    // aspetta e quella che permette di incatenare due nemici uno dopo l'altro.
-    const spinta = 0.95 * (window.Taratura ? window.Taratura.v('rimbalzo') : 1);
+    // Alzata due volte dal playtest: 0,72 -> 0,95 -> 1,15. Sopra 1 il rimbalzo manda PIU' IN ALTO
+    // di un salto normale, ed e' voluto: e' la ricompensa del colpo in testa e quello che permette
+    // di incatenare due nemici uno dopo l'altro senza toccare terra in mezzo.
+    const spinta = 1.15 * (window.Taratura ? window.Taratura.v('rimbalzo') : 1);
     this.player.setVelocityY(-p.jumpVelocity * spinta);       // rimbalzo (e blocca lo snap: vy<0)
     this.jumpsLeft = p.doubleJump ? 2 : 1;                    // puoi risaltare dopo il rimbalzo
     this.canCutJump = true;
@@ -3685,13 +3794,22 @@ class GameScene extends Phaser.Scene {
       // i piedi sulla testa prima di far rimbalzare.
       const surf0 = this.terrainTopAt(this.player.x);
       const piediDopo = (pbody.bottom - surf0) >= -44 ? surf0 : pbody.bottom;
+      const T = GameScene.RIMBALZO_TOLLERANZA;
       const preda = this.enemies.getChildren().find((e) => {
         if (!e.active || e.spawning || e.fugitive || !e.body) return false;
         if (Math.abs(pbody.center.x - e.body.center.x) > e.body.halfWidth + pbody.halfWidth) return false;
-        // Arrivi DALL'ALTO: o i piedi sono ancora sopra la testa, o l'hanno oltrepassata in questo
-        // stesso frame (caduta veloce: fra un frame e l'altro si puo' saltare tutto il nemico).
-        const daSopra = pbody.bottom <= e.body.top + 6 || this._prevBottom <= e.body.top;
-        return daSopra && piediDopo >= e.body.top;
+        // Arrivi DALL'ALTO: nel fotogramma scorso i piedi non erano ancora scesi sotto la testa.
+        // E' questo che distingue il salto in testa dallo strisciare contro il fianco.
+        const daSopra = this._prevBottom <= e.body.top + T;
+        // E ci sei arrivato: o i piedi hanno raggiunto la testa, o ci arriveranno con lo snap.
+        // ⚠️ LA TOLLERANZA NON E' COSMETICA. Prima le due condizioni erano `bottom <= testa+6` e
+        // `piediDopo >= testa`, e insieme lasciavano una fascia utile di 4 PIXEL: la seconda
+        // esige che i piedi siano entro 44px dal suolo, la prima che siano sopra la testa, e da
+        // quando cerumino e crosta sono alti 46 le due si sovrappongono appena. Restava in piedi
+        // solo grazie al ramo "oltrepassata in questo frame", che pero' bucava a certe velocita'
+        // di caduta: da qui il "alle volte non rimbalza" del playtest. Ora la fascia e' larga
+        // quanto la tolleranza, in tutte e due le direzioni, e non dipende dall'altezza del nemico.
+        return daSopra && piediDopo >= e.body.top - T;
       });
       if (preda) this.stompEnemy(preda);
     }
@@ -4256,6 +4374,14 @@ GameScene.MISCHIA_ANGOLO = [-117, -101, -29, 8].map((g) => g * Math.PI / 180);
 // Oltre questa inclinazione della mira si usa la posa col braccio in su invece di quella in
 // avanti. Le diagonali non hanno una posa loro: si sceglie la piu' vicina.
 GameScene.MIRA_SU_OLTRE = 55 * Math.PI / 180;
+// Quanto sopra la testa di un nemico vale gia' come "gli sei saltato addosso", in pixel. Vale in
+// tutte e due le direzioni (vedi il rimbalzo in update): sopra decide quanto presto scatta, sotto
+// quanto in ritardo si puo' ancora recuperare. Con 12 la fascia utile e' 24px su un nemico alto
+// 46 — grosso modo il quarto superiore del corpo, che e' quello che il giocatore mira.
+GameScene.RIMBALZO_TOLLERANZA = 12;
+// I fogli del personaggio, per misurarne l'altezza disegnata all'avvio (misuraAltezzeDisegnate).
+GameScene.FOGLI_PG = ['hero_idle', 'hero_walk', 'hero_run', 'hero_jump', 'hero_crouch',
+  'hero_crouchwalk', 'hero_aim', 'hero_runaim', 'hero_crouchaim', 'hero_melee'];
 // I metodi che COSTRUISCONO il livello stanno in `src/scenes/game_livello.js`: sono 460
 // righe che non toccano ne' i nemici ne' il combattimento, e qui in mezzo facevano solo
 // volume. Si innestano sul prototipo invece di essere funzioni a se' che ricevono la scena,
