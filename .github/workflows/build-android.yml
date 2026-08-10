@@ -32,7 +32,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Prepara Android SDK
         uses: android-actions/setup-android@v3
@@ -67,6 +67,14 @@ jobs:
 
       - name: Crea il progetto Android
         run: npx cap add android
+
+      # Stesso Android della versione di rilascio (vedi release-android.yml): se l'APK di prova
+      # puntasse a un Android diverso da quello del pacchetto pubblicato, si collauderebbe una
+      # cosa e se ne spedirebbe un'altra.
+      - name: Punta ad Android 15 (come il pacchetto di rilascio)
+        run: |
+          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/; s/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
+          grep -q 'targetSdkVersion = 35' android/variables.gradle || { echo "targetSdkVersion NON impostato a 35"; exit 1; }
 
       # L'ICONA. La cartella android/ non e' versionata (la riga sopra la ricrea da zero a ogni
       # compilazione), quindi l'icona non si puo' tenere li' dentro: sta in android-res/, che e'

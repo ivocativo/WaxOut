@@ -14,6 +14,9 @@ SCHEDA = Path(__file__).resolve().parent.parent / "docs/store/testi-scheda.md"
 CAMPI = [
     ("nome IT", 30), ("descrizione breve IT", 80), ("descrizione completa IT", 4000),
     ("nome EN", 30), ("descrizione breve EN", 80), ("descrizione completa EN", 4000),
+    # Note di rilascio: Play le chiede a ogni caricamento, 500 caratteri per lingua.
+    ("note prova IT", 500), ("note prova EN", 500),
+    ("note 1.0.0 IT", 500), ("note 1.0.0 EN", 500),
 ]
 
 
