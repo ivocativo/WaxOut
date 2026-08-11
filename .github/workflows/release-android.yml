@@ -85,19 +85,22 @@ jobs:
         run: npx cap add android
 
       # ⚠️ A QUALE ANDROID PUNTA L'APP. Google alza questo requisito ogni anno e RIFIUTA il
-      # caricamento se non e' rispettato: "il livello API target minimo deve essere 35"
-      # (Android 15), incontrato il 2026-08-09 alla prima app creata su Play Console.
+      # caricamento se non e' rispettato. Storia vera, in due giorni: il 2026-08-09 Play chiedeva
+      # 35 (Android 15) contro il 34 di Capacitor 6; il giorno dopo, caricato un pacchetto con 35,
+      # ha chiesto **36** (Android 16), perche' la regola e' "non piu' vecchio di un anno rispetto
+      # all'ultimo Android uscito" e la scadenza era il 31/08/2026.
       # Lo si scrive qui invece di fidarsi del valore che sceglie Capacitor: cosi' e' una NOSTRA
       # decisione, verificabile, e non cambia sotto i piedi quando si aggiorna una libreria.
-      # Per alzarlo l'anno prossimo basta cambiare il numero in questo unico punto.
-      - name: Punta ad Android 15 (richiesto da Google Play)
+      # ⚠️ Quando Google lo rialzera' (succede ogni anno, verso agosto): cambiare il numero QUI e
+      # nel controllo del manifest piu' sotto, e rifare girare il workflow. Nient'altro.
+      - name: Punta ad Android 16 (richiesto da Google Play)
         run: |
-          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/; s/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
+          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 36/; s/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle
           cat android/variables.gradle
           # Se la sostituzione non ha preso (Capacitor ha cambiato il formato del file), meglio
           # fermarsi qui che scoprirlo da Play dopo aver caricato.
-          grep -q 'targetSdkVersion = 35' android/variables.gradle || { echo "targetSdkVersion NON impostato a 35"; exit 1; }
-          grep -q 'compileSdkVersion = 35' android/variables.gradle || { echo "compileSdkVersion NON impostato a 35"; exit 1; }
+          grep -q 'targetSdkVersion = 36' android/variables.gradle || { echo "targetSdkVersion NON impostato a 36"; exit 1; }
+          grep -q 'compileSdkVersion = 36' android/variables.gradle || { echo "compileSdkVersion NON impostato a 36"; exit 1; }
 
       - name: Metti l'icona dell'app
         run: cp -r android-res/. android/app/src/main/res/
@@ -161,7 +164,7 @@ jobs:
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon
 
-      # Non basta aver SCRITTO 35 in variables.gradle: conta cosa e' finito nel pacchetto. Qui si
+      # Non basta aver SCRITTO 36 in variables.gradle: conta cosa e' finito nel pacchetto. Qui si
       # legge il manifest che ha prodotto la compilazione, cioe' lo stesso numero che leggera' Play.
       - name: Verifica a quale Android punta il pacchetto
         run: |
@@ -171,9 +174,9 @@ jobs:
           else
             echo "manifest: $MAN"
             grep -o 'targetSdkVersion="[0-9]*"' "$MAN" || true
-            grep -q 'targetSdkVersion="35"' "$MAN" \
-              || { echo "ERRORE: il pacchetto NON punta ad Android 15, Play lo rifiutera'"; exit 1; }
-            echo "punta ad Android 15 (API 35)"
+            grep -q 'targetSdkVersion="36"' "$MAN" \
+              || { echo "ERRORE: il pacchetto NON punta ad Android 16, Play lo rifiutera'"; exit 1; }
+            echo "punta ad Android 16 (API 36)"
           fi
 
       # Controllo finale: che il pacchetto sia DAVVERO firmato. Un AAB non firmato viene rifiutato
