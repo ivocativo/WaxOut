@@ -183,7 +183,20 @@ jobs:
       # da Play con un messaggio poco chiaro; meglio accorgersene qui.
       - name: Verifica che sia firmato
         run: |
-          AAB=$(find android -name "*.aab" | head -1)
+          # ⚠️ PERCORSO ESATTO, NON `find ... | head -1`. Gradle lascia in giro anche gli AAB
+          # INTERMEDI, che non sono firmati: il 2026-08-11 il controllo ne ha pescato uno
+          # (intermediates/intermediary_bundle/.../intermediary-bundle.aab) e la compilazione si
+          # e' fermata dicendo "non risulta firmato" mentre il pacchetto vero era perfetto.
+          # Il giorno prima aveva pescato quello giusto — per fortuna, non per costruzione: con
+          # un ordine diverso dei file si sarebbe caricato su Play un file di lavorazione.
+          # Se un domani Gradle cambiasse questo percorso, meglio fermarsi con l'elenco sotto gli
+          # occhi che indovinare quale file prendere.
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          if [ ! -f "$AAB" ]; then
+            echo "ERRORE: non trovo il pacchetto finale in $AAB. Ecco cosa c'e':"
+            find android/app/build/outputs -name "*.aab" || true
+            exit 1
+          fi
           echo "pacchetto: $AAB"
           unzip -l "$AAB" | grep -qi "META-INF/.*\.RSA\|META-INF/.*\.EC\|META-INF/.*\.DSA" \
             && echo "firma presente" \
