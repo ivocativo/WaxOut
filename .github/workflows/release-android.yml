@@ -105,6 +105,25 @@ jobs:
       - name: Metti l'icona dell'app
         run: cp -r android-res/. android/app/src/main/res/
 
+      # SCHERMO INTERO E ORIZZONTALE FISSO (playtest 2026-08-11, Galaxy A34 / Android 16).
+      # Due cose distinte:
+      #  - MainActivity.java nostro al posto di quello vuoto di Capacitor: nasconde le barre di
+      #    sistema, che da Android 15 vengono disegnate SOPRA il gioco e coprivano il pulsante
+      #    di salto (toccandolo si usciva dall'app);
+      #  - orientamento bloccato in orizzontale nel manifest: il gioco e' pensato solo cosi',
+      #    e da verticale restava una striscia in mezzo allo schermo.
+      # ⚠️ Come per l'icona: la cartella android/ si rigenera a ogni compilazione, quindi questi
+      # file stanno nel repository e si ricopiano qui, non si modificano "una volta e via".
+      - name: Schermo intero e orizzontale fisso
+        run: |
+          APP=android/app/src/main/java/io/github/ivocativo/waxout
+          cp android-src/MainActivity.java "$APP/MainActivity.java"
+          MAN=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<activity#<activity\n            android:screenOrientation="sensorLandscape"#' "$MAN"
+          grep -q 'sensorLandscape' "$MAN" || { echo "ERRORE: orientamento non impostato nel manifest"; exit 1; }
+          grep -q 'nascondiLeBarre' "$APP/MainActivity.java" || { echo "ERRORE: MainActivity non e' la nostra"; exit 1; }
+          echo "schermo intero + orizzontale: ok"
+
       # Il numero di versione. `versionCode` deve CRESCERE a ogni caricamento su Play, e non si puo'
       # mai riusare: si prende il numero progressivo della compilazione, che cresce da solo e non
       # dipende da nessuno che si ricordi di aggiornarlo. `versionName` e' quello che vedono i

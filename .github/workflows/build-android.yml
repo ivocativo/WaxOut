@@ -86,6 +86,17 @@ jobs:
           echo "--- icone in posa ---"
           ls android/app/src/main/res/mipmap-xxxhdpi/
 
+      # Stesso trattamento del pacchetto di rilascio (vedi release-android.yml): schermo intero
+      # e orientamento fisso. Se l'APK di prova non li avesse, i tester collauderebbero un'app
+      # diversa da quella che si pubblica — ed e' proprio da loro che e' arrivata la segnalazione.
+      - name: Schermo intero e orizzontale fisso
+        run: |
+          APP=android/app/src/main/java/io/github/ivocativo/waxout
+          cp android-src/MainActivity.java "$APP/MainActivity.java"
+          MAN=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<activity#<activity\n            android:screenOrientation="sensorLandscape"#' "$MAN"
+          grep -q 'sensorLandscape' "$MAN" || { echo "ERRORE: orientamento non impostato nel manifest"; exit 1; }
+
       - name: Sincronizza Capacitor
         run: npx cap sync android
 

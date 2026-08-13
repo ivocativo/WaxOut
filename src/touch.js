@@ -25,6 +25,46 @@ window.TouchControls = (function () {
       (scene.sys.game.device.input.touch === true);
   }
 
+  // QUANTO SPAZIO SI PRENDONO LE BARRE DI SISTEMA, in unita' di gioco.
+  // Da Android 15 il sistema disegna l'app A TUTTO SCHERMO, barre comprese: senza questa
+  // correzione i tasti home/indietro/recenti finiscono SOPRA il pulsante di salto e sopra la
+  // leva, e toccandoli si esce dal gioco (segnalato dai tester su Galaxy A34, Android 16).
+  // Il browser espone quello spazio con env(safe-area-inset-*), ma solo alla CSS: si misura
+  // mettendo un elemento invisibile che usa quei valori come spaziatura e rileggendoli.
+  // ⚠️ E' la SECONDA difesa, non la prima: l'app nasconde gia' le barre (vedi
+  // android-src/MainActivity.java). Serve per i telefoni in cui quel meccanismo non funziona,
+  // e nel momento in cui l'utente le fa ricomparire con una strisciata. Le due difese sono
+  // indipendenti apposta: se cade una, l'altra tiene.
+  function margineSicurezza(scene) {
+    const vuoto = { sx: 0, dx: 0, giu: 0 };
+    let css;
+    try {
+      // Forzatura per le prove: ?safe=40 finge barre da 40px su tutti i lati.
+      const q = new URLSearchParams(window.location.search).get('safe');
+      if (q !== null) {
+        const v = parseFloat(q) || 0;
+        css = { sx: v, dx: v, giu: v };
+      } else {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;'
+          + 'padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);'
+          + 'padding-bottom:env(safe-area-inset-bottom)';
+        document.body.appendChild(d);
+        const s = getComputedStyle(d);
+        css = { sx: parseFloat(s.paddingLeft) || 0, dx: parseFloat(s.paddingRight) || 0,
+          giu: parseFloat(s.paddingBottom) || 0 };
+        d.remove();
+      }
+    } catch (e) { return vuoto; }
+    // Da pixel dello schermo a unita' di gioco: il canvas e' scalato, e displayScale dice
+    // quante unita' di gioco vale un pixel a schermo.
+    const k = (scene.scale && scene.scale.displayScale) || { x: 1, y: 1 };
+    // ⚠️ Con un tetto: una lettura strana non deve poter spingere i comandi in mezzo allo
+    // schermo. Meglio una protezione parziale che comandi in un posto assurdo.
+    const cap = (v) => Math.min(Math.max(v, 0), 90);
+    return { sx: cap(css.sx * k.x), dx: cap(css.dx * k.x), giu: cap(css.giu * k.y) };
+  }
+
   // Disegna l'icona del pulsante (vettoriale: indipendente dal font).
   function drawIcon(g, x, y, r, type) {
     const s = r * 0.42;
@@ -88,6 +128,9 @@ window.TouchControls = (function () {
     if (need > 0) scene.input.addPointer(need);
 
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT;
+    // Spazio occupato dalle barre di sistema: tutti i comandi si spostano verso l'interno di
+    // altrettanto. A barre nascoste vale zero e non cambia niente.
+    const M = margineSicurezza(scene);
 
     function holdBtn(arc, key) {
       arc.on('pointerdown', () => { window.Sfx.unlock(); state[key] = true; press(arc, true); });
@@ -105,7 +148,7 @@ window.TouchControls = (function () {
     // l'impossibilita' di fare le diagonali con un solo dito del vecchio pad a frecce.
     // Il pomello segue il dito (sensazione analogica); la direzione viene "agganciata"
     // a 8 vie e tradotta negli stessi flag left/right/aimUp/aimDown letti da GameScene.
-    const baseX = 122, baseY = H - 108, R = 66, knobR = 34, DEAD = 0.36;
+    const baseX = 122 + M.sx, baseY = H - 108 - M.giu, R = 66, knobR = 34, DEAD = 0.36;
     const ring = scene.add.circle(baseX, baseY, R, 0xfff7e8, 0.10).setScrollFactor(0).setDepth(DEPTH);
     ring.setStrokeStyle(3, 0xfff7e8, 0.45);
     const knob = scene.add.circle(baseX, baseY, knobR, 0xfff7e8, 0.34).setScrollFactor(0).setDepth(DEPTH + 1);
@@ -147,17 +190,18 @@ window.TouchControls = (function () {
 
     // DESTRA: Spruzza (tieni premuto) + Salto (dedicato).
     const ar = 50;
-    holdBtn(button(scene, W - ar * 3 - 30, H - ar - 26, ar, 'spray'), 'sprayHeld');
+    const bx = W - M.dx, by = H - M.giu;    // angolo in basso a destra, barre escluse
+    holdBtn(button(scene, bx - ar * 3 - 30, by - ar - 26, ar, 'spray'), 'sprayHeld');
     // Salto: impulso (jumpQueued) per far partire il salto + stato "tenuto" (jumpHeld)
     // per il salto ad altezza variabile (rilasci presto = saltino, tieni = salto pieno).
-    const jumpBtn = button(scene, W - ar - 22, H - ar - 26, ar, 'jump');
+    const jumpBtn = button(scene, bx - ar - 22, by - ar - 26, ar, 'jump');
     jumpBtn.on('pointerdown', () => { window.Sfx.unlock(); state.jumpQueued = true; state.jumpHeld = true; press(jumpBtn, true); });
     jumpBtn.on('pointerup', () => { state.jumpHeld = false; press(jumpBtn, false); });
     jumpBtn.on('pointerout', () => { state.jumpHeld = false; press(jumpBtn, false); });
 
     // Scatto: solo se gia sbloccato (sopra il Salto).
     if (window.GameState.player && window.GameState.player.dash) {
-      tapBtn(button(scene, W - ar - 22, H - ar * 3 - 42, ar * 0.82, 'dash'), 'dashQueued');
+      tapBtn(button(scene, bx - ar - 22, by - ar * 3 - 42, ar * 0.82, 'dash'), 'dashQueued');
     }
 
     return state;
