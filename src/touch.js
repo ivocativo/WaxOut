@@ -58,11 +58,20 @@ window.TouchControls = (function () {
     } catch (e) { return vuoto; }
     // Da pixel dello schermo a unita' di gioco: il canvas e' scalato, e displayScale dice
     // quante unita' di gioco vale un pixel a schermo.
-    const k = (scene.scale && scene.scale.displayScale) || { x: 1, y: 1 };
-    // ⚠️ Con un tetto: una lettura strana non deve poter spingere i comandi in mezzo allo
-    // schermo. Meglio una protezione parziale che comandi in un posto assurdo.
-    const cap = (v) => Math.min(Math.max(v, 0), 90);
-    return { sx: cap(css.sx * k.x), dx: cap(css.dx * k.x), giu: cap(css.giu * k.y) };
+    // ⚠️ QUEL NUMERO PUO' NON ESSERE UN NUMERO. displayScale e' gameSize/displaySize, e quando il
+    // canvas ha ancora dimensione ZERO — succede per un istante all'avvio e durante una rotazione
+    // — viene infinito; zero per infinito fa NaN, e i comandi finivano a coordinate inesistenti,
+    // cioe' SPARIVANO TUTTI. Su un telefono vuol dire gioco senza comandi. Trovato in anteprima
+    // il 2026-08-13 perche' li' il canvas era davvero 0x0.
+    // Se il numero non e' valido non si sposta niente: meglio i comandi al loro posto di sempre
+    // che comandi invisibili. E' la scelta di quale guasto avere quando qualcosa va storto.
+    const k = (scene.scale && scene.scale.displayScale) || {};
+    const buono = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
+    const kx = buono(k.x), ky = buono(k.y);
+    // Il tetto serve all'altro estremo: una lettura anomala non deve poter spingere i comandi in
+    // mezzo allo schermo. Meglio una protezione parziale che comandi in un posto assurdo.
+    const cap = (v) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 90) : 0);
+    return { sx: cap(css.sx * kx), dx: cap(css.dx * kx), giu: cap(css.giu * ky) };
   }
 
   // Disegna l'icona del pulsante (vettoriale: indipendente dal font).
@@ -191,21 +200,33 @@ window.TouchControls = (function () {
     // DESTRA: Spruzza (tieni premuto) + Salto (dedicato).
     const ar = 50;
     const bx = W - M.dx, by = H - M.giu;    // angolo in basso a destra, barre escluse
-    holdBtn(button(scene, bx - ar * 3 - 30, by - ar - 26, ar, 'spray'), 'sprayHeld');
+    // QUANTO STANNO LONTANI DAL BORDO. Erano 22 di lato e 26 dal fondo, e i tester li hanno
+    // trovati scomodi: "un filo troppo vicini al bordo, la presa del telefono e' scomoda"
+    // (2026-08-13). Alzati a 56 e 44, cioe' gli stessi margini che aveva gia' la LEVA a sinistra
+    // (56 dal lato, 42 dal fondo) e che nessuno ha mai segnalato — invece di inventare due numeri
+    // nuovi si e' copiato quello che gia' funzionava.
+    // ⚠️ Sono i due numeri da toccare per rifare questa taratura: tutto il resto della pulsantiera
+    // si posiziona RISPETTO al salto, quindi si sposta di conseguenza e le distanze fra un
+    // pulsante e l'altro non cambiano.
+    const MARGINE_LATO = 56, MARGINE_FONDO = 44;
+    const jx = bx - MARGINE_LATO - ar, jy = by - MARGINE_FONDO - ar;
+    holdBtn(button(scene, jx - (ar * 2 + 8), jy, ar, 'spray'), 'sprayHeld');
     // Salto: impulso (jumpQueued) per far partire il salto + stato "tenuto" (jumpHeld)
     // per il salto ad altezza variabile (rilasci presto = saltino, tieni = salto pieno).
-    const jumpBtn = button(scene, bx - ar - 22, by - ar - 26, ar, 'jump');
+    const jumpBtn = button(scene, jx, jy, ar, 'jump');
     jumpBtn.on('pointerdown', () => { window.Sfx.unlock(); state.jumpQueued = true; state.jumpHeld = true; press(jumpBtn, true); });
     jumpBtn.on('pointerup', () => { state.jumpHeld = false; press(jumpBtn, false); });
     jumpBtn.on('pointerout', () => { state.jumpHeld = false; press(jumpBtn, false); });
 
     // Scatto: solo se gia sbloccato (sopra il Salto).
     if (window.GameState.player && window.GameState.player.dash) {
-      tapBtn(button(scene, bx - ar - 22, by - ar * 3 - 42, ar * 0.82, 'dash'), 'dashQueued');
+      tapBtn(button(scene, jx, jy - (ar * 2 + 16), ar * 0.82, 'dash'), 'dashQueued');
     }
 
     return state;
   }
 
-  return { attach, isTouchDevice };
+  // margineSicurezza e' esposto per i controlli automatici: e' il punto in cui, il 2026-08-13,
+  // un numero non valido faceva sparire tutti i comandi, e va potuto esercitare da solo.
+  return { attach, isTouchDevice, margineSicurezza };
 })();

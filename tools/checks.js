@@ -1504,6 +1504,40 @@ window.__earwaxChecks = function (opts) {
       'scarto massimo ' + peggio.toFixed(2) + 'px fra il disegno a destra e quello a sinistra');
   }
 
+  // [37] I COMANDI A SCHERMO NON POSSONO FINIRE A COORDINATE NON VALIDE (2026-08-13).
+  // Da quando i comandi si spostano per non finire sotto le barre di sistema, la loro posizione
+  // dipende da `scale.displayScale`, che vale gameSize/displaySize. Quando il canvas ha ancora
+  // dimensione ZERO — all'avvio e a ogni ROTAZIONE del telefono — quel rapporto e' infinito, e
+  // zero per infinito fa NaN: i comandi finivano a coordinate inesistenti e SPARIVANO TUTTI.
+  // Su un telefono e' un gioco senza leva e senza pulsanti, in una finestra di pochi millesimi:
+  // il tipo di difetto che un tester non riesce a riprodurre e che quindi non verrebbe mai
+  // sistemato. Qui si esercita direttamente il calcolo, nei casi limite che lo rompevano.
+  {
+    const M = window.TouchControls.margineSicurezza;
+    const casi = [
+      ['canvas a zero (rotazione)', { scale: { displayScale: { x: Infinity, y: Infinity } } }],
+      ['scala non ancora pronta', { scale: {} }],
+      ['scena senza scala', {}],
+      ['scala normale', { scale: { displayScale: { x: 0.75, y: 0.75 } } }],
+      ['scala negativa', { scale: { displayScale: { x: -2, y: -2 } } }],
+    ];
+    const rotti = [];
+    for (const [nome, finta] of casi) {
+      const r = M(finta);
+      const valori = [r.sx, r.dx, r.giu];
+      if (!valori.every((v) => Number.isFinite(v) && v >= 0 && v <= 90)) {
+        rotti.push(nome + ' -> ' + JSON.stringify(r));
+      }
+    }
+    if (!rotti.length) {
+      ok('i comandi a schermo non finiscono a coordinate non valide', '-',
+        casi.length + ' casi limite (canvas a zero, scala assente, scala negativa): '
+        + 'margini sempre numeri validi fra 0 e 90');
+    } else {
+      ko('i comandi a schermo non finiscono a coordinate non valide', '-', rotti.join(' | '));
+    }
+  }
+
   // [34] L'INTERRUTTORE DEL PANNELLO DI PROVA (2026-08-04, verso la pubblicazione). Spegnendo
   // `CONFIG.PANNELLO_PROVA` il pannello deve sparire E tutte le manopole devono tornare al valore
   // normale, god-mode compreso — anche se nel telefono e' rimasto salvato qualcosa da una prova
