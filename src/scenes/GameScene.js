@@ -381,7 +381,6 @@ class GameScene extends Phaser.Scene {
     // distanza. (Con overlap(gruppo, oggetto) Phaser puo' invertire gli argomenti:
     // individuiamo sempre il proiettile-getto dal gruppo this.shots.)
     this.makeSoapTexture();
-    this.makeCuraTexture();
     this.shots = this.physics.add.group({ allowGravity: false });
     // Abilità PERFORANTE: la pallina non si spappola al primo colpo ma ne attraversa
     // alcuni (pierceLeft). pierceGrace evita di ri-colpire lo stesso bersaglio mentre esce.
@@ -1062,6 +1061,15 @@ class GameScene extends Phaser.Scene {
   // Pallina di cerume da raccogliere (premia chi sale sulle pedane). Ondeggia leggera.
   // heal=true: pallina rosata che invece di cerume cura un po' di vita (rara, negli scrigni).
   addWaxPickup(x, y, heal) {
+    // ⚠️ LA TEXTURE SI CREA QUI, NON IN UN PASSO DELL'AVVIO. Prima stava dentro
+    // agganciaProiettiliEGetto, che e' il SETTIMO passo di create(); ma le cure nascono nel
+    // SECONDO (costruisciIlCondotto costruisce il livello e ci mette dentro i pickup). Alla
+    // prima run dell'app la texture non esisteva ancora e la croce non si vedeva; dalla seconda
+    // in poi sì, perche' le texture sopravvivono al cambio di scena. Da qui il difetto
+    // segnalato: "all'avvio non si vede, ma se faccio un'altra run senza riavviare l'app sì".
+    // Chiamandola nel punto in cui SERVE il problema non puo' tornare riordinando create():
+    // makeCuraTexture esce subito se la texture c'e' gia', quindi costa una verifica e basta.
+    if (heal) this.makeCuraTexture();
     // La cura ha una texture SUA (croce bianca su rosso), non il cerume ritinto: vedi
     // makeCuraTexture per il perche' la tinta non poteva funzionare.
     const p = this.pickups.create(x, y, heal ? 'cura' : 'wax_glob').setDepth(7);

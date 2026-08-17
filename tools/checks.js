@@ -1538,6 +1538,35 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [39] LA CURA SI VEDE GIA' ALLA PRIMA RUN DELL'APP (2026-08-17). Difetto segnalato: appena
+  // aperta l'app la croce della cura non si vedeva, ma bastava iniziare un'altra run — senza
+  // riavviare — perche' comparisse. La texture veniva creata al SETTIMO passo di create(),
+  // mentre le cure nascono nel SECONDO (il livello si costruisce prima). Dalla seconda run in
+  // poi la texture c'era gia', perche' sopravvive al cambio di scena: per questo il difetto
+  // spariva da solo ed era facile crederlo risolto.
+  // ⚠️ QUI SI RICREA LA CONDIZIONE DELLA PRIMA VOLTA cancellando la texture: senza quel passo
+  // il controllo passerebbe sempre, perche' i controlli precedenti l'hanno gia' creata. E' la
+  // differenza fra provare il caso e provare lo stato in cui ci si trova per caso.
+  {
+    const gs9 = avviaLivello(2);
+    g.textures.remove('cura');
+    const senza = g.textures.exists('cura');
+    const cura = gs9.addWaxPickup(gs9.player.x, gs9.player.y - 60, true) ||
+      gs9.pickups.getChildren().slice(-1)[0];
+    const cerume = (gs9.addWaxPickup(gs9.player.x + 40, gs9.player.y - 60, false),
+      gs9.pickups.getChildren().slice(-1)[0]);
+    const okCura = !!cura && cura.texture.key === 'cura';
+    const okCerume = !!cerume && cerume.texture.key === 'wax_glob';
+    if (!senza && okCura && okCerume) {
+      ok('la cura si vede gia\' alla prima run', 2,
+        'texture cancellata come al primo avvio: la cura nasce lo stesso con la sua croce '
+        + '(texture "' + cura.texture.key + '"), il cerume resta "' + cerume.texture.key + '"');
+    } else {
+      ko('la cura si vede gia\' alla prima run', 2, 'texture presente prima della prova=' + senza
+        + ' cura=' + (cura && cura.texture.key) + ' cerume=' + (cerume && cerume.texture.key));
+    }
+  }
+
   // [38] I CARTELLI DEL BOSS SI ACCORDANO AL GENERE (2026-08-16). In italiano il participio si
   // accorda, e i cartelli erano al maschile fisso: con la Regina usciva "REGINA DELLE CROSTE:
   // DISTRUTTO" (segnalato dai tester). Ora ogni boss dichiara il proprio genere accanto al nome.
