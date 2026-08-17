@@ -157,13 +157,30 @@ window.TouchControls = (function () {
     // l'impossibilita' di fare le diagonali con un solo dito del vecchio pad a frecce.
     // Il pomello segue il dito (sensazione analogica); la direzione viene "agganciata"
     // a 8 vie e tradotta negli stessi flag left/right/aimUp/aimDown letti da GameScene.
-    const baseX = 122 + M.sx, baseY = H - 108 - M.giu, R = 66, knobR = 34, DEAD = 0.36;
+    // LEVA MOBILE (2026-08-18, chiesta dall'utente): la leva non sta in un punto fisso, NASCE
+    // DOVE APPOGGI IL DITO. Prima bisognava cercarla: appoggiando il pollice anche solo mezzo
+    // centimetro piu' in la', il gioco leggeva gia' una spinta in quella direzione, e il
+    // personaggio partiva da solo.
+    // Tre scelte, prese con l'utente:
+    //  1. si puo' appoggiare in TUTTA LA META' SINISTRA dello schermo, non solo nell'angolo:
+    //     e' il senso della modifica, non dover cercare la leva;
+    //  2. a dito sollevato la leva resta visibile IN TRASPARENZA nella sua posizione di riposo,
+    //     se no chi apre il gioco per la prima volta non sa dove si comanda il movimento;
+    //  3. trascinando oltre il bordo, il CENTRO INSEGUE il dito invece di bloccarsi (vedi
+    //     moveKnob). Senza questo, scivolando verso sinistra si arriva al limite e la direzione
+    //     si inchioda: e' la differenza fra una leva mobile e una leva che sembra rotta.
+    const RIPOSO_X = 122 + M.sx, RIPOSO_Y = H - 108 - M.giu;
+    const R = 66, knobR = 34, DEAD = 0.36;
+    const ALPHA_RIPOSO = 0.55;                 // quanto si vede quando non la tocchi
+    let baseX = RIPOSO_X, baseY = RIPOSO_Y;    // centro CORRENTE: cambia a ogni presa
     const ring = scene.add.circle(baseX, baseY, R, 0xfff7e8, 0.10).setScrollFactor(0).setDepth(DEPTH);
     ring.setStrokeStyle(3, 0xfff7e8, 0.45);
     const knob = scene.add.circle(baseX, baseY, knobR, 0xfff7e8, 0.34).setScrollFactor(0).setDepth(DEPTH + 1);
     knob.setStrokeStyle(2, 0xfff7e8, 0.65);
-    // Zona di presa generosa attorno alla base (anche se il dito parte un po' fuori).
-    const zone = scene.add.zone(baseX, baseY, R * 2.7, R * 2.7).setScrollFactor(0).setDepth(DEPTH - 1).setInteractive();
+    ring.setAlpha(ALPHA_RIPOSO); knob.setAlpha(ALPHA_RIPOSO);
+    // Zona di presa: tutta la meta' sinistra. ⚠️ Si ferma a meta' schermo apposta — piu' in la'
+    // ci sono salto e spruzzo, e una zona che li coprisse se li mangerebbe.
+    const zone = scene.add.zone(W / 4, H / 2, W / 2, H).setScrollFactor(0).setDepth(DEPTH - 1).setInteractive();
     let stickId = null;
 
     function clearDirs() { state.left = state.right = state.aimUp = state.aimDown = false; }
@@ -184,15 +201,45 @@ window.TouchControls = (function () {
       else { state.right = true; state.aimUp = true; }                    // NE
     }
     function moveKnob(px, py) {
-      const dx = px - baseX, dy = py - baseY;
-      const len = Math.hypot(dx, dy) || 0.0001;
-      const cl = Math.min(len, R);
-      knob.setPosition(baseX + (dx / len) * cl, baseY + (dy / len) * cl);
+      let dx = px - baseX, dy = py - baseY;
+      let len = Math.hypot(dx, dy) || 0.0001;
+      // Il dito e' andato oltre il bordo: il CENTRO gli va dietro, restando a distanza R.
+      // Cosi' si puo' continuare a spingere all'infinito nella stessa direzione senza che la
+      // leva "finisca la corsa" (scelta 3 qui sopra).
+      if (len > R) {
+        baseX = px - (dx / len) * R;
+        baseY = py - (dy / len) * R;
+        ring.setPosition(baseX, baseY);
+        dx = px - baseX; dy = py - baseY; len = R;
+      }
+      knob.setPosition(baseX + dx, baseY + dy);
       applyVec(dx, dy);
     }
-    function releaseStick() { stickId = null; knob.setPosition(baseX, baseY); clearDirs(); }
+    // Dito sollevato: la leva torna dove sta di solito e si fa di nuovo trasparente. Il ritorno
+    // e' animato perche' un salto istantaneo dall'altra parte dello schermo si legge come un
+    // difetto grafico.
+    function releaseStick() {
+      stickId = null;
+      clearDirs();
+      scene.tweens.killTweensOf([ring, knob]);
+      baseX = RIPOSO_X; baseY = RIPOSO_Y;
+      // ⚠️ ANELLO E POMELLO INSIEME. Riportare il pomello di colpo e animare solo l'anello
+      // faceva vedere i due pezzi della stessa leva muoversi in due modi diversi.
+      scene.tweens.add({ targets: [ring, knob], x: RIPOSO_X, y: RIPOSO_Y,
+        alpha: ALPHA_RIPOSO, duration: 160, ease: 'Quad.out' });
+    }
 
-    zone.on('pointerdown', (pointer) => { window.Sfx.unlock(); stickId = pointer.id; moveKnob(pointer.x, pointer.y); });
+    zone.on('pointerdown', (pointer) => {
+      window.Sfx.unlock();
+      stickId = pointer.id;
+      // LA LEVA NASCE QUI. Il centro va esattamente sotto il dito, quindi la spinta iniziale e'
+      // zero: appoggiare non fa piu' partire il personaggio da solo.
+      scene.tweens.killTweensOf([ring, knob]);
+      baseX = pointer.x; baseY = pointer.y;
+      ring.setPosition(baseX, baseY); ring.setAlpha(1);
+      knob.setPosition(baseX, baseY); knob.setAlpha(1);
+      clearDirs();
+    });
     scene.input.on('pointermove', (pointer) => { if (stickId === pointer.id) moveKnob(pointer.x, pointer.y); });
     scene.input.on('pointerup', (pointer) => { if (stickId === pointer.id) releaseStick(); });
     scene.input.on('pointerupoutside', (pointer) => { if (stickId === pointer.id) releaseStick(); });

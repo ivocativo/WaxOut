@@ -1538,6 +1538,65 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [41] PULIRE NON PAGA, MA FA AVANZARE IL LIVELLO (2026-08-18, scelta dell'utente).
+  // La moneta si guadagna solo raccogliendo i pallini. ⚠️ Il controllo verifica DUE cose che
+  // sembrano una sola e non lo sono: che rompere il cerume non dia moneta, e che continui a far
+  // avanzare la percentuale di pulito. Se sparissero tutte e due, il gioco diventerebbe
+  // INFINIBILE (serve l'80% per passare di livello) e i controlli sull'economia passerebbero
+  // lo stesso: e' proprio la coppia che va tenuta d'occhio.
+  {
+    const gsE = avviaLivello(3);
+    const b = gsE.blocks.getChildren().find((x) => x.active && !x.ceiling);
+    const monetaPrima = window.GameState.wax;
+    const pulitoPrima = gsE.cleanedWax || 0;
+    if (b) gsE.damageBlock(b, 999999);
+    const guadagno = window.GameState.wax - monetaPrima;
+    const avanzato = (gsE.cleanedWax || 0) > pulitoPrima;
+    // e un pallino DEVE invece pagare
+    const primaPallino = window.GameState.wax;
+    gsE.dropWaxPellet(gsE.player.x, gsE.player.y - 40, 10);
+    const pallino = gsE.pickups.getChildren().slice(-1)[0];
+    if (pallino) gsE.raccogliPickup ? gsE.raccogliPickup(pallino) : gsE.physics.overlap(gsE.player, pallino);
+    const pallinoOk = !!pallino;
+    if (b && guadagno === 0 && avanzato && pallinoOk) {
+      ok('pulire non paga ma fa avanzare il livello', 3,
+        'blocco distrutto: moneta +' + guadagno + ', pulito avanzato; un nemico vale '
+        + Math.round((window.CONFIG.NEMICI_CERUME || 1) * 100) / 100 + 'x il suo valore base');
+    } else {
+      ko('pulire non paga ma fa avanzare il livello', 3, 'blocco=' + !!b + ' guadagno=' + guadagno
+        + ' pulito avanzato=' + avanzato + ' pallino creato=' + pallinoOk);
+    }
+  }
+
+  // [40] NESSUN NEMICO NASCE DENTRO IL CERUME, NEMMENO CON LA POSIZIONE IMPOSTA (2026-08-18).
+  // Il controllo sul cerume esisteva gia', ma viveva dentro pickGroundX — e meta' dei nemici non
+  // ci passa: sciami, guardiani delle membrane, nemici che si sdoppiano e il fuggitivo nascono a
+  // una posizione IMPOSTA. Restavano incastrati a spingere contro un cumulo senza avanzare.
+  // ⚠️ Qui si CHIEDE APPOSTA di nascere dentro un cumulo, che e' il caso che il vecchio controllo
+  // non poteva vedere: farlo nascere "a caso" e sperare che capiti sul cerume proverebbe poco.
+  {
+    const gsC = avviaLivello(3);
+    const muro = gsC.blocks.getChildren().find((b) => b.active && !b.ceiling);
+    if (!muro) {
+      ok('nessun nemico nasce dentro il cerume', 3, 'nessun cumulo nel livello: prova non eseguita');
+    } else {
+      const dentro = Math.round(muro.x);
+      const nato = gsC.spawnEnemy('blob', { x: dentro });
+      const finito = nato ? Math.round(nato.x) : null;
+      const ancoraDentro = nato ? gsC.puntoOccupatoDalCerume(nato.x) : true;
+      // e il punto chiesto doveva davvero essere occupato, se no la prova non prova niente
+      const partenzaOccupata = gsC.puntoOccupatoDalCerume(dentro);
+      if (partenzaOccupata && nato && !ancoraDentro) {
+        ok('nessun nemico nasce dentro il cerume', 3,
+          'chiesto x=' + dentro + ' (dentro un cumulo), spostato a x=' + finito
+          + ' (' + Math.abs(finito - dentro) + 'px piu' + '\' in la\'), fuori dal cerume');
+      } else {
+        ko('nessun nemico nasce dentro il cerume', 3, 'partenza occupata=' + partenzaOccupata
+          + ' nato=' + !!nato + ' ancora dentro=' + ancoraDentro + ' x=' + finito);
+      }
+    }
+  }
+
   // [39] LA CURA SI VEDE GIA' ALLA PRIMA RUN DELL'APP (2026-08-17). Difetto segnalato: appena
   // aperta l'app la croce della cura non si vedeva, ma bastava iniziare un'altra run — senza
   // riavviare — perche' comparisse. La texture veniva creata al SETTIMO passo di create(),

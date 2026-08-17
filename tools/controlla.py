@@ -8,6 +8,7 @@
 #
 # Serve una tantum:  python -m pip install playwright  &&  python -m playwright install chromium
 import functools
+import random
 import http.server
 import socket
 import socketserver
@@ -24,13 +25,20 @@ def porta_libera():
     # "pericolose" (ERR_UNSAFE_PORT) — quasi tutte sotto la 1024 piu' parecchie sparse fino alla
     # 1900 circa. Lasciando scegliere al sistema (porta 0) prima o poi ne esce una bloccata e i
     # controlli falliscono senza motivo: successo due volte di fila il 2026-07-27.
-    for _ in range(50):
+    # ⚠️ SI PROVANO PORTE DELL'INTERVALLO, non si chiede al sistema. Chiedendo al sistema una
+    # porta qualsiasi (bind sulla 0) su Windows si ottiene sempre un numero sopra la 49000, che
+    # e' fuori dall'intervallo accettato qui: il ciclo non trovava MAI un numero buono e si
+    # finiva sempre sul ripiego fisso 8321. Risultato: due esecuzioni dei controlli non potevano
+    # coesistere, e la seconda moriva con un errore di socket che sembrava un guasto del gioco
+    # (successo il 2026-08-18, due giri persi a cercare un controllo rotto che non esisteva).
+    for _ in range(200):
+        porta = random.randint(8000, 32000)
         with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
-            porta = s.getsockname()[1]
-        if 8000 <= porta <= 32000:
-            return porta
-    # Ripiego: una porta fissa alta, se il sistema continua a dare numeri fuori intervallo.
+            try:
+                s.bind(("127.0.0.1", porta))
+                return porta
+            except OSError:
+                continue
     return 8321
 
 
@@ -59,8 +67,22 @@ def main():
         print(f"Non trovo {CHECKS}")
         return 2
 
-    porta = porta_libera()
-    httpd = avvia_server(porta)
+    # ⚠️ RIPROVARE SE LA PORTA E' OCCUPATA. porta_libera() ne sceglie una libera, la lascia e
+    # poi avvia_server la riprende: fra i due momenti qualcun altro puo' portarsela via. Succede
+    # sul serio quando girano DUE esecuzioni dei controlli insieme, e allora lo script muore con
+    # un errore di socket che sembra un guasto del gioco (successo il 2026-08-18: due giri persi
+    # a cercare un controllo rotto che non esisteva).
+    httpd = None
+    for tentativo in range(6):
+        porta = porta_libera()
+        try:
+            httpd = avvia_server(porta)
+            break
+        except OSError:
+            if tentativo == 5:
+                print("Non riesco a prendere una porta libera: c'e' un'altra esecuzione dei "
+                      "controlli in corso? Aspetta che finisca e rilancia.")
+                return 2
     url = f"http://127.0.0.1:{porta}/"
     print(f"Gioco servito su {url}")
 

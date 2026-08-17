@@ -1372,6 +1372,10 @@ class GameScene extends Phaser.Scene {
       // (guardiano di una membrana) o scelta automatica lontano dal giocatore.
       if (cfg.boss) x = Phaser.Math.Clamp(this.goalX - 260, 700, this.worldW - 200);
       else x = (opts.x !== undefined) ? Phaser.Math.Clamp(opts.x, 60, this.worldW - 60) : this.pickGroundX();
+      // Qui passano TUTTI i nemici di terra, compresi quelli con la posizione imposta: e' l'unico
+      // punto in cui la garanzia "non dentro il cerume" vale per tutti. Il boss e' escluso perche'
+      // la sua posizione e' il presidio del timpano e non va spostata.
+      if (!cfg.boss) x = this.scostaDalCerume(x);
       // L'hitbox scala con lo sprite: la quota di riposo usa l'altezza GIA' scalata sulla
       // superficie LOCALE del terreno (terrainTopAt), cosi' il corpo e lo sbuffo di comparsa
       // appoggiano sul terreno sotto x, non sulla vecchia linea piatta 360.
@@ -1432,7 +1436,12 @@ class GameScene extends Phaser.Scene {
     e.hp = cfg.hp; e.maxHp = cfg.hp;
     e.speed = cfg.speed;
     e.contactDamage = cfg.dmg;
-    e.waxValue = cfg.wax;
+    // ⚠️ Il cerume che lascia cadere un nemico passa da CONFIG.NEMICI_CERUME, che vale 3 da
+    // quando pulire non paga piu' (vedi damageBlock): senza quel moltiplicatore il negozio
+    // sarebbe diventato quasi irraggiungibile. Il FUGGITIVO dorato non passa di qui — il suo
+    // valore e' scritto a parte ed e' gia' un premio grosso, triplicarlo lo renderebbe l'unica
+    // fonte di guadagno che conta.
+    e.waxValue = Math.round(cfg.wax * (window.CONFIG.NEMICI_CERUME || 1));
     e.bitKey = cfg.bit;
     e.knockUntil = 0;
     if (cfg.spit) {
@@ -1665,14 +1674,41 @@ class GameScene extends Phaser.Scene {
       return x;
     };
     // Un nemico non deve nascere DENTRO un cumulo di cerume: ci resta incastrato a spingere
-    // senza avanzare (segnalato il 2026-06-30, ritrovato dai controlli automatici il 2026-07-21).
-    // Si scarta il punto occupato e se ne prova un altro; se proprio non se ne trova uno libero
-    // si tiene l'ultimo, cosi' non si sta mai peggio di prima.
-    const occupato = (cx) => this.blocks.getChildren().some((b) => b.active
-      && Math.abs(b.x - cx) < 30 && Math.abs(b.y - (this.terrainTopAt(cx) - 20)) < 46);
+    // senza avanzare. Qui si scarta il punto occupato e se ne prova un altro; la garanzia vera
+    // per TUTTI i nemici sta pero' in posizioneDiNascita (vedi scostaDalCerume), perche' questa
+    // funzione non viene nemmeno chiamata quando la posizione e' imposta da fuori.
     let x = scegli();
-    for (let tent = 0; tent < 8 && occupato(x); tent++) x = scegli();
+    for (let tent = 0; tent < 8 && this.puntoOccupatoDalCerume(x); tent++) x = scegli();
     return Math.round(Phaser.Math.Clamp(x, left, right));
+  }
+
+  // C'e' un cumulo di cerume proprio dove appoggerebbe un nemico che nasce in `cx`?
+  // ⚠️ REGOLA IN UN POSTO SOLO: prima questa condizione era scritta dentro pickGroundX e da li'
+  // non poteva proteggere nessun altro. La stessa regola in due punti prima o poi diverge.
+  puntoOccupatoDalCerume(cx) {
+    return this.blocks.getChildren().some((b) => b.active
+      && Math.abs(b.x - cx) < 30 && Math.abs(b.y - (this.terrainTopAt(cx) - 20)) < 46);
+  }
+
+  // Sposta il punto di nascita al primo posto libero vicino, se quello scelto e' dentro il cerume.
+  // ⚠️ SERVE PERCHE' META' DEI NEMICI NON PASSA DA pickGroundX. Nascono a una posizione IMPOSTA
+  // gli sciami (disposti attorno a un centro), i guardiani delle membrane, i nemici che si
+  // sdoppiano morendo e il fuggitivo dorato: per tutti loro il controllo sul cerume non veniva
+  // fatto, e finivano incastrati a spingere contro un cumulo senza avanzare (segnalato dai
+  // tester il 2026-08-18).
+  // Si SPOSTA invece di riprovare a caso: quelle posizioni vogliono dire qualcosa (il guardiano
+  // sta davanti alla sua membrana, lo sciame sta insieme), e buttarle via le tradirebbe. Si
+  // cerca alternandosi a destra e a sinistra, cosi' il nemico resta il piu' vicino possibile a
+  // dove doveva stare. Se e' pieno dappertutto si tiene il punto originale: mai stare peggio.
+  scostaDalCerume(x) {
+    if (!this.puntoOccupatoDalCerume(x)) return x;
+    for (let d = 26; d <= 260; d += 26) {
+      for (const verso of [1, -1]) {
+        const c = Phaser.Math.Clamp(x + verso * d, 60, this.worldW - 60);
+        if (!this.puntoOccupatoDalCerume(c)) return c;
+      }
+    }
+    return x;
   }
 
   // Il nemico sbuca dal pavimento: parte schiacciato a terra e "cresce" in altezza.
@@ -2634,7 +2670,13 @@ class GameScene extends Phaser.Scene {
       window.Sfx.smash();
       this.burst(b.bitKey, b.x, b.y, 14);
       this.splat(b.x, b.y, b.waxType);
-      window.GameState.wax += Math.round(b.waxValue * (window.GameState.player.waxMult || 1) * (this.mutWaxMult || 1) * window.CONFIG.WAX_GAIN);   // Cerume Extra + mutatore + manopola globale
+      // ⚠️ PULIRE IL CERUME NON DA' PIU' MONETA (scelta dell'utente, 2026-08-18: "si ottiene
+      // troppo facilmente moneta spendibile allo shop"). La moneta si guadagna SOLO raccogliendo
+      // i pallini: quelli lasciati dai nemici e quelli sulle pedane e negli scrigni. Pulire
+      // serve ad aprirsi la strada e a completare il livello, non a far cassa.
+      // ⚠️ `cleanedWax` RESTA: e' un'altra cosa. Conta quanto condotto hai pulito e decide se il
+      // livello e' completo (l'80% richiesto). Toglierlo renderebbe il gioco infinibile — sono
+      // due numeri che sembrano lo stesso e non lo sono.
       this.cleanedWax = (this.cleanedWax || 0) + b.waxValue;   // per la % "pulito" (valore GREZZO, il moltiplicatore non conta)
       const dcol = b.col;
       if (b.waxImg) b.waxImg.destroy();

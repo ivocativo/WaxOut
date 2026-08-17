@@ -608,11 +608,33 @@ window.GameGfx = {
     const bg = scene.add.rectangle(W / 2, y, t.width + 52, t.height + 26, 0x14161f, 0.74)
       .setOrigin(0.5).setDepth(120).setScrollFactor(0).setStrokeStyle(3, strokeCol, 0.95);
     const group = [bg, t];
+    // ⚠️ UN CARTELLO ALLA VOLTA. Si disegnano tutti alla stessa altezza e restano quasi tre
+    // secondi: se ne arriva un altro prima, i due testi finiscono UNO SOPRA L'ALTRO e non si
+    // legge piu' niente. Segnalato col fuggitivo dorato (uccidendolo subito dopo la comparsa,
+    // "IN FUGA" e "CATTURATO" si accavallavano), ma vale per qualsiasi coppia ravvicinata:
+    // arrivo del boss + furia, mutatore + evento, e cosi' via.
+    // Il nuovo SOSTITUISCE il vecchio, con un'uscita rapida invece che immediata (sparire di
+    // colpo si legge come uno sfarfallio). Sostituire e non impilare: con tre cartelli in fila
+    // una pila finirebbe fuori schermo, e comunque quello che conta e' sempre l'ultimo.
+    const vecchio = scene._cartelloAttivo;
+    if (vecchio && vecchio.length && vecchio[0].active) {
+      scene.tweens.killTweensOf(vecchio);
+      scene.tweens.add({ targets: vecchio, alpha: 0, duration: 150, ease: 'Quad.in',
+        onComplete: () => vecchio.forEach((o) => { if (o.active) o.destroy(); }) });
+    }
+    scene._cartelloAttivo = group;
     group.forEach((o) => { o.setAlpha(0); o.setScale(0.85); });
     // "Pop" d'entrata + permanenza lunga + dissolvenza.
     scene.tweens.add({ targets: group, alpha: 1, scaleX: 1, scaleY: 1, duration: 320, ease: 'Back.out' });
     scene.time.delayedCall(2600, () => {
-      scene.tweens.add({ targets: group, alpha: 0, duration: 550, ease: 'Quad.in', onComplete: () => { bg.destroy(); t.destroy(); } });
+      // se nel frattempo un altro cartello ha preso il posto, questo e' gia' stato tolto
+      if (!bg.active || !t.active) return;
+      scene.tweens.add({ targets: group, alpha: 0, duration: 550, ease: 'Quad.in',
+        onComplete: () => {
+          if (scene._cartelloAttivo === group) scene._cartelloAttivo = null;
+          if (bg.active) bg.destroy();
+          if (t.active) t.destroy();
+        } });
     });
   },
 

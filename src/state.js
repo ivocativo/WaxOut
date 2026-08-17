@@ -58,6 +58,13 @@ window.CONFIG = {
   VITA_NEMICI: 0.8,       // quanto sono piu' fragili i nemici
   // GIRO DEL PLAYTEST ROUND 5 (2026-08-02), chiesto dall'utente.
   DANNO_NEMICI: 0.7,      // quanto meno male fanno i nemici (contatto e proiettili)
+  // ECONOMIA (2026-08-18, scelta dell'utente): pulire il cerume NON da' piu' moneta — si
+  // guadagna solo raccogliendo i pallini. Misurato prima del cambio: pulire un livello intero
+  // valeva 54 (liv.1), 123 (liv.5), 175 (liv.10), mentre un nemico ne vale ~2: il cerume era la
+  // quasi totalita' del guadagno, e senza compensare il negozio sarebbe diventato decorativo.
+  // Di qui il moltiplicatore sul bottino dei nemici. ⚠️ Da rileggere col playtest: e' il numero
+  // che decide quanto ci si mette a comprare il primo potenziamento.
+  NEMICI_CERUME: 3,       // quanto vale il pallino lasciato da un nemico (1 = com'era prima)
   // RAFFICA RADIALE (abilita' impilabile, playtest round 5): ogni tot parte una corona di
   // palline tutt'attorno. Il danno e' RIDOTTO apposta: e' un'arma che spara da sola mentre
   // pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
