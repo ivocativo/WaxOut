@@ -381,6 +381,7 @@ class GameScene extends Phaser.Scene {
     // distanza. (Con overlap(gruppo, oggetto) Phaser puo' invertire gli argomenti:
     // individuiamo sempre il proiettile-getto dal gruppo this.shots.)
     this.makeSoapTexture();
+    this.makeCuraTexture();
     this.shots = this.physics.add.group({ allowGravity: false });
     // Abilità PERFORANTE: la pallina non si spappola al primo colpo ma ne attraversa
     // alcuni (pierceLeft). pierceGrace evita di ri-colpire lo stesso bersaglio mentre esce.
@@ -1061,10 +1062,12 @@ class GameScene extends Phaser.Scene {
   // Pallina di cerume da raccogliere (premia chi sale sulle pedane). Ondeggia leggera.
   // heal=true: pallina rosata che invece di cerume cura un po' di vita (rara, negli scrigni).
   addWaxPickup(x, y, heal) {
-    const p = this.pickups.create(x, y, 'wax_glob').setDepth(7);
+    // La cura ha una texture SUA (croce bianca su rosso), non il cerume ritinto: vedi
+    // makeCuraTexture per il perche' la tinta non poteva funzionare.
+    const p = this.pickups.create(x, y, heal ? 'cura' : 'wax_glob').setDepth(7);
     p.body.setAllowGravity(false);
     p.body.setSize(14, 14, true);
-    if (heal) { p.isHeal = true; p.setTint(0xff8fae); p.waxValue = 2; p.healValue = window.CONFIG.CURA_PICKUP; }
+    if (heal) { p.isHeal = true; p.waxValue = 2; p.healValue = window.CONFIG.CURA_PICKUP; }
     else p.waxValue = 5;
     this.tweens.add({ targets: p, y: y - 6, yoyo: true, repeat: -1, duration: 750, ease: 'Sine.inOut' });
   }
@@ -1483,9 +1486,23 @@ class GameScene extends Phaser.Scene {
 
   // Nome del boss in campo, per i cartelli (furia, sconfitta, "batti il boss per passare").
   nomeBoss(e) {
-    const k = (e && e.bossKind) || (window.GameState.level >= window.CONFIG.RUN_LEVELS ? 'gran'
+    return window.I18n.t('boss_nome_' + this.tipoBoss(e));
+  }
+
+  // Quale boss e' in campo. Estratto da nomeBoss perche' serve anche al GENERE: la stessa
+  // scelta fatta in due posti diversi prima o poi diverge.
+  tipoBoss(e) {
+    return (e && e.bossKind) || (window.GameState.level >= window.CONFIG.RUN_LEVELS ? 'gran'
       : (window.GameState.level >= 10 ? 'regina' : 'tappo'));
-    return window.I18n.t('boss_nome_' + k);
+  }
+
+  // Il cartello giusto per il boss in campo, accordato al suo genere. In italiano il participio
+  // si accorda ("REGINA DELLE CROSTE: DISTRUTTA", non DISTRUTTO); in inglese le due varianti
+  // sono identiche. Si chiede sempre quella col genere, cosi' il gioco non deve sapere in che
+  // lingua sta parlando.
+  cartelloBoss(chiave, e) {
+    const g = window.I18n.t('boss_genere_' + this.tipoBoss(e));
+    return window.I18n.t(chiave + '_' + (g === 'f' ? 'f' : 'm'), { nome: this.nomeBoss(e) });
   }
 
   // LAVAGGIO DI COLORE DELLE ELITE (playtest round 5: "poco riconoscibili, saturazione
@@ -1829,6 +1846,28 @@ class GameScene extends Phaser.Scene {
   }
 
   // ---------- Combattimento ----------
+
+  // Texture procedurale della PALLINA CURA: nessun file, come quella del getto.
+  // ⚠️ PERCHE' NON BASTA UNA TINTA. Prima la cura era la stessa immagine del cerume
+  // (`wax_glob`) con `setTint(0xff8fae)` sopra, ed era "poco distinguibile" (playtest
+  // 2026-08-16). Il motivo e' lo stesso gia' incontrato con le elite: setTint MOLTIPLICA i
+  // colori, e su un disegno ambrato il rosa non si aggiunge, si spegne — restava una pallina
+  // di cerume appena piu' scura in mezzo ad altre palline di cerume.
+  // Qui la cura ha una FORMA sua: croce bianca su fondo rosso. Il colore da solo non basterebbe
+  // comunque per chi distingue male i colori; la forma si legge sempre.
+  makeCuraTexture() {
+    if (this.textures.exists('cura')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const S = 18, c = S / 2;
+    g.fillStyle(0x7a1226, 1); g.fillCircle(c, c, c);            // bordo scuro: stacca dal fondo
+    g.fillStyle(0xe8304f, 1); g.fillCircle(c, c, c - 1.6);      // rosso pieno
+    g.fillStyle(0xff8fa3, 0.85); g.fillCircle(c - 2.2, c - 2.4, 2.1);   // luce in alto a sinistra
+    g.fillStyle(0xffffff, 1);                                    // croce
+    g.fillRect(c - 1.6, c - 5, 3.2, 10);
+    g.fillRect(c - 5, c - 1.6, 10, 3.2);
+    g.generateTexture('cura', S, S);
+    g.destroy();
+  }
 
   // Texture procedurale per la pallina del getto (acqua e sapone): nessun file.
   makeSoapTexture() {
@@ -2690,7 +2729,7 @@ class GameScene extends Phaser.Scene {
       if (e.kind === 'boss') {
         this.cameras.main.shake(260, 0.014);
         this.burst(e.bitKey, e.x, e.y, 28);
-        this.showBanner(window.I18n.t('game_boss_dead', { nome: this.nomeBoss(e) }), '#ffd166');
+        this.showBanner(this.cartelloBoss('game_boss_dead', e), '#ffd166');
         this.addWaxPickup(e.x - 22, e.y - 8, true);
         this.addWaxPickup(e.x + 22, e.y - 8, true);
       } else {
@@ -2989,7 +3028,7 @@ class GameScene extends Phaser.Scene {
     if (enraged && !e._enraged) {                 // passaggio di fase (2a): FURIA
       e._enraged = true;
       this.cameras.main.shake(200, 0.01);
-      this.showBanner(window.I18n.t('game_boss_enrage', { nome: this.nomeBoss(e) }), '#ff7043');
+      this.showBanner(this.cartelloBoss('game_boss_enrage', e), '#ff7043');
       e.spitEvery = Math.max(700, Math.round(e.spitEvery * 0.6));
       e._summonAt = now + 2500;
     }

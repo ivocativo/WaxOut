@@ -1538,6 +1538,46 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [38] I CARTELLI DEL BOSS SI ACCORDANO AL GENERE (2026-08-16). In italiano il participio si
+  // accorda, e i cartelli erano al maschile fisso: con la Regina usciva "REGINA DELLE CROSTE:
+  // DISTRUTTO" (segnalato dai tester). Ora ogni boss dichiara il proprio genere accanto al nome.
+  // ⚠️ Questo controllo esiste per il boss CHE NON C'E' ANCORA: chi ne aggiunge uno nuovo deve
+  // ricordarsi del genere, e senza una rete la dimenticanza si vedrebbe solo giocando fino a
+  // quel boss, in italiano, e leggendo il cartello.
+  {
+    const I = window.I18n;
+    const linguaPrima = 'it';
+    const guasti = [];
+    for (const lang of ['it', 'en']) {
+      I.setLang(lang);
+      for (const k of ['tappo', 'regina', 'gran']) {
+        const g = I.t('boss_genere_' + k);
+        if (g !== 'm' && g !== 'f') { guasti.push(lang + '/' + k + ': genere = "' + g + '"'); continue; }
+        for (const frase of ['game_boss_dead_', 'game_boss_enrage_']) {
+          for (const gen of ['m', 'f']) {
+            const t = I.t(frase + gen, { nome: 'X' });
+            // se la chiave manca, t() restituisce la chiave stessa: e' cosi' che si riconosce
+            if (!t || t.indexOf(frase) === 0) guasti.push(lang + ': manca ' + frase + gen);
+          }
+        }
+      }
+    }
+    // e il caso concreto che ha fatto nascere il controllo
+    I.setLang('it');
+    const gsB = g.scene.getScene('GameScene');
+    const regina = gsB.cartelloBoss('game_boss_dead', { bossKind: 'regina' });
+    const tappo = gsB.cartelloBoss('game_boss_dead', { bossKind: 'tappo' });
+    if (!/DISTRUTTA/.test(regina)) guasti.push('la Regina non e\' al femminile: ' + regina);
+    if (!/DISTRUTTO/.test(tappo)) guasti.push('il Tappo non e\' al maschile: ' + tappo);
+    I.setLang(linguaPrima);
+    if (!guasti.length) {
+      ok('i cartelli del boss si accordano al genere', '-',
+        'tre boss x due lingue: "' + regina + '" e "' + tappo + '"');
+    } else {
+      ko('i cartelli del boss si accordano al genere', '-', guasti.slice(0, 4).join(' | '));
+    }
+  }
+
   // [34] L'INTERRUTTORE DEL PANNELLO DI PROVA (2026-08-04, verso la pubblicazione). Spegnendo
   // `CONFIG.PANNELLO_PROVA` il pannello deve sparire E tutte le manopole devono tornare al valore
   // normale, god-mode compreso — anche se nel telefono e' rimasto salvato qualcosa da una prova
