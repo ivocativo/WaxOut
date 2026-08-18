@@ -1448,6 +1448,10 @@ window.__earwaxChecks = function (opts) {
     const prende = (k) => cima[k] >= bordoBasso;
     const prendeGiu = (k) => cima[k] >= bassoGiu;
     const bassi = !prende('spit') && !prende('hopper');   // in piedi non si prendono: e' il loro senso
+    // ⚠️ IL SALTATORE NON SI PRENDE NEMMENO ABBASSANDOSI, ED E' VOLUTO: e' alto 30 e la fascia
+    // bassa del colpo accovacciato parte da 37. Deciso con l'utente il 2026-08-18 dopo averglielo
+    // fatto notare: un nemico che saltella si prende al volo o col coton fioc. NON "correggerlo"
+    // alzandolo — sembrerebbe una svista e invece e' una scelta.
     const giuOk = prendeGiu('spit');                      // ...ma abbassandosi il gorgogliante SI'
 
     if (prende('blob') && prende('crust') && bassi && giuOk) {
@@ -1456,7 +1460,7 @@ window.__earwaxChecks = function (opts) {
         + Math.round(bassoGiu) + '; cerumino ' + Math.round(cima.blob) + ' e crosta '
         + Math.round(cima.crust) + ' si prendono in piedi; gorgogliante ' + Math.round(cima.spit)
         + ' solo abbassandosi; saltatore ' + Math.round(cima.hopper)
-        + ' con nessuna delle due (si prende al volo mentre salta, o col coton fioc)');
+        + ' con nessuna delle due: VOLUTO, si prende al volo mentre salta o col coton fioc');
     } else {
       ko('i colpi prendono i nemici alti in piedi e il gorgogliante da accovacciati', 3,
         'bordo basso in piedi=' + Math.round(bordoBasso) + ' accovacciati=' + Math.round(bassoGiu)
@@ -1627,6 +1631,14 @@ window.__earwaxChecks = function (opts) {
   // differenza fra provare il caso e provare lo stato in cui ci si trova per caso.
   {
     const gs9 = avviaLivello(2);
+    // ⚠️ PRIMA SI TOLGONO GLI OGGETTI CHE LA USANO. Cancellare una texture mentre un pickup in
+    // campo la sta ancora disegnando manda in errore il renderer al primo fotogramma
+    // ("Cannot read properties of null (reading 'glTexture')"). Era il "+1 errore in console"
+    // che compariva a intermittenza: dipendeva dal fatto che il livello generato a caso avesse
+    // o no una cura gia' in campo. Il gioco non c'entrava niente — era questo controllo.
+    gs9.pickups.getChildren().slice().forEach((p) => {
+      if (p.active && p.texture && p.texture.key === 'cura') p.destroy();
+    });
     g.textures.remove('cura');
     const senza = g.textures.exists('cura');
     const cura = gs9.addWaxPickup(gs9.player.x, gs9.player.y - 60, true) ||

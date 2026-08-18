@@ -102,7 +102,26 @@ def main():
             timeout=90_000,
         )
 
-        pagina.add_script_tag(content=CHECKS.read_text(encoding="utf-8"))
+        # ATTENZIONE: PRIMA LA SINTASSI, POI TUTTO IL RESTO. Un errore di battitura in checks.js
+        # — un apostrofo dentro una stringa basta — rende ILLEGGIBILE l'intero file: nessun
+        # controllo gira, e il sintomo e' "window.__earwaxChecks is not a function" con uscita 1,
+        # cioe' sembra un controllo fallito quando invece non ne sta girando NEMMENO UNO.
+        # Successo il 2026-08-18: due giri a vuoto a cercare il controllo sbagliato.
+        # In questo progetto non c'e' Node: la sintassi la si fa verificare al browser, che e'
+        # gia' aperto. Costa un istante e dice subito dov'e' il guaio.
+        sorgente = CHECKS.read_text(encoding="utf-8")
+        errore = pagina.evaluate(
+            "(src) => { try { new Function(src); return null; } catch (e) { return e.message; } }",
+            sorgente,
+        )
+        if errore:
+            print(f"ERRORE DI SINTASSI in {CHECKS.name}: {errore}")
+            print("Nessun controllo e' stato eseguito. Correggi il file e rilancia.")
+            browser.close()
+            httpd.shutdown()
+            return 2
+
+        pagina.add_script_tag(content=sorgente)
         print("Eseguo i controlli (ci vuole un minuto)...\n")
         esito = pagina.evaluate("() => window.__earwaxChecks()")
         browser.close()
