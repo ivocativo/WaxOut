@@ -1212,7 +1212,15 @@ class GameScene extends Phaser.Scene {
     // Tabella dei tipi di nemico (statistiche scalate col livello).
     let cfg;
     if (kind === 'crust') {
-      cfg = { tex: 'enemy_crust', hp: 60 + lvl * 6, speed: 46, dmg: 16 + lvl * 2, wax: 8, bit: 'bit_dirt', body: [26, 22], scale: 1.6 };
+      // ⚠️ TRE BASTONATE COL COLPO BASE (scelta dell'utente, 2026-08-19). Il danno base e' 39
+      // (26 x DANNO_PG 1,5, senza acquisti al negozio), quindi servono PIU' DI 78 punti vita.
+      // Con i vecchi 60+lvl*6 la crosta ne aveva 53 al livello 1 e cadeva in due colpi.
+      // La crescita per livello e' stata abbassata da 6 a 4 apposta: con 6 sarebbe passata a
+      // quattro bastonate gia' a meta' run, e la scelta era "tre", non "sempre di piu'".
+      // Misurato dopo: 3 colpi dal livello 1 al 12, 4 dal 13 in poi (quando il giocatore ha
+      // gia' pescato carte di danno).
+      // ⚠️ Vale anche per il GETTO: la crosta e' piu' dura in assoluto, non solo di mazza.
+      cfg = { tex: 'enemy_crust', hp: 96 + lvl * 4, speed: 46, dmg: 16 + lvl * 2, wax: 8, bit: 'bit_dirt', body: [26, 22], scale: 1.6 };
     } else if (kind === 'fly') {
       cfg = { tex: 'enemy_fly', hp: 24 + lvl * 3, speed: 88 + lvl * 4, dmg: 10 + lvl * 2, wax: 7, bit: 'bit_wax', body: [24, 18], fly: true };
     } else if (kind === 'spit') {
@@ -2239,10 +2247,17 @@ class GameScene extends Phaser.Scene {
   // nemico vicino il tasto attacco fa la mazzata invece del getto). Ritorna il nemico o null.
   meleeTargetNear() {
     const px = this.player.x, py = this.player.y;
+    // ⚠️ IL RAGGIO SEGUE LA PORTATA. Era 58 fisso, scritto a mano e mai collegato al
+    // potenziamento: con la portata a 81 o 127 si continuava a iniziare il colpo solo a 58, e i
+    // pixel in piu' servivano solo se un secondo nemico capitava dentro l'arco per caso. Era un
+    // potenziamento che allungava il braccio lasciando il grilletto dov'era — da qui il "non si
+    // percepisce" dei tester. In verticale NON si scala: quello dice se il nemico e' alla tua
+    // altezza, non quanto lontano arrivi.
+    const portata = window.GameState.player.attackRange || 1;
     let target = null;
     this.enemies.getChildren().forEach((e) => {
       if (!e.active || e.spawning) return;
-      if (Math.abs(e.x - px) < 58 && Math.abs(e.y - py) < 56) target = e;
+      if (Math.abs(e.x - px) < 58 * portata && Math.abs(e.y - py) < 56) target = e;
     });
     return target;
   }
@@ -2251,11 +2266,12 @@ class GameScene extends Phaser.Scene {
   // che col getto quando gli sei addosso). Ritorna il blocco più vicino davanti a te, o null.
   meleeWaxNear() {
     const px = this.player.x, py = this.player.y;
+    const portata = window.GameState.player.attackRange || 1;   // come per i nemici: segue la portata
     let best = null, bd = 1e9;
     this.blocks.getChildren().forEach((b) => {
       if (!b.active) return;
       const dx = Math.abs(b.x - px), dy = Math.abs(b.y - py);
-      if (dx < 46 && dy < 44) { const d = dx + dy; if (d < bd) { bd = d; best = b; } }
+      if (dx < 46 * portata && dy < 44) { const d = dx + dy; if (d < bd) { bd = d; best = b; } }
     });
     return best;
   }
@@ -2316,6 +2332,24 @@ class GameScene extends Phaser.Scene {
   // fermo-immagine e schizzo. Sta a se' perche' arriva mezza animazione dopo il gesto (vedi
   // meleeSwing) — e perche' cosi' portata e direzione si leggono nell'istante in cui il braccio
   // e' davvero avanti, non in quello in cui hai premuto.
+  // SCIA DELLA BASTONATA: un arco disegnato dove il colpo arriva DAVVERO.
+  // ⚠️ Il raggio e' la portata vera, non un numero deciso a occhio: e' quello che rende visibile
+  // il potenziamento. Con la portata base l'arco e' corto, con tre carte e' vistoso — e siccome
+  // e' lo stesso numero che decide il danno, non puo' mentire su dove colpisci.
+  arcoMischia(range, cy) {
+    const verso = this.facing < 0 ? -1 : 1;
+    const g = this.add.graphics().setDepth(11.5).setScrollFactor(1);
+    g.lineStyle(5, 0xfff2c4, 0.85);
+    // L'arco copre il gesto: da alto-dietro a basso-avanti, specchiato col verso.
+    const da = verso > 0 ? -1.15 : Math.PI + 1.15;
+    const a2 = verso > 0 ? 0.45 : Math.PI - 0.45;
+    g.beginPath();
+    g.arc(this.player.x, this.player.y + cy, range, Math.min(da, a2), Math.max(da, a2), verso < 0);
+    g.strokePath();
+    this.tweens.add({ targets: g, alpha: 0, duration: 220, ease: 'Quad.out',
+      onComplete: () => g.destroy() });
+  }
+
   meleeImpatto(M) {
     const p = window.GameState.player;
     const range = M.portata * p.attackRange * window.CONFIG.MISCHIA_PORTATA;
@@ -2348,6 +2382,7 @@ class GameScene extends Phaser.Scene {
     // IMPATTO: quando la mazzata CONNETTE, micro-pausa (hit-stop) + tremolio -> peso.
     // Piu' forte sui nemici e col martello; leggero sul solo cerume.
     if (hitAny) {
+      this.arcoMischia(range, cy);
       this.cameras.main.shake(hitEnemy ? 130 : 60, hitEnemy ? 0.010 : 0.004);
       this.hitStop(M.fermo || (hitEnemy ? 78 : 40));
       this.sporcati(hitEnemy);          // lo schizzo torna addosso: ci si sporca di cerume
@@ -2481,6 +2516,22 @@ class GameScene extends Phaser.Scene {
     window.Sfx.crack();
   }
 
+  // NUMERO DI DANNO che sale e sfuma sopra il nemico colpito.
+  // Serve a rendere visibile una cosa che altrimenti non si vede: quanto fa male un colpo.
+  // Colori diversi per i tre casi, perche' il numero da solo non spiega PERCHE' e' basso:
+  //   forte (corpo a corpo) = ambra piena · normale (getto) = bianco · scalfito (armatura) = grigio.
+  // Il grigio sulla crosta e' didattico: dice "qui il getto non morde, cambia arma".
+  numeroDanno(x, y, dmg, tipo) {
+    const col = tipo === 'forte' ? '#ffd166' : (tipo === 'scalfito' ? '#9fb0c4' : '#fff7e8');
+    const t = this.add.text(x, y, String(Math.max(1, Math.round(dmg))), {
+      fontFamily: 'monospace', fontSize: tipo === 'forte' ? '17px' : '14px', color: col,
+      stroke: '#14161f', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(122);
+    // Sale poco e sfuma in fretta: deve informare senza coprire il gioco.
+    this.tweens.add({ targets: t, y: y - 22, alpha: 0, duration: 520, ease: 'Quad.out',
+      onComplete: () => t.destroy() });
+  }
+
   // Anello dell'ONDA D'URTO: cerchio giallo che si espande attorno al giocatore.
   blastFx(R) {
     const ring = this.add.circle(this.player.x, this.player.y, R || 84, 0xffe08a, 0.18).setDepth(11).setScale(0.3);
@@ -2529,9 +2580,16 @@ class GameScene extends Phaser.Scene {
     // solo il rettangolo di danno, non l'arma disegnata) — ora l'arma stessa si ingrandisce con
     // `p.attackRange`, smorzato a meta' (altrimenti dopo tante pescate diventerebbe assurda:
     // e' una carta "comune" ripescabile all'infinito).
-    const reachScale = 1 + (window.GameState.player.attackRange - 1) * 0.5;
+    // ⚠️ L'ARMA SI ALLUNGA ESATTAMENTE QUANTO LA PORTATA, e solo in LUNGHEZZA.
+    // Prima l'ingrandimento era smorzato a meta' e valeva su tutti e due i lati: il coton fioc
+    // diventava piu' grosso invece che piu' lungo, e soprattutto MENTIVA. Misurato: con 5 carte
+    // la portata del colpo e' 173px e il bastoncino disegnato ne era 115 — si colpiva 58 pixel
+    // oltre la punta visibile. Un'arma che colpisce dove non arriva e' peggio di un'arma grande.
+    // Se un giorno la lunghezza risultasse assurda, il numero da tagliare e' la PORTATA (cioe' la
+    // meccanica), non il disegno: il disegno deve dire la verita' su dove si colpisce.
+    const allungo = window.GameState.player.attackRange;
     w.setTexture(cfg.tex).setOrigin(cfg.origin[0], cfg.origin[1])
-      .setScale(cfg.scale * reachScale, cfg.scale * reachScale * (cfg.spessore || 1)).setVisible(true);
+      .setScale(cfg.scale * allungo, cfg.scale * (cfg.spessore || 1)).setVisible(true);
     this._weaponMode = 'melee'; this._weaponCfg = cfg; this._weaponFlip = this.facing < 0;
     // Come per il getto: deve coprire l'intervallo tra una bastonata e l'altra, se no il coton
     // fioc lampeggia tra un colpo e il successivo (segnalato nel playtest).
@@ -2715,8 +2773,23 @@ class GameScene extends Phaser.Scene {
     // Corazzati contro il GETTO: la crosta e la Regina delle Croste (boss del 2o tratto). Il
     // corpo a corpo fa danno pieno: e' il modo in cui il gioco insegna a cambiare arma.
     const armored = ((e.kind === 'crust' || e.bossArmor) && !heavy && !dot);
-    if (armored) dmg = Math.max(2, Math.round(dmg * (e.bossArmor ? 0.35 : 0.3)));   // lo scalfisce: poco ma visibile
+    // ⚠️ ARMATURA DELLA CROSTA AMMORBIDITA da 0,3 a 0,4 (2026-08-19). Non e' una taratura a
+    // sensazione: alzandole la vita a 96+lvl*4 (tre bastonate col colpo base) col vecchio 0,3
+    // servivano da 7 a 11 palline per abbatterla col getto, contro le 3 di mazza — la crosta
+    // era diventata quasi immune a distanza invece che semplicemente scomoda. Con 0,4 tornano
+    // 5 palline al livello 1, come prima del cambio di vita, e la mazza resta la scelta
+    // migliore: 3 colpi in 1,5 secondi contro 5 palline in 1,7. La lezione ("qui cambia arma")
+    // si impara lo stesso, senza punire chi preferisce sparare.
+    // Il boss corazzato resta a 0,35: li' il tempo lungo e' voluto, e' uno scontro a se'.
+    if (armored) dmg = Math.max(2, Math.round(dmg * (e.bossArmor ? 0.35 : 0.4)));   // lo scalfisce: poco ma visibile
     e.hp -= dmg;
+    // ⚠️ IL NUMERO SI MOSTRA DOPO L'ARMATURA, cioe' il danno DAVVERO inflitto. Mostrare quello
+    // "teorico" sarebbe peggio di non mostrarlo: sulla crosta si leggerebbe 39 mentre gliene
+    // togli 12, e il giocatore concluderebbe che il gioco e' rotto invece di capire che li' serve
+    // la mazza. E' anche il motivo per cui i numeri servono: il potenziamento del danno cambia
+    // il conto delle bastonate solo ogni tanto (misurato: da 39 a 47 non cambia NIENTE contro la
+    // crosta), e senza numeri quell'aumento e' invisibile.
+    this.numeroDanno(e.x, e.y - 18, dmg, heavy ? 'forte' : (armored ? 'scalfito' : 'normale'));
 
     // Fuggitivo Dorato ed ELITE hanno una tinta permanente (e' la loro firma visiva): il lampo
     // del colpo la sovrascrive, va rimessa quando il lampo finisce, altrimenti resterebbero del

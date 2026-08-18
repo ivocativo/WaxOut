@@ -30,7 +30,11 @@ class UpgradeScene extends Phaser.Scene {
       { id: 'hp', rep: true, rarity: 'common', apply: (s) => { s.maxHp += 25; s.hp = s.maxHp; } },
       { id: 'attspd', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.attackCooldown = Math.max(150, s.attackCooldown - 45); } },
       { id: 'speed', rep: true, rarity: 'common', apply: (s) => { s.moveSpeed += 30; } },
-      { id: 'range', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.attackRange += 0.4; } },
+      // ⚠️ +0,2 e non piu' +0,4 (2026-08-19). Da quando il raggio che fa SCATTARE la bastonata
+      // cresce insieme alla portata (vedi meleeTargetNear), ogni carta si sente davvero: col
+      // vecchio +0,4 bastavano due carte perche' il corpo a corpo si mangiasse il getto a media
+      // distanza, cambiando carattere al gioco senza che il giocatore lo avesse scelto.
+      { id: 'range', rep: true, rarity: 'common', peso: PESO_MISCHIA, apply: (s) => { s.attackRange += 0.2; } },
       // Getto Rapido (round 2, G.2): parallelo di Riflessi ma per il getto a distanza (che
       // prima non aveva NESSUN comune a velocizzarlo).
       { id: 'jetspd', rep: true, rarity: 'common', apply: (s) => { s.shotCooldown = Math.max(120, s.shotCooldown - 40); } },
