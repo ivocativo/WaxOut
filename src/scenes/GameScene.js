@@ -2343,8 +2343,14 @@ class GameScene extends Phaser.Scene {
     // L'arco copre il gesto: da alto-dietro a basso-avanti, specchiato col verso.
     const da = verso > 0 ? -1.15 : Math.PI + 1.15;
     const a2 = verso > 0 ? 0.45 : Math.PI - 0.45;
+    // ⚠️ NIENTE min/max SUGLI ANGOLI. Ordinandoli si perde l'informazione che conta — da dove
+    // A dove — e l'arco viene percorso DALLA PARTE LUNGA: verso sinistra si disegnavano 268
+    // gradi invece di 92, cioe' tre quarti di cerchio attorno al personaggio (segnalato dal
+    // playtest 2026-08-19). Gli angoli vanno passati NELL'ORDINE del gesto, e il verso di
+    // percorrenza dice se si va avanti o indietro: specchiare un arco vuol dire mandarlo
+    // all'indietro, non riordinarne gli estremi.
     g.beginPath();
-    g.arc(this.player.x, this.player.y + cy, range, Math.min(da, a2), Math.max(da, a2), verso < 0);
+    g.arc(this.player.x, this.player.y + cy, range, da, a2, verso < 0);
     g.strokePath();
     this.tweens.add({ targets: g, alpha: 0, duration: 220, ease: 'Quad.out',
       onComplete: () => g.destroy() });

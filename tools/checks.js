@@ -1561,6 +1561,42 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [42] L'ARCO DELLA BASTONATA E' UN QUARTO DI CERCHIO IN TUTTI E DUE I VERSI (2026-08-19).
+  // Segnalato dal playtest: colpendo verso sinistra si disegnavano TRE QUARTI di cerchio attorno
+  // al personaggio invece del quarto corrispondente al gesto. La causa: per specchiare l'arco gli
+  // angoli venivano ordinati con min/max, e cosi' si perde l'informazione che conta — da dove A
+  // dove — e l'arco viene percorso dalla parte lunga. Specchiare vuol dire mandarlo ALL'INDIETRO,
+  // non riordinarne gli estremi.
+  // ⚠️ Si intercetta la chiamata vera a Graphics.arc: misurare il disegno finito non si puo'
+  // (getBounds su un Graphics non guarda il tracciato), e rifare il calcolo a mano proverebbe
+  // solo che so ripetere la formula.
+  {
+    const gsA = avviaLivello(2);
+    const proto = Phaser.GameObjects.Graphics.prototype;
+    const veroArc = proto.arc;
+    const visti = [];
+    proto.arc = function (x, y, r, a1, a2, anti) { visti.push({ a1, a2, anti }); return veroArc.apply(this, arguments); };
+    gsA.facing = 1; gsA.arcoMischia(120, 0);
+    gsA.facing = -1; gsA.arcoMischia(120, 0);
+    proto.arc = veroArc;
+    const ampiezza = (v) => {
+      let d = v.anti ? (v.a1 - v.a2) : (v.a2 - v.a1);
+      while (d < 0) d += Math.PI * 2;
+      return d * 180 / Math.PI;
+    };
+    const gradi = visti.map(ampiezza);
+    const ok2 = gradi.length === 2 && gradi.every((d) => d > 60 && d < 130)
+      && Math.abs(gradi[0] - gradi[1]) < 2;
+    if (ok2) {
+      ok('l arco della bastonata e un quarto di cerchio nei due versi', 2,
+        'destra ' + Math.round(gradi[0]) + ' gradi, sinistra ' + Math.round(gradi[1])
+        + ' gradi (prima a sinistra ne faceva 268)');
+    } else {
+      ko('l arco della bastonata e un quarto di cerchio nei due versi', 2,
+        'ampiezze misurate: ' + gradi.map((d) => Math.round(d)).join(' e ') + ' gradi');
+    }
+  }
+
   // [41] PULIRE NON PAGA, MA FA AVANZARE IL LIVELLO (2026-08-18, scelta dell'utente).
   // La moneta si guadagna solo raccogliendo i pallini. ⚠️ Il controllo verifica DUE cose che
   // sembrano una sola e non lo sono: che rompere il cerume non dia moneta, e che continui a far
