@@ -1278,7 +1278,15 @@ class GameScene extends Phaser.Scene {
       // (scelta dell'utente).
       enemy_blob:   { dispH: 52, hbW: 40, hbH: 46 },
       enemy_crust:  { dispH: 52, hbW: 40, hbH: 46 },
-      enemy_spit:   { dispH: 40, hbW: 30, hbH: 26 },
+      // GORGOGLIANTE ALZATO (playtest 2026-08-18: "i colpi passano sopra la testa").
+      // ⚠️ MISURATO, non stimato: il colpo accovacciato occupa da 37 a 51 sopra il suolo,
+      // quello in piedi da 44 a 58. Con la testa a 26 il getto gli passava sopra in TUTTE
+      // e due le pose: contro di lui il getto non serviva a niente, restava solo il coton
+      // fioc. Portandolo a 40 lo prende il colpo accovacciato (40 > 37) e continua a NON
+      // prenderlo quello in piedi (40 < 44), che e' il senso del nemico basso: per colpirlo
+      // ti devi abbassare. Il disegno cresce in proporzione, se no la sagoma che si tocca
+      // sarebbe piu' grande di quella che si vede.
+      enemy_spit:   { dispH: 48, hbW: 30, hbH: 40 },
       // Moscerino: hitbox allargata (26x20 -> 34x28) e sagoma un filo piu' grande. Erano
       // "troppo difficili da colpire" (playtest 2026-07-29): un bersaglio che vola, ondeggia e
       // ha anche il corpo piccolo diventa frustrante invece che impegnativo.

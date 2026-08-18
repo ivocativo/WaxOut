@@ -1431,17 +1431,36 @@ window.__earwaxChecks = function (opts) {
       for (let n = 0; n < 300 && e.active && e.spawning; n++) avanza(gsH, 1);
       if (e.active) cima[k] = (gsH.terrainTopAt(e.x) - e.body.top);
     });
-    const prende = (k) => cima[k] >= bordoBasso;
-    const bassi = !prende('spit') && !prende('hopper');
+    // ⚠️ E ADESSO ANCHE IL COLPO ACCOVACCIATO. Il controllo diceva "ci si deve abbassare" ma
+    // provava SOLO il colpo in piedi: dava per buono che abbassarsi servisse, senza verificarlo
+    // mai. Non serviva: il colpo accovacciato parte a 37 dal suolo e il gorgogliante era alto 26,
+    // quindi il getto gli passava sopra in TUTTE E DUE le pose (segnalato dai tester 2026-08-18,
+    // e il gorgogliante e' stato alzato a 40). Una frase in un controllo e' un'affermazione: o si
+    // misura, o non si scrive.
+    gsH.crouching = true;
+    gsH.shots.clear(true, true);
+    gsH.lastShot = -1e9;
+    gsH.fireJet(1, 0);
+    const palGiu = gsH.shots.getChildren()[0];
+    const bassoGiu = palGiu ? (suolo - palGiu.y) - palGiu.body.height / 2 : 999;
+    gsH.crouching = false;
 
-    if (prende('blob') && prende('crust') && bassi) {
-      ok('i colpi in piedi prendono cerumino e crosta', 3,
-        'il colpo passa a ' + Math.round(bordoBasso) + 'px dal suolo; cerumino ' + Math.round(cima.blob)
-        + ' e crosta ' + Math.round(cima.crust) + ' lo intercettano, gorgogliante ' + Math.round(cima.spit)
-        + ' e saltatore ' + Math.round(cima.hopper) + ' no (ci si deve abbassare)');
+    const prende = (k) => cima[k] >= bordoBasso;
+    const prendeGiu = (k) => cima[k] >= bassoGiu;
+    const bassi = !prende('spit') && !prende('hopper');   // in piedi non si prendono: e' il loro senso
+    const giuOk = prendeGiu('spit');                      // ...ma abbassandosi il gorgogliante SI'
+
+    if (prende('blob') && prende('crust') && bassi && giuOk) {
+      ok('i colpi prendono i nemici alti in piedi e il gorgogliante da accovacciati', 3,
+        'in piedi il colpo passa a ' + Math.round(bordoBasso) + 'px dal suolo, accovacciati a '
+        + Math.round(bassoGiu) + '; cerumino ' + Math.round(cima.blob) + ' e crosta '
+        + Math.round(cima.crust) + ' si prendono in piedi; gorgogliante ' + Math.round(cima.spit)
+        + ' solo abbassandosi; saltatore ' + Math.round(cima.hopper)
+        + ' con nessuna delle due (si prende al volo mentre salta, o col coton fioc)');
     } else {
-      ko('i colpi in piedi prendono cerumino e crosta', 3,
-        'bordo basso del colpo=' + Math.round(bordoBasso) + ' cime=' + JSON.stringify(cima));
+      ko('i colpi prendono i nemici alti in piedi e il gorgogliante da accovacciati', 3,
+        'bordo basso in piedi=' + Math.round(bordoBasso) + ' accovacciati=' + Math.round(bassoGiu)
+        + ' cime=' + JSON.stringify(cima));
     }
   }
 

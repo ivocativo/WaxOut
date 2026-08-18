@@ -201,18 +201,16 @@ window.TouchControls = (function () {
       else { state.right = true; state.aimUp = true; }                    // NE
     }
     function moveKnob(px, py) {
-      let dx = px - baseX, dy = py - baseY;
-      let len = Math.hypot(dx, dy) || 0.0001;
-      // Il dito e' andato oltre il bordo: il CENTRO gli va dietro, restando a distanza R.
-      // Cosi' si puo' continuare a spingere all'infinito nella stessa direzione senza che la
-      // leva "finisca la corsa" (scelta 3 qui sopra).
-      if (len > R) {
-        baseX = px - (dx / len) * R;
-        baseY = py - (dy / len) * R;
-        ring.setPosition(baseX, baseY);
-        dx = px - baseX; dy = py - baseY; len = R;
-      }
-      knob.setPosition(baseX + dx, baseY + dy);
+      const dx = px - baseX, dy = py - baseY;
+      const len = Math.hypot(dx, dy) || 0.0001;
+      // ⚠️ IL CENTRO NON SI MUOVE PIU'. Resta dove hai appoggiato il dito la prima volta, fino a
+      // quando non lo stacchi. Andando oltre il bordo cambia solo la DIREZIONE: il pomello si
+      // ferma sul bordo (e' solo il disegno), ma l'angolo si continua a leggere dal dito vero,
+      // quindi si puo' girare tutt'attorno senza limiti. Una prima versione faceva inseguire il
+      // centro al dito: l'utente l'ha provata e preferisce cosi' (2026-08-18) — la leva resta
+      // dov'e' e non "scivola" via mentre giochi.
+      const cl = Math.min(len, R);
+      knob.setPosition(baseX + (dx / len) * cl, baseY + (dy / len) * cl);
       applyVec(dx, dy);
     }
     // Dito sollevato: la leva torna dove sta di solito e si fa di nuovo trasparente. Il ritorno
