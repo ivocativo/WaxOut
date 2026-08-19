@@ -114,10 +114,10 @@ window.I18n = (function () {
       over_shop: 'SHOP',
       over_menu: 'MENU',
       // --- Negozio ---
-      shop_title: 'EARWAX SHOP',
+      shop_title: 'WAXOUT SHOP',
       shop_bank: 'Wax in bank: {bank}   |   Best level: {best}',
       shop_lv: 'Lv. {lv}/{max}',
-      shop_lv_infezione: '(up to {max} with Infection)',
+      shop_max_infezione: 'MAX  ·  Infection {n}',
       shop_owned: 'Owned',
       shop_notowned: 'Not owned',
       shop_max: 'MAX',
@@ -139,7 +139,6 @@ window.I18n = (function () {
       // Progetti (blueprint): sblocchi che aggiungono abilità nuove alle run
       shop_stats_title: 'UPGRADES',
       shop_bp_title: 'BLUEPRINTS',
-      shop_bp_hint: 'Unlock new abilities for your runs',
       shop_bp_done: 'UNLOCKED',
       shop_unlock: 'UNLOCK\n{cost}',
       bp_magnet_name: 'Wax Magnet', bp_magnet_desc: 'Pulls nearby wax to you',
@@ -409,7 +408,7 @@ window.I18n = (function () {
       shop_title: 'NEGOZIO DEL CERUME',
       shop_bank: 'Cerume in banca: {bank}   |   Miglior livello: {best}',
       shop_lv: 'Liv. {lv}/{max}',
-      shop_lv_infezione: '(fino a {max} con l Infezione)',
+      shop_max_infezione: 'MAX  ·  Infezione {n}',
       shop_owned: 'Acquistato',
       shop_notowned: 'Non posseduto',
       shop_max: 'MAX',
@@ -431,7 +430,6 @@ window.I18n = (function () {
       // Progetti (blueprint): sblocchi che aggiungono abilità nuove alle run
       shop_stats_title: 'POTENZIAMENTI',
       shop_bp_title: 'PROGETTI',
-      shop_bp_hint: 'Sblocca nuove abilità per le tue run',
       shop_bp_done: 'SBLOCCATO',
       shop_unlock: 'SBLOCCA\n{cost}',
       bp_magnet_name: 'Calamita', bp_magnet_desc: 'Attira il cerume vicino',

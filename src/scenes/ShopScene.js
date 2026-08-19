@@ -29,15 +29,17 @@ class ShopScene extends Phaser.Scene {
     }).setOrigin(0.5);
     intestazione(leftX, 108, T.t('shop_stats_title'), '#ffd166');
     intestazione(rightX, 108, T.t('shop_bp_title'), '#9fe6a0');
-    this.add.text(rightX, 127, T.t('shop_bp_hint'), {
-      fontFamily: 'monospace', fontSize: '11px', color: '#c9a6b2',
-    }).setOrigin(0.5);
 
-    const startY = 168, rowH = 72;
-
-    // --- Colonna POTENZIAMENTI (stat ripetibili) ---
-    const statIds = ['hp', 'dmg', 'speed', 'djump'];
     const U = window.UNLOCKS;
+    // ⚠️ L'ELENCO SI RICAVA DA window.UNLOCKS, NON SI SCRIVE A MANO. Prima era
+    // ['hp','dmg','speed','djump'] scritto qui: aggiungendo l'Ugello Potenziato in UNLOCKS il
+    // potenziamento esisteva, si applicava, aveva prezzo e scritte... e NON COMPARIVA NEL
+    // NEGOZIO, perche' nessuno si era ricordato di aggiungerlo anche a questa riga (segnalato
+    // dall'utente: "il potenziamento dell'ugello non compare"). Ora un potenziamento nuovo si
+    // vede da solo. L'ordine e' quello di scrittura in UNLOCKS, quindi si decide li'.
+    const statIds = Object.keys(U);
+    // Le righe si stringono se sono tante, cosi' aggiungerne una non le fa uscire dallo schermo.
+    const startY = 168, rowH = statIds.length > 4 ? 62 : 72;
     statIds.forEach((id, i) => {
       const item = U[id];
       const lv = window.Meta.unlockLevel(id);
@@ -47,11 +49,7 @@ class ShopScene extends Phaser.Scene {
       const tettoMax = window.Meta.tettoMassimo(id);
       const maxed = lv >= tetto;
       const cost = item.base + item.step * lv;
-      // Se il tetto puo' ancora crescere battendo l'infezione, lo si DICE: un "10/10" secco
-      // sembra la fine della progressione, e sparisce il motivo per salire di grado.
-      const lvLabel = tetto > 1
-        ? T.t('shop_lv', { lv: lv, max: tetto })
-          + (tettoMax > tetto ? '  ' + T.t('shop_lv_infezione', { max: tettoMax }) : '')
+      const lvLabel = tetto > 1 ? T.t('shop_lv', { lv: lv, max: tetto })
         : (lv > 0 ? T.t('shop_owned') : T.t('shop_notowned'));
       this.makeRow(leftX, startY + i * rowH, colW, {
         name: T.t('unlock_' + id + '_name'),
@@ -62,7 +60,15 @@ class ShopScene extends Phaser.Scene {
         sub: T.t('unlock_' + id + '_eff', { n: item.per < 1 ? Math.round(item.per * 100) : item.per })
           + '  ·  ' + lvLabel,
         done: maxed,
-        doneLabel: T.t('shop_max'),
+        // ⚠️ IL "COME SI ALZA" SI DICE DOVE NASCE LA DOMANDA. Prima c'era una frase in coda a
+        // ogni riga ("fino a 15 con l'Infezione") anche quando mancavano ancora dieci acquisti:
+        // rumore per il 90% del tempo, e l'utente l'ha bocciata. Ora il posto di quella
+        // informazione e' il pulsante MAX — cioe' esattamente il momento in cui il giocatore
+        // sbatte contro il tetto e si chiede "e adesso?". Dice anche QUALE grado serve, non un
+        // generico "sali di infezione": un obiettivo con un numero si insegue, un invito vago no.
+        doneLabel: (maxed && tettoMax > tetto)
+          ? T.t('shop_max_infezione', { n: window.Meta.gradiSuperati() })
+          : T.t('shop_max'),
         cost: cost,
         buyLabel: T.t('shop_buy', { cost: cost }),
         onBuy: () => this.buyStat(id),
