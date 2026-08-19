@@ -131,6 +131,8 @@ window.I18n = (function () {
       unlock_dmg_eff: '+{n} damage at run start',
       unlock_speed_name: 'Spring Boots',
       unlock_speed_eff: '+{n} speed at run start',
+      unlock_getto_name: 'Power Nozzle',
+      unlock_getto_eff: '+{n}% jet damage per level',
       unlock_djump_name: 'Innate Double Jump',
       unlock_djump_eff: 'Start every run with double jump',
       // Progetti (blueprint): sblocchi che aggiungono abilità nuove alle run
@@ -420,6 +422,8 @@ window.I18n = (function () {
       unlock_dmg_eff: '+{n} danno a inizio run',
       unlock_speed_name: 'Stivali Molla',
       unlock_speed_eff: '+{n} velocita a inizio run',
+      unlock_getto_name: 'Ugello Potenziato',
+      unlock_getto_eff: '+{n}% danno del getto per livello',
       unlock_djump_name: 'Doppio Salto Innato',
       unlock_djump_eff: 'Inizi ogni run col doppio salto',
       // Progetti (blueprint): sblocchi che aggiungono abilità nuove alle run

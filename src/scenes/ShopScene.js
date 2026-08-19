@@ -47,7 +47,12 @@ class ShopScene extends Phaser.Scene {
         : (lv > 0 ? T.t('shop_owned') : T.t('shop_notowned'));
       this.makeRow(leftX, startY + i * rowH, colW, {
         name: T.t('unlock_' + id + '_name'),
-        sub: T.t('unlock_' + id + '_eff', { n: item.per }) + '  ·  ' + lvLabel,
+        // ⚠️ `per` PUO' ESSERE UNA FRAZIONE. L'Ugello Potenziato vale 0,08 (cioe' +8%): stampato
+        // cosi' com'e' il negozio avrebbe scritto "+0.08% danno del getto", che e' una bugia
+        // di due ordini di grandezza. Chi aggiunge uno sblocco in percentuale non deve
+        // ricordarsi di niente: si riconosce da solo.
+        sub: T.t('unlock_' + id + '_eff', { n: item.per < 1 ? Math.round(item.per * 100) : item.per })
+          + '  ·  ' + lvLabel,
         done: maxed,
         doneLabel: T.t('shop_max'),
         cost: cost,

@@ -204,12 +204,12 @@ class UpgradeScene extends Phaser.Scene {
     // RIMESCOLA (2026-08-19, chiesto dall'utente): ripesca le tre carte pagando cerume.
     // ⚠️ SI PAGA COL CERUME DELLA RUN, cioe' quello che finirebbe in banca per il negozio: la
     // scelta vera non e' "spendo una moneta", e' "questa carta adesso o un potenziamento
-    // permanente dopo". E' il motivo per cui il prezzo e' alto (vedi CONFIG.RIMESCOLA_COSTO,
-    // misurato: quanto si raccoglie in una run fino al livello 10).
+    // permanente dopo". Il prezzo CRESCE COL LIVELLO perche' cresce il raccolto: cosi' quanto
+    // costa resta costante in "livelli di gioco" (vedi CONFIG.RIMESCOLA_COSTO_BASE).
     // Il rimescolo e' un semplice restart della scena: create() ripesca da capo. Si puo' fare
     // perche' qui dentro non si assegna niente al giocatore — l'unica cosa che cambia lo stato
     // e' choose(), che parte solo quando scegli una carta.
-    const costo = window.CONFIG.RIMESCOLA_COSTO;
+    const costo = window.CONFIG.RIMESCOLA_COSTO_BASE * Math.max(1, window.GameState.level);
     const puoi = window.GameState.wax >= costo;
     window.GameGfx.uiButton(this, W / 2, H - 122,
       T.t(puoi ? 'up_rimescola' : 'up_rimescola_no', { costo: costo }),

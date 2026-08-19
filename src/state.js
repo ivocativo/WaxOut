@@ -65,15 +65,20 @@ window.CONFIG = {
   // Di qui il moltiplicatore sul bottino dei nemici. ⚠️ Da rileggere col playtest: e' il numero
   // che decide quanto ci si mette a comprare il primo potenziamento.
   NEMICI_CERUME: 3,       // quanto vale il pallino lasciato da un nemico (1 = com'era prima)
-  // RIMESCOLA le tre carte a fine livello. ⚠️ COSTO MISURATO, non scelto a occhio: simulando
-  // dieci livelli (50s l'uno, uccidendo TUTTO) si raccolgono ~3.170 di cerume fino al livello
-  // 10; chi gioca normalmente ne lascia indietro una parte, quindi la media realistica sta sui
-  // 2.000-2.500. L'utente lo voleva a quel prezzo apposta: deve premerlo con parsimonia.
-  // ⚠️ Conseguenza da tenere d'occhio nel playtest: il cerume si accumula DURANTE la run,
-  // quindi nei primi livelli non ce n'e' abbastanza e il pulsante resta spento — proprio
-  // quando le carte contano di piu'. Se da' fastidio, la strada e' un costo che cresce col
-  // livello invece che fisso.
-  RIMESCOLA_COSTO: 2200,
+  // RIMESCOLA le tre carte a fine livello: COSTO CHE CRESCE COL LIVELLO (base x livello).
+  // ⚠️ LA PRIMA STIMA ERA SBAGLIATA E VA RACCONTATO PERCHE'. Avevo calcolato ~3.170 di cerume
+  // fino al livello 10 e messo un costo fisso di 2.200; l'utente ha giudicato la cifra esagerata
+  // e aveva ragione. Quel calcolo poggiava su due assunzioni non verificate: 50 secondi a livello
+  // e soprattutto UCCIDERE OGNI NEMICO CHE COMPARE. La seconda e' irreale — molti nemici nascono
+  // dietro, o li si supera — e da sola gonfia il totale di due o tre volte.
+  // Ancoraggio migliore, preso dal gioco e non da un'ipotesi: in modo CORSA il gioco considera
+  // 31-50 secondi (secondo il livello) sufficienti ad attraversare un condotto. Con una cadenza
+  // di comparsa di 2-3 secondi fanno 20-30 nemici per livello, di cui se ne uccide forse due
+  // terzi: ~110-360 di cerume a livello, cioe' 1.200-2.000 fino al livello 10, non 3.170.
+  // Il costo cresce col livello perche' cresce il guadagno: cosi' "quanto costa" resta piu' o
+  // meno costante in numero di livelli di gioco. A livello 1 costa meno di mezzo livello di
+  // raccolto (le prime carte contano molto: giusto poterle rimescolare); al 10 ne costa due.
+  RIMESCOLA_COSTO_BASE: 60,   // costo = questo x il livello attuale
   // RAFFICA RADIALE (abilita' impilabile, playtest round 5): ogni tot parte una corona di
   // palline tutt'attorno. Il danno e' RIDOTTO apposta: e' un'arma che spara da sola mentre
   // pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
@@ -162,10 +167,26 @@ window.effettoCerumeAcceso = function () {
 // Potenziamenti PERMANENTI del negozio (roguelike meta-progression).
 // 'per' = bonus per ogni livello acquistato; base/step = costo (in cerume) del
 // prossimo acquisto = base + step * livelloAttuale; max = quante volte si compra.
+// ⚠️ TETTI ALZATI e nuovo sblocco del GETTO (2026-08-19). Due misure alla base:
+//  1. il danno del getto e' 24 A QUALUNQUE grado di infezione, mentre la vita dei nemici cresce
+//     del 15% per grado E col livello. Colpi per uccidere, dal livello 1 infezione 0 al livello
+//     15 infezione 5: cerumino 2->6, gorgogliante 2->7, saltatore 3->9, CROSTA 8->22. Il getto
+//     perdeva due terzi di efficacia senza avere modo di recuperare;
+//  2. il motivo di fondo: la progressione del giocatore era tutta PIATTA (+20 vita, +4 danno)
+//     mentre quella dei nemici e' PERCENTUALE. Sommare numeri fissi a una crescita in
+//     percentuale e' una gara persa in partenza.
+// Percio' il getto sale IN PERCENTUALE: un potenziamento comprato all'inizio vale ancora
+// qualcosa a infezione 5. E' la strada scelta dall'utente fra le due proposte.
+// I tetti salgono perche' col crescere della difficolta' serve spazio per crescere: hp e danno
+// da 10 a 15, velocita' da 8 a 12.
 window.UNLOCKS = {
-  hp:    { per: 20, base: 45, step: 35, max: 10, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
-  dmg:   { per: 4,  base: 55, step: 45, max: 10, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
-  speed: { per: 15, base: 40, step: 30, max: 8,  name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  hp:    { per: 20, base: 45, step: 35, max: 15, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
+  dmg:   { per: 4,  base: 55, step: 45, max: 15, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
+  speed: { per: 15, base: 40, step: 30, max: 12, name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  // ⚠️ `per` E' UNA FRAZIONE, non un numero fisso: +8% di danno del getto per livello comprato.
+  // Prezzo piu' alto degli altri (base 70, passo 55) perche' l'effetto e' moltiplicativo e non
+  // si spegne mai: a 12 livelli sono +96%, cioe' il getto quasi raddoppia.
+  getto: { per: 0.08, base: 70, step: 55, max: 12, name: 'Ugello Potenziato', effect: '+8% danno del getto per livello' },
   djump: { per: 1,  base: 200, step: 0, max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
 };
 
@@ -338,7 +359,10 @@ window.GameState = {
       attackCooldown: Math.round(M.cadenza * window.CONFIG.MISCHIA_CADENZA),   // ms tra una bastonata e l'altra
       attackRange: 1,        // moltiplicatore portata corpo a corpo
       // Arma a distanza: getto di acqua e sapone (pulisce il cerume e colpisce i nemici)
-      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * G.danno * TD * window.CONFIG.DANNO_PG),  // un po' sotto al corpo a corpo
+      // Il moltiplicatore dell'Ugello Potenziato si applica DOPO la parte piatta: e' quello che
+      // permette al getto di stare dietro alla vita dei nemici, che cresce in percentuale.
+      jetDamage: Math.round((16 + lv('dmg') * U.dmg.per * 0.5) * (1 + lv('getto') * U.getto.per)
+        * G.danno * TD * window.CONFIG.DANNO_PG),  // un po' sotto al corpo a corpo
       shotCooldown: G.cadenza,   // ms tra uno spruzzo e l'altro
       shotLife: G.gittata,       // ms di vita di una pallina = quanto lontano arriva il getto
       doubleJump: lv('djump') > 0,

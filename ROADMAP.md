@@ -21,6 +21,17 @@ getto vale META' che sulla mazza (`jetDamage: 16 + lv('dmg') * per * 0.5`). Da q
 dell'utente di un potenziamento del negozio dedicato ai colpi a distanza: e' fondata, e la crosta
 a 17 palline al grado 5 e' il caso limite che la giustifica.
 
+## H.5 — ARMI: PERCHE' NON FUNZIONAVANO (dall'utente, 2026-08-19)
+I 5 kit dell'Arsenale erano stati bocciati. Il motivo, detto dall'utente:
+ 1. **alteravano il corpo a corpo**, che non e' quello che si vuole variare;
+ 2. ⚠️ **in questo gioco la CADENZA DI TIRO domina su tutto il resto.** Un'arma che scambia
+    cadenza per danno non e' una scelta: e' un malus travestito. E' l'osservazione piu' utile
+    ricevuta sul bilanciamento, e spiega da sola perche' i kit sembravano tutti peggiori del base.
+**Direzione per un eventuale rifacimento:** le armi devono cambiare il COMPORTAMENTO del
+proiettile (perfora, rimbalza, si divide, raggio continuo, cerca il bersaglio), non i numeri di
+cadenza e danno. Un'arma che fa una cosa DIVERSA si sceglie; un'arma che fa la stessa cosa con
+numeri diversi si subisce.
+
 ## H.1 — TASTO RIMESCOLA a fine livello (deciso)
 Un pulsante che ripesca le tre carte, a costo di cerume. Da decidere: costo fisso o crescente
 dentro lo stesso livello (crescente evita di rimescolare all'infinito con la banca piena).
