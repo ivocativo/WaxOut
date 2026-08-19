@@ -789,7 +789,35 @@ PG e nemici ci camminano via **heightmap-snap** (in `agganciaAlTerreno`: `body.y
 
 ---
 
+## LEZIONI DI BILANCIAMENTO (2026-08-18/19) — valgono oltre il singolo numero
+
+- ⚠️ **LA CADENZA DI TIRO DOMINA SU TUTTO** (osservazione dell'utente, la piu' utile ricevuta sul
+  bilanciamento). Un'arma che scambia cadenza per danno non e' una scelta: e' un malus travestito.
+  E' il motivo per cui i 5 kit dell'Arsenale sembravano tutti peggiori del kit base. Chi rifara'
+  le armi deve cambiare il COMPORTAMENTO del proiettile (perfora, rimbalza, si divide, raggio
+  continuo), non i numeri — e non toccare il corpo a corpo.
+- ⚠️ **PIATTO CONTRO PERCENTUALE.** La progressione del giocatore era tutta piatta (+20 vita,
+  +4 danno) mentre quella dei nemici e' percentuale (+15% vita per grado di infezione, piu' la
+  crescita per livello). Sommare numeri fissi a una crescita in percentuale e' una gara persa in
+  partenza: il getto restava a 24 di danno dal primo all'ultimo livello del gioco. Da qui
+  l'Ugello Potenziato, che sale in percentuale.
+- ⚠️ **IL DANNO CONTA SOLO A COLPI INTERI.** Da 39 a 47 di danno non cambia NIENTE contro un
+  nemico da 58 vita: muore in due colpi comunque. Ogni carta di danno sblocca un solo tipo di
+  nemico e per il resto e' invisibile — per questo servono i numeri di danno a schermo.
+- ⚠️ **STIMARE UN'ECONOMIA E' FACILE SBAGLIARLO.** La stima del guadagno per run era gonfiata di
+  due-tre volte da una sola assunzione non dichiarata ("il giocatore uccide OGNI nemico che
+  compare"). Quando serve un numero di economia, meglio cercare un ancoraggio DENTRO il gioco
+  (es. il tempo che il modo CORSA considera sufficiente per un livello) che costruirlo su ipotesi.
+
 ## RISCHI / punti aperti da tenere d'occhio
+- ⚠️ **ELENCHI SCRITTI A MANO CHE DOVREBBERO RICAVARSI DAI DATI.** Il negozio aveva
+  `['hp','dmg','speed','djump']` scritto nel codice: un potenziamento nuovo esisteva in tutto e
+  per tutto ma NON COMPARIVA. Risolto ricavando l'elenco da `Object.keys(UNLOCKS)`. Vale la pena
+  cercarne altri dello stesso tipo: sono difetti che non danno nessun errore.
+- ⚠️ **APOSTROFI NELLE STRINGHE: due file rotti in due giorni** (`mezz'aria` in checks.js,
+  `serve piu' cerume` in i18n.js). Il sintomo e' fuorviante — nel secondo caso spariva l'intero
+  I18n e la scena moriva su `T.t`, che sembra un difetto della scena. Nelle stringhe di questo
+  progetto gli apostrofi si evitano e basta.
 - **⚠️ ASSET OLTRE IL 32° NON SI CARICANO (scoperto 2026-08-09, risolto).** Phaser scarica al
   massimo `maxParallelDownloads` file (di fabbrica **32**) e quando quei 32 finiscono insieme si
   dichiara concluso: i file oltre restano in coda **per sempre, senza errore e senza fallimento**.

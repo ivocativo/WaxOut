@@ -32,19 +32,40 @@ proiettile (perfora, rimbalza, si divide, raggio continuo, cerca il bersaglio), 
 cadenza e danno. Un'arma che fa una cosa DIVERSA si sceglie; un'arma che fa la stessa cosa con
 numeri diversi si subisce.
 
-## H.1 — TASTO RIMESCOLA a fine livello (deciso)
-Un pulsante che ripesca le tre carte, a costo di cerume. Da decidere: costo fisso o crescente
-dentro lo stesso livello (crescente evita di rimescolare all'infinito con la banca piena).
+## H.1 — TASTO RIMESCOLA a fine livello ✅ FATTO
+Pulsante che ripesca le tre carte pagando cerume. Costo = `RIMESCOLA_COSTO_BASE` (60) x livello:
+60 al primo, 600 al decimo, 840 al quattordicesimo.
+⚠️ **La prima stima del costo era sbagliata di due-tre volte** e vale la pena ricordarlo: avevo
+calcolato ~3.170 fino al livello 10 assumendo 50s a livello E UCCIDENDO OGNI NEMICO CHE COMPARE.
+La seconda assunzione e' irreale. Ancoraggio migliore, preso dal gioco invece che da un'ipotesi:
+in modo CORSA il gioco stesso considera 31-50 secondi sufficienti ad attraversare un condotto.
+**Da tarare col playtest:** se lo si preme ogni volta e' troppo economico, se non lo si preme mai
+e' troppo caro.
 
 ## H.2 — POTENZIAMENTI LEGGENDARI nel negozio (deciso, contenuto da scegliere)
 Costo molto alto E sbloccati solo finendo un grado di infezione. Icona con punto interrogativo
 finche' non si e' raggiunto il grado richiesto: e' il richiamo che deve far venire voglia di
 salire. Idee dell'utente: razzi, bomba pulisci-schermo, raggio laser.
+⚠️ **Alla luce di H.5** (la cadenza domina): i leggendari devono essere MODI DIVERSI DI SPARARE,
+non "piu' danno". Il raggio laser e la bomba pulisci-schermo sono gia' le due idee giuste — la
+prima cambia il comportamento del colpo, la seconda e' un'abilita' a parte che non tocca la
+cadenza. Idee aggiunte, tutte basate su meccaniche gia' presenti: getto continuo (idropulitrice),
+sciame di bolle (il Bubble Buddy esiste come progetto), aspiratore (il magnete del cerume esiste).
+⚠️ Il punto interrogativo deve DIRE IL GRADO RICHIESTO, non solo che esiste qualcosa: un mistero
+completo incuriosisce una volta, un obiettivo con un numero sopra si insegue.
 
-## H.3 — TETTI PIU' ALTI sui potenziamenti base (deciso)
+## H.3 — TETTI PIU' ALTI sui potenziamenti base ✅ FATTO
 Oggi: hp max 10 (+20 l'uno), dmg max 10 (+4), speed max 8 (+15), doppio salto 1.
 Costo totale per comprare tutto: ~5.960 cerume, cioe' 7-13 run complete con l'economia attuale.
 Alzare i tetti allunga la progressione insieme alla difficolta'.
+Fatto: `max` in UNLOCKS e' il tetto DI PARTENZA, `perInfezione` quanti livelli si aggiungono per
+ogni grado battuto (Meta.gradiSuperati / tettoSblocco / tettoMassimo). Vita e danno 10 -> 15,
+velocita' 8 -> 13, raggiunti solo dopo aver superato il grado 5.
+⚠️ Prima versione SBAGLIATA: li avevo alzati e basta, disponibili da subito. Se n'e' accorto
+l'utente chiedendo "devono sbloccarsi solo all'aumentare dell'infezione, e' cosi'?".
+⚠️ Nuovo sblocco **UGELLO POTENZIATO**: +8% danno del getto per livello, max 12 (+96%), NON
+legato all'infezione — non e' un premio per veterani ma la correzione di uno squilibrio presente
+dal primo giro. Misurato: crosta a livello 15 infezione 5 da 22 palline a 12.
 ⚠️ Da fare INSIEME a H.2: se i leggendari costano molto e i tetti salgono, la banca serve per due
 cose contemporaneamente e i prezzi vanno guardati insieme, non uno alla volta.
 
