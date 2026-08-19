@@ -167,27 +167,28 @@ window.effettoCerumeAcceso = function () {
 // Potenziamenti PERMANENTI del negozio (roguelike meta-progression).
 // 'per' = bonus per ogni livello acquistato; base/step = costo (in cerume) del
 // prossimo acquisto = base + step * livelloAttuale; max = quante volte si compra.
-// ⚠️ TETTI ALZATI e nuovo sblocco del GETTO (2026-08-19). Due misure alla base:
-//  1. il danno del getto e' 24 A QUALUNQUE grado di infezione, mentre la vita dei nemici cresce
-//     del 15% per grado E col livello. Colpi per uccidere, dal livello 1 infezione 0 al livello
-//     15 infezione 5: cerumino 2->6, gorgogliante 2->7, saltatore 3->9, CROSTA 8->22. Il getto
-//     perdeva due terzi di efficacia senza avere modo di recuperare;
-//  2. il motivo di fondo: la progressione del giocatore era tutta PIATTA (+20 vita, +4 danno)
-//     mentre quella dei nemici e' PERCENTUALE. Sommare numeri fissi a una crescita in
-//     percentuale e' una gara persa in partenza.
-// Percio' il getto sale IN PERCENTUALE: un potenziamento comprato all'inizio vale ancora
-// qualcosa a infezione 5. E' la strada scelta dall'utente fra le due proposte.
-// I tetti salgono perche' col crescere della difficolta' serve spazio per crescere: hp e danno
-// da 10 a 15, velocita' da 8 a 12.
+// ⚠️ TETTI CHE CRESCONO COL GRADO DI INFEZIONE SUPERATO (2026-08-19).
+// `max` e' il tetto DI PARTENZA; `perInfezione` e' quanti livelli in piu' si sbloccano per ogni
+// grado di infezione gia' battuto (vedi Meta.tettoSblocco). Chi non ha mai vinto compra fino al
+// tetto base; chi ha battuto il grado 5 arriva al massimo assoluto.
+// E' la richiesta dell'utente: il gioco diventa piu' difficile, quindi deve diventare possibile
+// potenziarsi di piu' — ma quel margine te lo devi guadagnare, se no e' solo un numero piu' alto.
+// ⚠️ Prima versione sbagliata: li avevo alzati e basta, disponibili da subito. L'utente se n'e'
+// accorto chiedendo "devono sbloccarsi solo all'aumentare dell'infezione, e' cosi'?". Non lo era.
+//
+// L'UGELLO POTENZIATO fa eccezione e non e' legato all'infezione: non e' un premio per veterani,
+// e' la CORREZIONE di uno squilibrio che c'e' fin dal primo giro (il danno del getto e' fisso a
+// 24 mentre la vita dei nemici cresce col livello). Legarlo all'infezione vorrebbe dire lasciare
+// il difetto in piedi proprio per chi non ha ancora vinto. Il suo tetto e' alto e basta.
 window.UNLOCKS = {
-  hp:    { per: 20, base: 45, step: 35, max: 15, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
-  dmg:   { per: 4,  base: 55, step: 45, max: 15, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
-  speed: { per: 15, base: 40, step: 30, max: 12, name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  hp:    { per: 20, base: 45, step: 35, max: 10, perInfezione: 1, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
+  dmg:   { per: 4,  base: 55, step: 45, max: 10, perInfezione: 1, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
+  speed: { per: 15, base: 40, step: 30, max: 8,  perInfezione: 1, name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
   // ⚠️ `per` E' UNA FRAZIONE, non un numero fisso: +8% di danno del getto per livello comprato.
   // Prezzo piu' alto degli altri (base 70, passo 55) perche' l'effetto e' moltiplicativo e non
   // si spegne mai: a 12 livelli sono +96%, cioe' il getto quasi raddoppia.
-  getto: { per: 0.08, base: 70, step: 55, max: 12, name: 'Ugello Potenziato', effect: '+8% danno del getto per livello' },
-  djump: { per: 1,  base: 200, step: 0, max: 1,  name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
+  getto: { per: 0.08, base: 70, step: 55, max: 12, perInfezione: 0, name: 'Ugello Potenziato', effect: '+8% danno del getto per livello' },
+  djump: { per: 1,  base: 200, step: 0, max: 1,  perInfezione: 0, name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
 };
 
 // PROGETTI (blueprint): sblocchi PERMANENTI una-tantum che aggiungono ABILITA' NUOVE al

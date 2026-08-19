@@ -41,9 +41,17 @@ class ShopScene extends Phaser.Scene {
     statIds.forEach((id, i) => {
       const item = U[id];
       const lv = window.Meta.unlockLevel(id);
-      const maxed = lv >= item.max;
+      // ⚠️ IL TETTO NON E' item.max: quello e' solo il tetto DI PARTENZA. Quello vero cresce coi
+      // gradi di infezione superati (Meta.tettoSblocco).
+      const tetto = window.Meta.tettoSblocco(id);
+      const tettoMax = window.Meta.tettoMassimo(id);
+      const maxed = lv >= tetto;
       const cost = item.base + item.step * lv;
-      const lvLabel = item.max > 1 ? T.t('shop_lv', { lv: lv, max: item.max })
+      // Se il tetto puo' ancora crescere battendo l'infezione, lo si DICE: un "10/10" secco
+      // sembra la fine della progressione, e sparisce il motivo per salire di grado.
+      const lvLabel = tetto > 1
+        ? T.t('shop_lv', { lv: lv, max: tetto })
+          + (tettoMax > tetto ? '  ' + T.t('shop_lv_infezione', { max: tettoMax }) : '')
         : (lv > 0 ? T.t('shop_owned') : T.t('shop_notowned'));
       this.makeRow(leftX, startY + i * rowH, colW, {
         name: T.t('unlock_' + id + '_name'),
@@ -170,7 +178,7 @@ class ShopScene extends Phaser.Scene {
   buyStat(id) {
     const item = window.UNLOCKS[id];
     const lv = window.Meta.unlockLevel(id);
-    if (lv >= item.max) { window.Sfx.hurt(); return; }   // gia al massimo
+    if (lv >= window.Meta.tettoSblocco(id)) { window.Sfx.hurt(); return; }   // gia al massimo per il grado raggiunto
     const cost = item.base + item.step * lv;
     if (!window.Meta.spend(cost)) { window.Sfx.hurt(); return; }  // cerume insufficiente
     window.Meta.setUnlock(id, lv + 1);

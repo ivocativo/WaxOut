@@ -70,6 +70,32 @@ window.Meta = (function () {
       return Math.min((state.infezioneMax | 0) + 1, window.CONFIG.INFEZIONE_MAX);
     },
 
+    // Quanti gradi di infezione sono stati SUPERATI (non "sbloccati": vinti davvero).
+    // infezioneMax vale -1 finche' non si vince mai, quindi qui si parte da 0.
+    gradiSuperati() {
+      return Math.min(Math.max(0, (state.infezioneMax | 0) + 1), window.CONFIG.INFEZIONE_MAX);
+    },
+
+    // TETTO EFFETTIVO di un potenziamento del negozio: quello di partenza piu' un livello per
+    // ogni grado di infezione battuto (vedi window.UNLOCKS). E' il modo in cui "il gioco diventa
+    // piu' difficile, quindi ti lascio potenziare di piu'" diventa una cosa che ti guadagni.
+    // ⚠️ Sta QUI e non in ShopScene perche' serve in tre punti diversi del negozio (etichetta,
+    // pulsante, acquisto): la stessa regola scritta tre volte prima o poi diverge.
+    tettoSblocco(id) {
+      const u = (window.UNLOCKS || {})[id];
+      if (!u) return 0;
+      return u.max + (u.perInfezione || 0) * this.gradiSuperati();
+    },
+
+    // Il tetto ASSOLUTO, cioe' quello che si raggiungerebbe battendo tutti i gradi. Serve al
+    // negozio per dire "10/10, ma con l'infezione arrivi a 15": senza quel confronto un tetto
+    // raggiunto sembra la fine della progressione, e sparisce il motivo per salire di grado.
+    tettoMassimo(id) {
+      const u = (window.UNLOCKS || {})[id];
+      if (!u) return 0;
+      return u.max + (u.perInfezione || 0) * window.CONFIG.INFEZIONE_MAX;
+    },
+
     // Aggiunge cerume alla banca (usato dal pannello di prova).
     addBank(amount) { state.bank += Math.max(0, amount | 0); save(); return state.bank; },
 
