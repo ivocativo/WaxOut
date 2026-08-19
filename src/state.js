@@ -65,6 +65,15 @@ window.CONFIG = {
   // Di qui il moltiplicatore sul bottino dei nemici. ⚠️ Da rileggere col playtest: e' il numero
   // che decide quanto ci si mette a comprare il primo potenziamento.
   NEMICI_CERUME: 3,       // quanto vale il pallino lasciato da un nemico (1 = com'era prima)
+  // RIMESCOLA le tre carte a fine livello. ⚠️ COSTO MISURATO, non scelto a occhio: simulando
+  // dieci livelli (50s l'uno, uccidendo TUTTO) si raccolgono ~3.170 di cerume fino al livello
+  // 10; chi gioca normalmente ne lascia indietro una parte, quindi la media realistica sta sui
+  // 2.000-2.500. L'utente lo voleva a quel prezzo apposta: deve premerlo con parsimonia.
+  // ⚠️ Conseguenza da tenere d'occhio nel playtest: il cerume si accumula DURANTE la run,
+  // quindi nei primi livelli non ce n'e' abbastanza e il pulsante resta spento — proprio
+  // quando le carte contano di piu'. Se da' fastidio, la strada e' un costo che cresce col
+  // livello invece che fisso.
+  RIMESCOLA_COSTO: 2200,
   // RAFFICA RADIALE (abilita' impilabile, playtest round 5): ogni tot parte una corona di
   // palline tutt'attorno. Il danno e' RIDOTTO apposta: e' un'arma che spara da sola mentre
   // pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.

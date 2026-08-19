@@ -155,6 +155,8 @@ window.I18n = (function () {
       pause_menu: 'MAIN MENU',
       // --- Potenziamento (a fine livello) ---
       up_title: 'UPGRADE',
+      up_rimescola: 'REROLL  {costo}',
+      up_rimescola_no: 'REROLL  {costo}  (not enough wax)',
       up_hint: 'Choose a new ability or weapon (1 / 2 / 3 or click)',
       up_rarity_common: 'COMMON',
       up_rarity_rare: 'RARE',
@@ -442,6 +444,8 @@ window.I18n = (function () {
       pause_menu: 'MENU PRINCIPALE',
       // --- Potenziamento (a fine livello) ---
       up_title: 'POTENZIAMENTO',
+      up_rimescola: 'RIMESCOLA  {costo}',
+      up_rimescola_no: 'RIMESCOLA  {costo}  (cerume insufficiente)',
       up_hint: 'Scegli una nuova abilita o arma (1 / 2 / 3 o click)',
       up_rarity_common: 'COMUNE',
       up_rarity_rare: 'RARA',

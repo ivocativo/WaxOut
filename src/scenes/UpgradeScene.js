@@ -201,6 +201,28 @@ class UpgradeScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-TWO', () => { if (choices[1]) this.choose(choices[1]); });
     this.input.keyboard.on('keydown-THREE', () => { if (choices[2]) this.choose(choices[2]); });
 
+    // RIMESCOLA (2026-08-19, chiesto dall'utente): ripesca le tre carte pagando cerume.
+    // ⚠️ SI PAGA COL CERUME DELLA RUN, cioe' quello che finirebbe in banca per il negozio: la
+    // scelta vera non e' "spendo una moneta", e' "questa carta adesso o un potenziamento
+    // permanente dopo". E' il motivo per cui il prezzo e' alto (vedi CONFIG.RIMESCOLA_COSTO,
+    // misurato: quanto si raccoglie in una run fino al livello 10).
+    // Il rimescolo e' un semplice restart della scena: create() ripesca da capo. Si puo' fare
+    // perche' qui dentro non si assegna niente al giocatore — l'unica cosa che cambia lo stato
+    // e' choose(), che parte solo quando scegli una carta.
+    const costo = window.CONFIG.RIMESCOLA_COSTO;
+    const puoi = window.GameState.wax >= costo;
+    window.GameGfx.uiButton(this, W / 2, H - 122,
+      T.t(puoi ? 'up_rimescola' : 'up_rimescola_no', { costo: costo }),
+      () => {
+        // ⚠️ Si ricontrolla il cerume QUI e non solo al disegno: fra il disegno e il tocco la
+        // schermata resta ferma, ma affidarsi a un valore letto prima e' il genere di cosa che
+        // un giorno lascia rimescolare gratis.
+        if (window.GameState.wax < costo) return;
+        window.GameState.wax -= costo;
+        this.scene.restart();
+      },
+      { w: puoi ? 300 : 420, h: 40, size: 15, accento: puoi ? undefined : 0x6b5a52 });
+
     // Riepilogo statistiche
     const weaponName = T.t('arma_' + (p.arma || 'fioc') + '_name');
     const stats = [

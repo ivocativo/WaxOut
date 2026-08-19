@@ -1,3 +1,61 @@
+# BLOCCO H — Motivare il lungo periodo (2026-08-19) 🚧 IN PROGETTAZIONE
+
+Richiesta dell'utente: dare un motivo per continuare a giocare alle difficolta' alte. Quattro
+filoni, piu' una misura che li lega.
+
+## LA MISURA CHE ORIENTA TUTTO
+Colpi di GETTO per uccidere ogni nemico, per grado di infezione (livello 5, danno getto 24):
+
+| nemico | inf.0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| pulce | 1 | 1 | 2 | 2 | 2 | 2 |
+| cerumino | 2 | 2 | 3 | 3 | 3 | 3 |
+| moscerino | 2 | 2 | 2 | 2 | 3 | 3 |
+| gorgogliante | 3 | 3 | 4 | 4 | 4 | 5 |
+| saltatore | 3 | 4 | 4 | 5 | 5 | 5 |
+| crosta | 10 | 11 | 13 | 14 | 15 | 17 |
+
+⚠️ **Il danno del getto e' 24 a OGNI grado**: non cresce mai con l'infezione, mentre la vita dei
+nemici sale del 15% per grado. L'unico modo di alzarlo e' la carta `dmg` del negozio, che sul
+getto vale META' che sulla mazza (`jetDamage: 16 + lv('dmg') * per * 0.5`). Da qui l'idea
+dell'utente di un potenziamento del negozio dedicato ai colpi a distanza: e' fondata, e la crosta
+a 17 palline al grado 5 e' il caso limite che la giustifica.
+
+## H.1 — TASTO RIMESCOLA a fine livello (deciso)
+Un pulsante che ripesca le tre carte, a costo di cerume. Da decidere: costo fisso o crescente
+dentro lo stesso livello (crescente evita di rimescolare all'infinito con la banca piena).
+
+## H.2 — POTENZIAMENTI LEGGENDARI nel negozio (deciso, contenuto da scegliere)
+Costo molto alto E sbloccati solo finendo un grado di infezione. Icona con punto interrogativo
+finche' non si e' raggiunto il grado richiesto: e' il richiamo che deve far venire voglia di
+salire. Idee dell'utente: razzi, bomba pulisci-schermo, raggio laser.
+
+## H.3 — TETTI PIU' ALTI sui potenziamenti base (deciso)
+Oggi: hp max 10 (+20 l'uno), dmg max 10 (+4), speed max 8 (+15), doppio salto 1.
+Costo totale per comprare tutto: ~5.960 cerume, cioe' 7-13 run complete con l'economia attuale.
+Alzare i tetti allunga la progressione insieme alla difficolta'.
+⚠️ Da fare INSIEME a H.2: se i leggendari costano molto e i tetti salgono, la banca serve per due
+cose contemporaneamente e i prezzi vanno guardati insieme, non uno alla volta.
+
+## H.4 — VARIETA' PER GRADO DI INFEZIONE (deciso, bloccato sull'arte)
+Sfondi diversi e musica diversa ai gradi alti.
+⚠️ **IL MECCANISMO C'E' GIA': `window.BG_SETS`, oggi vale `[2]`, cioe' UN SOLO set.** Manca solo
+il materiale: servono 3 immagini per set (vista piatta, fondo magenta) generate dall'utente, poi
+`tools/bake_background_set.ps1` fa il resto. Vedi la memoria `earwaxwar-background-pipeline`.
+Non e' lavoro di codice: e' lavoro d'arte che deve fare l'utente.
+
+## DAL BACKLOG, gia' in elenco e utile a questo scopo
+- **Varianti sfondo per livello** e **altri set di sfondo** (§Estetica): stesso meccanismo di H.4.
+- **Piu' varieta' di nemici / varianti boss**, piu' eventi: e' il filone piu' diretto per la
+  varieta' a lungo termine, e non e' mai stato aperto.
+- **Altri segreti/easter egg**: oggi ce n'e' UNO (lo scrigno in alto).
+- **Arena dedicata per l'Assedio**: oggi riusa un livello normale col timer.
+- **ARMI del PG: le meccaniche dei 5 kit ci sono, manca l'ARTE.** ⚠️ Vale la pena rileggerlo alla
+  luce di H.2: cinque armi gia' funzionanti e mai viste dal giocatore sono un serbatoio di
+  contenuto gia' pronto, molto piu' economico di inventare tre leggendari da zero.
+
+---
+
 # Earwax War — Piano esecutivo
 
 > 📄 **A cosa serve questo file:** è la "lista di lavoro" dei blocchi in corso, usa e getta.
