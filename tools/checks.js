@@ -1561,6 +1561,45 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [43] LA BOMBA NON TOCCA IL BOSS, MA PULISCE INTORNO (2026-08-19, scelta dell'utente).
+  // La Bomba di Cerume fa 4 volte il danno del corpo a corpo su tutto lo schermo: bastavano poche
+  // bombe per abbattere un boss, e lo scontro si sarebbe risolto premendo un pulsante.
+  // ⚠️ Il controllo verifica DUE cose insieme, perche' la regola e' "il boss no, il resto si'":
+  // se un domani si escludesse troppo, la bomba diventerebbe inutile negli scontri col boss —
+  // che e' proprio il momento in cui serve di piu' come salvagente.
+  {
+    const gsB = avviaLivello(5);   // livello di boss
+    // ⚠️ IL BOSS NON C'E' SUBITO: il livello si apre col cartello e la finestra di respiro
+    // (vedi `avvioAl`), e lui entra dopo. Cercandolo appena creata la scena non lo si trova, e
+    // il controllo fallisce per un motivo che non c'entra niente con quello che vuole provare.
+    let boss = null;
+    for (let n = 0; n < 400 && !boss; n++) {
+      avanza(gsB, 1);
+      boss = gsB.enemies.getChildren().find((e) => e.active && e.kind === 'boss');
+    }
+    const gregario = gsB.spawnEnemy('blob', { x: gsB.player.x + 120 });
+    if (gregario) gregario.spawning = false;
+    if (!boss || !gregario) {
+      ko('la bomba non uccide il boss', 5, 'boss=' + !!boss + ' gregario=' + !!gregario);
+    } else {
+      boss.spawning = false;
+      const vitaBoss = boss.hp, vitaGreg = gregario.hp;
+      gsB.esplodiBomba();
+      avanza(gsB, 60);                                    // il tempo che l'onda arrivi a tutti
+      const bossIntatto = boss.active && boss.hp === vitaBoss;
+      const gregarioColpito = !gregario.active || gregario.hp < vitaGreg;
+      if (bossIntatto && gregarioColpito) {
+        ok('la bomba non uccide il boss', 5,
+          'boss a ' + boss.hp + ' vita (invariata), e intanto il gregario e stato '
+          + (gregario.active ? 'colpito' : 'eliminato'));
+      } else {
+        ko('la bomba non uccide il boss', 5, 'boss intatto=' + bossIntatto
+          + ' (vita ' + vitaBoss + ' -> ' + (boss.active ? boss.hp : 'morto') + ')'
+          + ' gregario colpito=' + gregarioColpito);
+      }
+    }
+  }
+
   // [42] L'ARCO DELLA BASTONATA E' UN QUARTO DI CERCHIO IN TUTTI E DUE I VERSI (2026-08-19).
   // Segnalato dal playtest: colpendo verso sinistra si disegnavano TRE QUARTI di cerchio attorno
   // al personaggio invece del quarto corrispondente al gesto. La causa: per specchiare l'arco gli

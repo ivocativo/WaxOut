@@ -2591,6 +2591,13 @@ class GameScene extends Phaser.Scene {
     const quando = (o) => Math.min(DURATA, (Math.hypot(o.x - px, o.y - py) / raggio) * DURATA);
     this.enemies.getChildren().slice().forEach((e) => {
       if (!e.active || e.spawning || !dentro(e)) return;
+      // ⚠️ IL BOSS NON PRENDE DANNO DALLA BOMBA (scelta dell'utente, 2026-08-19). Con 4 volte il
+      // danno del corpo a corpo bastavano poche bombe per abbattere un boss, e lo scontro — che
+      // e' il momento in cui il gioco chiede di piu' — si sarebbe risolto premendo un pulsante.
+      // La bomba resta comunque utilissima contro di lui: gli spazza via i PROIETTILI e i nemici
+      // che lo accompagnano, cioe' quello che rende difficile lo scontro. Non e' un'arma spuntata,
+      // e' un'arma con un ruolo diverso.
+      if (e.kind === 'boss') return;
       this.time.delayedCall(quando(e), () => {
         // fra l'onda e l'arrivo puo' essere successo di tutto: si ricontrolla
         if (e.active && this.scene.isActive()) this.damageEnemy(e, dmg, true);
