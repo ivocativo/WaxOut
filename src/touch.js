@@ -97,6 +97,10 @@ window.TouchControls = (function () {
       g.fillCircle(x - s * 0.3, y - s * 0.2, s * 0.26);
       g.fillCircle(x + s * 0.3, y - s * 0.2, s * 0.26);
       g.fillCircle(x, y - s * 0.9, s * 0.22);
+    } else if (type === 'bomba') {          // bomba: sfera con miccia accesa
+      g.fillCircle(x, y + s * 0.18, s * 0.72);
+      g.fillRect(x - s * 0.16, y - s * 0.95, s * 0.32, s * 0.45);   // miccia
+      g.fillCircle(x + s * 0.28, y - s * 1.05, s * 0.22);           // scintilla
     } else if (type === 'dash') {
       g.fillTriangle(x - s, y - s, x, y, x - s, y + s);
       g.fillTriangle(x, y - s, x + s, y, x, y + s);
@@ -125,7 +129,7 @@ window.TouchControls = (function () {
       left: false, right: false,
       aimUp: false, aimDown: false,        // mira verticale del getto
       sprayHeld: false,                     // tenuto premuto = spruzza in continuo
-      jumpQueued: false, dashQueued: false, // impulsi singoli
+      jumpQueued: false, dashQueued: false, bombaQueued: false, // impulsi singoli
       jumpHeld: false,                      // tenuto premuto (per il salto ad altezza variabile)
     };
     if (!isTouchDevice(scene)) return state;
@@ -264,8 +268,15 @@ window.TouchControls = (function () {
     jumpBtn.on('pointerout', () => { state.jumpHeld = false; press(jumpBtn, false); });
 
     // Scatto: solo se gia sbloccato (sopra il Salto).
-    if (window.GameState.player && window.GameState.player.dash) {
+    const haScatto = !!(window.GameState.player && window.GameState.player.dash);
+    if (haScatto) {
       tapBtn(button(scene, jx, jy - (ar * 2 + 16), ar * 0.82, 'dash'), 'dashQueued');
+    }
+    // BOMBA (leggendario): sopra allo Scatto, o al suo posto se lo Scatto non c'e' ancora —
+    // cosi' i pulsanti restano incolonnati e non si crea un buco.
+    if (window.GameState.player && window.GameState.player.bomba) {
+      const dy = haScatto ? (ar * 2 + 16) * 2 : (ar * 2 + 16);
+      tapBtn(button(scene, jx, jy - dy, ar * 0.82, 'bomba'), 'bombaQueued');
     }
 
     return state;

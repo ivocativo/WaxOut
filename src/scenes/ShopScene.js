@@ -5,6 +5,20 @@
 class ShopScene extends Phaser.Scene {
   constructor() { super('ShopScene'); }
 
+  // Quale delle tre schermate mostrare. Arriva da un restart della scena: si puo' fare perche'
+  // in create() non si tocca nessuno stato del giocatore.
+  init(data) {
+    this.pagina = Math.max(0, Math.min(2, (data && data.pagina) | 0));
+  }
+
+  // Cambio schermata, con i bordi CHIUSI (non circolari): scorrendo oltre l'ultima non si torna
+  // alla prima. Girare in tondo fa perdere il senso di "dove sono" quando le schermate sono poche.
+  vaiA(n) {
+    const dove = Math.max(0, Math.min(2, n));
+    if (dove === this.pagina) return;
+    this.scene.restart({ pagina: dove });
+  }
+
   create() {
     const W = window.CONFIG.WIDTH, H = window.CONFIG.HEIGHT, C = window.CONFIG.COLORS;
     const T = window.I18n;
@@ -18,73 +32,83 @@ class ShopScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '17px', color: '#ffe2b0',
     }).setOrigin(0.5);
 
-    // Due colonne
-    const colW = 440;
-    const leftX = W / 2 - 232, rightX = W / 2 + 232;
+    // ⚠️ TRE SCHERMATE, NON DUE COLONNE (2026-08-19, richiesta dell'utente). Con due colonne
+    // strette ogni riga aveva meta' larghezza, e le etichette lunghe uscivano dal riquadro — e'
+    // successo con "MAX · Infezione 0". A pagina intera lo spazio c'e', le righe respirano, e
+    // soprattutto AGGIUNGERE UNA CATEGORIA IN FUTURO E' UNA VOCE IN PIU' IN QUESTO ELENCO,
+    // non un rifacimento del layout. Si passa da una all'altra scorrendo il dito.
+    const PAGINE = [
+      { id: 'potenziamenti', titolo: T.t('shop_stats_title'), colore: '#ffd166' },
+      { id: 'progetti',      titolo: T.t('shop_bp_title'),    colore: '#9fe6a0' },
+      { id: 'leggendari',    titolo: T.t('shop_leg_title'),   colore: '#ffb347' },
+    ];
+    const pag = PAGINE[this.pagina] || PAGINE[0];
+    const colW = 700;
+    const cx = W / 2;
 
-    // Intestazioni di colonna: etichette piccole e spaziate, non titoli grossi — il titolo della
-    // schermata e' uno solo, queste sono divisioni interne.
-    const intestazione = (x, y, testo, colore) => this.add.text(x, y, testo, {
-      fontFamily: 'monospace', fontSize: '13px', color: colore,
+    // Titolo della sezione + pallini di posizione: dicono a colpo d'occhio dove sei e quante
+    // schermate ci sono. I pallini sono anche cliccabili, perche' su un PC non si scorre.
+    this.add.text(cx, 106, pag.titolo, {
+      fontFamily: 'monospace', fontSize: '15px', color: pag.colore,
     }).setOrigin(0.5);
-    intestazione(leftX, 108, T.t('shop_stats_title'), '#ffd166');
-    intestazione(rightX, 108, T.t('shop_bp_title'), '#9fe6a0');
+    PAGINE.forEach((v, i) => {
+      const d = this.add.circle(cx - (PAGINE.length - 1) * 9 + i * 18, 128, 5,
+        0xfff7e8, i === this.pagina ? 0.95 : 0.28).setInteractive({ useHandCursor: true });
+      d.on('pointerdown', () => { if (i !== this.pagina) { window.Sfx.pick(); this.vaiA(i); } });
+    });
 
+    // SCORRIMENTO COL DITO. ⚠️ Si guarda anche lo spostamento VERTICALE: senza quel controllo un
+    // tocco storto su un pulsante diventava un cambio pagina, e comprare qualcosa diventava un
+    // terno al lotto. E la soglia e' generosa (70px) perche' un tocco fermo non e' mai perfetto.
+    this.input.on('pointerdown', (pt) => { this._tocco = { x: pt.x, y: pt.y }; });
+    this.input.on('pointerup', (pt) => {
+      const t0 = this._tocco; this._tocco = null;
+      if (!t0) return;
+      const dx = pt.x - t0.x, dy = pt.y - t0.y;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      this.vaiA(this.pagina + (dx < 0 ? 1 : -1));
+    });
+
+    const startY = 172;
+
+    // --- POTENZIAMENTI (statistiche permanenti, ripetibili) ---
     const U = window.UNLOCKS;
-    // ⚠️ L'ELENCO SI RICAVA DA window.UNLOCKS, NON SI SCRIVE A MANO. Prima era
-    // ['hp','dmg','speed','djump'] scritto qui: aggiungendo l'Ugello Potenziato in UNLOCKS il
-    // potenziamento esisteva, si applicava, aveva prezzo e scritte... e NON COMPARIVA NEL
-    // NEGOZIO, perche' nessuno si era ricordato di aggiungerlo anche a questa riga (segnalato
-    // dall'utente: "il potenziamento dell'ugello non compare"). Ora un potenziamento nuovo si
-    // vede da solo. L'ordine e' quello di scrittura in UNLOCKS, quindi si decide li'.
-    const statIds = Object.keys(U);
-    // Le righe si stringono se sono tante, cosi' aggiungerne una non le fa uscire dallo schermo.
-    const startY = 168, rowH = statIds.length > 4 ? 62 : 72;
+    // ⚠️ L'ELENCO SI RICAVA DAI DATI. Prima era scritto a mano e l'Ugello Potenziato, che pure
+    // esisteva in tutto e per tutto, non compariva nel negozio.
+    const statIds = pag.id === 'potenziamenti' ? Object.keys(U) : [];
     statIds.forEach((id, i) => {
       const item = U[id];
       const lv = window.Meta.unlockLevel(id);
-      // ⚠️ IL TETTO NON E' item.max: quello e' solo il tetto DI PARTENZA. Quello vero cresce coi
-      // gradi di infezione superati (Meta.tettoSblocco).
+      // Il tetto vero cresce coi gradi di infezione superati (vedi Meta.tettoSblocco).
       const tetto = window.Meta.tettoSblocco(id);
       const tettoMax = window.Meta.tettoMassimo(id);
       const maxed = lv >= tetto;
       const cost = item.base + item.step * lv;
       const lvLabel = tetto > 1 ? T.t('shop_lv', { lv: lv, max: tetto })
         : (lv > 0 ? T.t('shop_owned') : T.t('shop_notowned'));
-      this.makeRow(leftX, startY + i * rowH, colW, {
+      this.makeRow(cx, startY + i * 64, colW, {
         name: T.t('unlock_' + id + '_name'),
-        // ⚠️ `per` PUO' ESSERE UNA FRAZIONE. L'Ugello Potenziato vale 0,08 (cioe' +8%): stampato
-        // cosi' com'e' il negozio avrebbe scritto "+0.08% danno del getto", che e' una bugia
-        // di due ordini di grandezza. Chi aggiunge uno sblocco in percentuale non deve
-        // ricordarsi di niente: si riconosce da solo.
+        // `per` puo' essere una FRAZIONE (l'Ugello vale 0,08 = +8%): stampata cosi' com'e' il
+        // negozio direbbe "+0.08%", una bugia di due ordini di grandezza.
         sub: T.t('unlock_' + id + '_eff', { n: item.per < 1 ? Math.round(item.per * 100) : item.per })
-          + '  ·  ' + lvLabel,
+          + '  ·  ' + lvLabel
+          // Il "come si alza" sta nella riga, ora che c'e' spazio: sul pulsante usciva dal bordo.
+          + ((maxed && tettoMax > tetto) ? '  ·  ' + T.t('shop_lv_serve', { n: window.Meta.gradiSuperati() }) : ''),
         done: maxed,
-        // ⚠️ IL "COME SI ALZA" SI DICE DOVE NASCE LA DOMANDA. Prima c'era una frase in coda a
-        // ogni riga ("fino a 15 con l'Infezione") anche quando mancavano ancora dieci acquisti:
-        // rumore per il 90% del tempo, e l'utente l'ha bocciata. Ora il posto di quella
-        // informazione e' il pulsante MAX — cioe' esattamente il momento in cui il giocatore
-        // sbatte contro il tetto e si chiede "e adesso?". Dice anche QUALE grado serve, non un
-        // generico "sali di infezione": un obiettivo con un numero si insegue, un invito vago no.
-        doneLabel: (maxed && tettoMax > tetto)
-          ? T.t('shop_max_infezione', { n: window.Meta.gradiSuperati() })
-          : T.t('shop_max'),
+        doneLabel: T.t('shop_max'),
         cost: cost,
         buyLabel: T.t('shop_buy', { cost: cost }),
         onBuy: () => this.buyStat(id),
       });
     });
 
-    // --- Colonna PROGETTI (blueprint: sblocchi una-tantum di abilità) ---
-    // Sono 8 (F.1c ne ha aggiunti 4 ai 4 originali): righe piu' basse/compatte di quelle a
-    // sinistra (solo 4) per starci tutte senza scorrimento, che qui non esiste.
-    const bpIds = ['magnet', 'blast', 'splash', 'companion', 'backshot', 'rage', 'stunshot', 'slam'];
+    // --- PROGETTI (sblocchi una-tantum che aggiungono abilita' alle run) ---
     const BP = window.BLUEPRINTS;
-    const bpStartY = 160, bpRowH = 44;   // 160 e non 152: sotto la riga di spiegazione, senza toccarla
+    const bpIds = pag.id === 'progetti' ? Object.keys(BP) : [];
     bpIds.forEach((id, i) => {
       const item = BP[id];
       const owned = window.Meta.unlockLevel(id) > 0;
-      this.makeRow(rightX, bpStartY + i * bpRowH, colW, {
+      this.makeRow(cx, startY + i * 42, colW, {
         name: T.t('bp_' + id + '_name'),
         sub: T.t('bp_' + id + '_desc'),
         accent: '#9fe6a0',
@@ -93,9 +117,32 @@ class ShopScene extends Phaser.Scene {
         cost: item.cost,
         buyLabel: T.t('shop_unlock', { cost: item.cost }),
         onBuy: () => this.buyBlueprint(id),
-        panelH: 38, nameSize: 13, subSize: 10,
+        panelH: 36, nameSize: 13, subSize: 10,
       });
     });
+
+    // --- LEGGENDARI: carissimi, e chiusi dietro ai gradi di infezione ---
+    // ⚠️ IL PUNTO INTERROGATIVO E' IL MECCANISMO, non un ripiego grafico: finche' non hai battuto
+    // il grado richiesto non vedi cosa c'e' — ma vedi CHE c'e' qualcosa e QUALE grado ti serve.
+    // Un mistero completo incuriosisce una volta; un obiettivo con un numero sopra si insegue.
+    const LEG = window.LEGGENDARI || {};
+    const legIds = pag.id === 'leggendari' ? Object.keys(LEG) : [];
+    legIds.forEach((id, i) => {
+      const item = LEG[id];
+      const svelato = window.Meta.gradiSuperati() > (item.infezione | 0);
+      const posseduto = window.Meta.unlockLevel(id) > 0;
+      this.makeRow(cx, startY + i * 64, colW, {
+        name: svelato ? T.t('leg_' + id + '_name') : '? ? ?',
+        sub: svelato ? T.t('leg_' + id + '_desc') : T.t('shop_leg_chiuso', { n: item.infezione | 0 }),
+        accent: '#ffb347',
+        done: posseduto || !svelato,
+        doneLabel: posseduto ? T.t('shop_bp_done') : T.t('shop_leg_serve', { n: item.infezione | 0 }),
+        cost: item.cost,
+        buyLabel: T.t('shop_unlock', { cost: item.cost }),
+        onBuy: () => this.buyLeggendario(id),
+      });
+    });
+
 
     // Pulsante indietro
     window.GameGfx.uiButton(this, W / 2, H - 28, T.t('shop_back'), () => this.toMenu(), { w: 210, h: 40 });
@@ -189,7 +236,23 @@ class ShopScene extends Phaser.Scene {
     if (!window.Meta.spend(cost)) { window.Sfx.hurt(); return; }  // cerume insufficiente
     window.Meta.setUnlock(id, lv + 1);
     window.Sfx.pick();
-    this.scene.restart();   // ridisegna con i nuovi valori
+    // ⚠️ Si resta sulla schermata in cui si stava: un restart nudo riporterebbe alla prima,
+    // e comprando un progetto ci si ritroverebbe fra i potenziamenti.
+    this.scene.restart({ pagina: this.pagina });   // ridisegna con i nuovi valori
+  }
+
+  // Acquisto di un LEGGENDARIO. ⚠️ Si ricontrolla il grado di infezione anche QUI e non solo al
+  // disegno: la schermata resta ferma fra il disegno e il tocco, ma fidarsi di un controllo fatto
+  // altrove e' il genere di cosa che un giorno lascia comprare a chi non ha diritto.
+  buyLeggendario(id) {
+    const item = (window.LEGGENDARI || {})[id];
+    if (!item) return;
+    if (window.Meta.unlockLevel(id) > 0) { window.Sfx.hurt(); return; }
+    if (window.Meta.gradiSuperati() <= (item.infezione | 0)) { window.Sfx.hurt(); return; }
+    if (!window.Meta.spend(item.cost)) { window.Sfx.hurt(); return; }
+    window.Meta.setUnlock(id, 1);
+    window.Sfx.pick();
+    this.scene.restart({ pagina: this.pagina });
   }
 
   buyBlueprint(id) {
@@ -198,7 +261,7 @@ class ShopScene extends Phaser.Scene {
     if (!window.Meta.spend(item.cost)) { window.Sfx.hurt(); return; }     // cerume insufficiente
     window.Meta.setUnlock(id, 1);
     window.Sfx.pick();
-    this.scene.restart();
+    this.scene.restart({ pagina: this.pagina });
   }
 
   refreshBank() {

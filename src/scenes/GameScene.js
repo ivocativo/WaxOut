@@ -425,7 +425,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // Input
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,J,SPACE,SHIFT,R,UP,DOWN,LEFT,RIGHT');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,J,B,SPACE,SHIFT,R,UP,DOWN,LEFT,RIGHT');   // B = Bomba (leggendario)
 
     // Comandi a schermo per telefono/tablet (vuoti su PC).
     this.touch = window.TouchControls.attach(this);
@@ -2538,6 +2538,74 @@ class GameScene extends Phaser.Scene {
       onComplete: () => t.destroy() });
   }
 
+  // BOMBA DI CERUME: spazza via quello che c'e' A SCHERMO.
+  // ⚠️ "A schermo" e non "nel livello": colpisce solo quello che il giocatore VEDE. Uccidere
+  // roba fuori campo non si vedrebbe, e un potere che non si vede non si sente — oltre a
+  // spazzare via nemici che il giocatore non aveva ancora incontrato.
+  // Colpisce anche i proiettili nemici in volo: e' la sua funzione di salvagente, il momento in
+  // cui la si preme davvero e' quando si e' circondati.
+  esplodiBomba() {
+    const p = window.GameState.player;
+    const cam = this.cameras.main;
+    const dentro = (o) => o.x > cam.scrollX - 40 && o.x < cam.scrollX + cam.width + 40;
+    const dmg = Math.max(1, Math.round(p.damage * window.CONFIG.BOMBA_DANNO));
+    const px = this.player.x, py = this.player.y;
+    // Raggio che copre di sicuro tutto lo schermo dal punto in cui sei (anche stando in un angolo).
+    const raggio = Math.hypot(cam.width, cam.height);
+    const DURATA = window.CONFIG.BOMBA_ONDA;
+
+    // ⚠️ NON SI FA MORIRE TUTTO INSIEME. Prima la bomba toglieva i nemici nello stesso istante e
+    // il risultato era che "sparivano": nessun rapporto visibile fra il gesto e l'effetto.
+    // Ora c'e' un'ONDA che parte dal personaggio, e ogni nemico muore QUANDO L'ONDA LO RAGGIUNGE.
+    // E' la stessa quantita' di danno, ma raccontata: si vede una causa che si propaga.
+    const onda = this.add.circle(px, py, raggio, 0xbfe8ff, 0.20).setDepth(139).setScale(0.02);
+    onda.setStrokeStyle(7, 0xffffff, 0.95);
+    this.tweens.add({ targets: onda, scale: 1, alpha: 0, duration: DURATA, ease: 'Cubic.out',
+      onComplete: () => onda.destroy() });
+    // Una seconda onda piu' lenta e piu' tenue: da' spessore al fronte invece di una riga sola.
+    const scia = this.add.circle(px, py, raggio, 0xffffff, 0).setDepth(138).setScale(0.02);
+    scia.setStrokeStyle(18, 0x9fd8ff, 0.35);
+    this.tweens.add({ targets: scia, scale: 1, alpha: 0, duration: DURATA * 1.35, ease: 'Quad.out',
+      onComplete: () => scia.destroy() });
+    // Lampo breve e non pieno: deve annunciare il colpo, non coprire l'onda che e' la cosa da
+    // guardare. Prima era 0,85 di opacita' per 420ms e si mangiava tutto.
+    const lampo = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height,
+      0xfff7e8, 0.45).setDepth(140).setScrollFactor(0);
+    this.tweens.add({ targets: lampo, alpha: 0, duration: 220, ease: 'Quad.out',
+      onComplete: () => lampo.destroy() });
+    this.cameras.main.shake(300, 0.014);
+    window.Sfx.smash();
+
+    // Schiuma: bolle sparse che partono col fronte, cosi' l'onda sembra sapone e non un cerchio.
+    for (let n = 0; n < 14; n++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = raggio * (0.25 + Math.random() * 0.55);
+      const b = this.add.circle(px, py, 4 + Math.random() * 7, 0xffffff, 0.75).setDepth(139);
+      this.tweens.add({ targets: b, x: px + Math.cos(a) * d, y: py + Math.sin(a) * d,
+        alpha: 0, duration: DURATA * (0.7 + Math.random() * 0.6), ease: 'Cubic.out',
+        onComplete: () => b.destroy() });
+    }
+
+    // ⚠️ "A schermo" e non "nel livello": colpisce solo quello che il giocatore VEDE. Uccidere
+    // roba fuori campo non si vedrebbe, e un potere che non si vede non si sente.
+    const quando = (o) => Math.min(DURATA, (Math.hypot(o.x - px, o.y - py) / raggio) * DURATA);
+    this.enemies.getChildren().slice().forEach((e) => {
+      if (!e.active || e.spawning || !dentro(e)) return;
+      this.time.delayedCall(quando(e), () => {
+        // fra l'onda e l'arrivo puo' essere successo di tutto: si ricontrolla
+        if (e.active && this.scene.isActive()) this.damageEnemy(e, dmg, true);
+      });
+    });
+    // I proiettili nemici in volo spariscono quando l'onda li prende: e' la parte "salvagente".
+    this.movers.getChildren().slice().forEach((m) => {
+      if (!m.active || !dentro(m)) return;
+      this.time.delayedCall(quando(m), () => {
+        if (m.active) { this.burst('bit_wax', m.x, m.y, 6); m.destroy(); }
+      });
+    });
+  }
+
+
   // Anello dell'ONDA D'URTO: cerchio giallo che si espande attorno al giocatore.
   blastFx(R) {
     const ring = this.add.circle(this.player.x, this.player.y, R || 84, 0xffe08a, 0.18).setDepth(11).setScale(0.3);
@@ -4135,6 +4203,21 @@ class GameScene extends Phaser.Scene {
     // Scatto
     const dashPressed = Phaser.Input.Keyboard.JustDown(k.SHIFT) || this.touch.dashQueued;
     this.touch.dashQueued = false;
+
+    // BOMBA DI CERUME (leggendario). Gesto a parte, con ricarica lunga: non tocca il colpo
+    // normale ne' la cadenza — un leggendario che cambia i numeri sarebbe un potenziamento come
+    // gli altri, uno che aggiunge un GESTO e' un giocattolo nuovo.
+    const bombaPremuta = Phaser.Input.Keyboard.JustDown(k.B) || this.touch.bombaQueued;
+    this.touch.bombaQueued = false;
+    // ⚠️ La ricarica va sul cronometro del TEMPO GIOCATO (GameState.tempoDiGioco), non su
+    // `time`: quest'ultimo riparte da zero a ogni livello, quindi la ricarica si sarebbe
+    // azzerata cambiando livello — e la bomba sarebbe stata pronta all'inizio di ognuno.
+    // Cosi' invece i 30 secondi sono trenta secondi di gioco vero: i menu non li consumano.
+    const tg = window.GameState.tempoDiGioco;
+    if (p.bomba && bombaPremuta && tg > (window.GameState.bombaPronta || 0)) {
+      window.GameState.bombaPronta = tg + window.CONFIG.BOMBA_RICARICA;
+      this.esplodiBomba();
+    }
     if (p.dash && dashPressed && now > this.dashReady) {
       this.dashUntil = now + 160;
       this.dashReady = now + 700;
@@ -4459,6 +4542,9 @@ class GameScene extends Phaser.Scene {
   //     il fotogramma SUCCESSIVO confronta coi propri.
   // ==========================================================================================
   update(time, delta) {
+    // Tempo GIOCATO: avanza solo qui dentro, quindi menu e pause non lo fanno correre.
+    // E' il cronometro delle ricariche lunghe, che devono attraversare i livelli (vedi la Bomba).
+    window.GameState.tempoDiGioco += delta;
     window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
     this.animateWax(time);                    // cerume "fluido": ondeggia e cola
     this.fermaProiettiliNelTerreno();         // colline e soffitto fermano i colpi (non sono solidi)

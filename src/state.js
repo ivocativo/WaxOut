@@ -82,6 +82,12 @@ window.CONFIG = {
   // RAFFICA RADIALE (abilita' impilabile, playtest round 5): ogni tot parte una corona di
   // palline tutt'attorno. Il danno e' RIDOTTO apposta: e' un'arma che spara da sola mentre
   // pensi ad altro, se picchiasse quanto il getto renderebbe inutile mirare.
+  // BOMBA DI CERUME (leggendario): spazza lo schermo. ⚠️ Non toglie il colpo normale ne' la
+  // cadenza — la lezione delle armi dice che toccare la cadenza rende tutto un malus. E' un
+  // gesto A PARTE con una ricarica lunga, cosi' resta un momento e non un'abitudine.
+  BOMBA_RICARICA: 30000,  // ms di GIOCO fra una bomba e l'altra (menu e pause non contano)
+  BOMBA_DANNO: 4,         // quante volte il danno del corpo a corpo, su tutto lo schermo
+  BOMBA_ONDA: 520,        // ms che l'onda impiega ad attraversare lo schermo
   RADIALE_OGNI: 2600,     // ms fra una raffica e l'altra
   RADIALE_DANNO: 0.55,    // quanto vale una pallina radiale rispetto a una del getto
   RADIALE_PER_PESCA: 4,   // quante direzioni aggiunge ogni carta pescata
@@ -206,6 +212,22 @@ window.BLUEPRINTS = {
   slam:      { cost: 450, ability: 'slam'      },
 };
 
+// LEGGENDARI (2026-08-19, richiesta dell'utente): sblocchi carissimi che si comprano SOLO dopo
+// aver battuto un certo grado di infezione. Finche' non lo si e' battuto la voce resta col punto
+// interrogativo, e questo e' il punto di tutto il meccanismo: deve far venire voglia di salire di
+// difficolta' per vedere cosa c'e' dietro.
+// ⚠️ `infezione` = il grado da SUPERARE, non da sbloccare. Il negozio confronta con
+// Meta.gradiSuperati(): con 0 gradi battuti si vede il primo leggendario ma non gli altri.
+// ⚠️ IL PUNTO INTERROGATIVO DICE IL GRADO RICHIESTO, non solo che esiste qualcosa. Un mistero
+// completo incuriosisce una volta; un obiettivo con un numero sopra si insegue.
+// ⚠️ COSA DEVE ESSERE UN LEGGENDARIO, dopo la lezione delle armi (vedi HANDOFF §Lezioni di
+// bilanciamento): un MODO DIVERSO di combattere, non "piu' danno". In questo gioco la cadenza
+// domina, quindi un leggendario che tocca i numeri e' un potenziamento come gli altri; uno che
+// cambia comportamento e' un giocattolo nuovo.
+window.LEGGENDARI = {
+  bomba: { cost: 1800, ability: 'bomba', infezione: 0 },
+};
+
 // ARSENALE (2026-07-27, richiesta dell'utente). Ogni "arma" e' in realta' un KIT COMPLETO:
 // cambia INSIEME il colpo ravvicinato e il getto. Il motivo e' che il gioco ha UN SOLO tasto
 // d'attacco, che sceglie da solo in base alla distanza (mazza da vicino, getto da lontano):
@@ -317,6 +339,12 @@ window.EVOLUTIONS = [
 // Stato di progressione DELLA RUN corrente (azzerato a ogni nuova run).
 window.GameState = {
   level: 1,
+  // ⚠️ CRONOMETRO DEL TEMPO GIOCATO DAVVERO, in millesimi. Non si puo' usare `scene.time.now`
+  // per le ricariche lunghe: quello si AZZERA a ogni livello (la scena si ricrea), quindi una
+  // ricarica avviata al livello 3 sarebbe gia' scaduta al livello 4 — o non scadrebbe mai.
+  // Qui si somma `delta` dentro update(), che gira SOLO mentre si gioca: i menu, la pausa e
+  // le schermate fra un livello e l'altro non contano, che e' esattamente quello che serve.
+  tempoDiGioco: 0,
   wax: 0,
   player: null,
   ownedAbilities: [],   // es. 'doublejump', 'dash', 'hammer'
@@ -367,6 +395,9 @@ window.GameState = {
       shotCooldown: G.cadenza,   // ms tra uno spruzzo e l'altro
       shotLife: G.gittata,       // ms di vita di una pallina = quanto lontano arriva il getto
       doubleJump: lv('djump') > 0,
+      // LEGGENDARIO: la Bomba di Cerume. Comprata una volta, vale per tutte le run — come i
+      // progetti. Il numero di usi non e' limitato: e' la ricarica a tenerla rara.
+      bomba: window.Meta.unlockLevel('bomba') > 0,
       dash: false,
       weapon: 'swab',        // (storico) resta per compatibilita': la texture ora viene dal kit
       // Abilità di run (scelte all'UpgradeScene) che cambiano lo stile di gioco:
