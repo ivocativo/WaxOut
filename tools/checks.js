@@ -1561,6 +1561,42 @@ window.__earwaxChecks = function (opts) {
     }
   }
 
+  // [44] SCIAME E "POCHI MA FEROCI" NON CAPITANO INSIEME (2026-08-19, segnalato dall'utente).
+  // Il tipo SCIAME promette tanti nemici, il mutatore BERSERK ne toglie: i due cartelli si
+  // smentivano a vicenda. La coppia nasceva in DUE posti che pescavano in modo indipendente —
+  // il sorteggio di GameScene e la porta rischiosa — quindi il controllo li prova entrambi.
+  // ⚠️ Si prova MOLTE VOLTE apposta: la coppia sbagliata usciva solo ogni tanto, ed e' il motivo
+  // per cui e' arrivata fino al playtest. Un solo giro non proverebbe niente.
+  {
+    const guasti = [];
+    // a) la regola nei dati
+    if (window.mutatoreVaCon('berserk', 'swarm')) guasti.push('la regola dice che berserk va con swarm');
+    if (!window.mutatoreVaCon('horde', 'swarm')) guasti.push('la regola vieta horde su swarm');
+    // b) la porta: 200 generazioni, nessuna deve accoppiare swarm con un mutatore che toglie nemici
+    let porteProvate = 0;
+    for (let n = 0; n < 200; n++) {
+      g.scene.stop('DoorScene');
+      g.scene.start('DoorScene');
+      const ds = g.scene.getScene('DoorScene');
+      if (!ds || !ds.doors) continue;
+      porteProvate++;
+      ds.doors.forEach((d) => {
+        if (!d.mutator) return;
+        if (!window.mutatoreVaCon(d.mutator, d.kind)) {
+          guasti.push('porta: ' + d.kind + ' + ' + d.mutator);
+        }
+      });
+    }
+    g.scene.stop('DoorScene');
+    if (!guasti.length && porteProvate > 50) {
+      ok('sciame e "pochi ma feroci" non capitano insieme', '-',
+        porteProvate + ' porte generate, nessuna coppia che si contraddice');
+    } else {
+      ko('sciame e "pochi ma feroci" non capitano insieme', '-',
+        (guasti.slice(0, 3).join(' | ') || 'porte provate: ' + porteProvate));
+    }
+  }
+
   // [43] LA BOMBA NON TOCCA IL BOSS, MA PULISCE INTORNO (2026-08-19, scelta dell'utente).
   // La Bomba di Cerume fa 4 volte il danno del corpo a corpo su tutto lo schermo: bastavano poche
   // bombe per abbattere un boss, e lo scontro si sarebbe risolto premendo un pulsante.

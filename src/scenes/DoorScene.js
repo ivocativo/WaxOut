@@ -39,9 +39,15 @@ class DoorScene extends Phaser.Scene {
     // Salvate su `this` (non solo variabili locali): servono al click handler E ai controlli
     // automatici, che verificano la porta generata chiamando direttamente choose() su una di
     // queste (vedi tools/checks.js).
+    // ⚠️ TIPO E MUTATORE NON SI PESCANO IN MODO INDIPENDENTE. Prima si sceglievano separatamente,
+    // e usciva la coppia SCIAME + BERSERK: "tanti nemici" promesso dal tipo e "pochi ma feroci"
+    // promesso dal mutatore, sulla stessa porta (segnalato dall'utente). Si sceglie prima il tipo,
+    // poi il mutatore FRA QUELLI CHE CI STANNO — regola nei dati, la stessa che usa GameScene.
+    const riskyKind = Phaser.Utils.Array.GetRandom(RISKY_KINDS);
+    const mutAmmessi = RISKY_MUTATORS.filter((id) => window.mutatoreVaCon(id, riskyKind));
     this.doors = [
       { kind: safeKind, mutator: null, waxMult: 1, tag: 'safe' },
-      { kind: Phaser.Utils.Array.GetRandom(RISKY_KINDS), mutator: Phaser.Utils.Array.GetRandom(RISKY_MUTATORS), waxMult: 2, tag: 'risky' },
+      { kind: riskyKind, mutator: Phaser.Utils.Array.GetRandom(mutAmmessi), waxMult: 2, tag: 'risky' },
     ];
 
     const cardW = 360, cardH = 340, gap = 40;

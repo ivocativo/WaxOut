@@ -712,7 +712,13 @@ class GameScene extends Phaser.Scene {
     }
     if (window.GameState.level < 2) return;
     if (Math.random() > 0.55) return;   // ~55% dei livelli ha un mutatore
-    this.mutator = Phaser.Utils.Array.GetRandom(window.MUTATORS);
+    // ⚠️ SOLO I MUTATORI COMPATIBILI COL TIPO DI LIVELLO. Senza questo filtro usciva SCIAME (il
+    // livello dei tanti nemici) insieme a BERSERK ("pochi ma feroci"): due cartelli che si
+    // smentiscono, e un livello che non e' ne' una cosa ne' l'altra. La regola sta nei dati
+    // (window.mutatoreVaCon), non qui, perche' anche la PORTA pesca mutatori e deve usare la stessa.
+    const ammessi = window.MUTATORS.filter((m) => window.mutatoreVaCon(m, this.levelKind));
+    if (!ammessi.length) return;
+    this.mutator = Phaser.Utils.Array.GetRandom(ammessi);
     this.mutator.apply(this);
   }
 
@@ -3697,6 +3703,11 @@ class GameScene extends Phaser.Scene {
     if (this.locked) return;
     this.locked = true;
     window.Sfx.lose();
+    // ⚠️ VIA I COMANDI A SCHERMO PRIMA DI DISEGNARE IL PANNELLO. La leva occupa tutta la meta'
+    // sinistra e sta a profondita' 199, mentre il pannello di fine run sta a 51-53: il tasto
+    // "NUOVA RUN" cade dentro la zona della leva, che si prendeva il tocco al posto suo
+    // (segnalato dall'utente). A partita finita i comandi non servono piu'.
+    if (this.touch && this.touch.spegni) this.touch.spegni();
     if (this.spawnTimer) this.spawnTimer.remove();
     if (this.quakeTimer) { this.quakeTimer.remove(false); this.quakeTimer = null; }
     this.freezeEnemies();

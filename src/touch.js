@@ -185,6 +185,9 @@ window.TouchControls = (function () {
     // Zona di presa: tutta la meta' sinistra. ⚠️ Si ferma a meta' schermo apposta — piu' in la'
     // ci sono salto e spruzzo, e una zona che li coprisse se li mangerebbe.
     const zone = scene.add.zone(W / 4, H / 2, W / 2, H).setScrollFactor(0).setDepth(DEPTH - 1).setInteractive();
+    // Tutto quello che si disegna a schermo, per poterlo togliere di mezzo quando serve
+    // (vedi state.spegni piu' sotto).
+    const creati = [ring, knob, zone];
     let stickId = null;
 
     function clearDirs() { state.left = state.right = state.aimUp = state.aimDown = false; }
@@ -259,10 +262,13 @@ window.TouchControls = (function () {
     // pulsante e l'altro non cambiano.
     const MARGINE_LATO = 56, MARGINE_FONDO = 44;
     const jx = bx - MARGINE_LATO - ar, jy = by - MARGINE_FONDO - ar;
-    holdBtn(button(scene, jx - (ar * 2 + 8), jy, ar, 'spray'), 'sprayHeld');
+    const bSpray = button(scene, jx - (ar * 2 + 8), jy, ar, 'spray');
+    creati.push(bSpray, bSpray._icon);
+    holdBtn(bSpray, 'sprayHeld');
     // Salto: impulso (jumpQueued) per far partire il salto + stato "tenuto" (jumpHeld)
     // per il salto ad altezza variabile (rilasci presto = saltino, tieni = salto pieno).
     const jumpBtn = button(scene, jx, jy, ar, 'jump');
+    creati.push(jumpBtn, jumpBtn._icon);
     jumpBtn.on('pointerdown', () => { window.Sfx.unlock(); state.jumpQueued = true; state.jumpHeld = true; press(jumpBtn, true); });
     jumpBtn.on('pointerup', () => { state.jumpHeld = false; press(jumpBtn, false); });
     jumpBtn.on('pointerout', () => { state.jumpHeld = false; press(jumpBtn, false); });
@@ -270,14 +276,34 @@ window.TouchControls = (function () {
     // Scatto: solo se gia sbloccato (sopra il Salto).
     const haScatto = !!(window.GameState.player && window.GameState.player.dash);
     if (haScatto) {
-      tapBtn(button(scene, jx, jy - (ar * 2 + 16), ar * 0.82, 'dash'), 'dashQueued');
+      const bDash = button(scene, jx, jy - (ar * 2 + 16), ar * 0.82, 'dash');
+      creati.push(bDash, bDash._icon);
+      tapBtn(bDash, 'dashQueued');
     }
     // BOMBA (leggendario): sopra allo Scatto, o al suo posto se lo Scatto non c'e' ancora —
     // cosi' i pulsanti restano incolonnati e non si crea un buco.
     if (window.GameState.player && window.GameState.player.bomba) {
       const dy = haScatto ? (ar * 2 + 16) * 2 : (ar * 2 + 16);
-      tapBtn(button(scene, jx, jy - dy, ar * 0.82, 'bomba'), 'bombaQueued');
+      const bBomba = button(scene, jx, jy - dy, ar * 0.82, 'bomba');
+      creati.push(bBomba, bBomba._icon);
+      tapBtn(bBomba, 'bombaQueued');
     }
+
+    // ⚠️ SPEGNERE I COMANDI QUANDO LA PARTITA E' FINITA. Il pannello di fine run e' disegnato
+    // DENTRO la scena di gioco, a profondita' 51-53, mentre la leva sta a 199: il tasto "NUOVA
+    // RUN" cade nella meta' sinistra dello schermo, cioe' dentro la zona di presa della leva, che
+    // si prendeva il tocco al posto suo (segnalato dall'utente: "il cursore analogico si sposta
+    // sul tasto impedendone l'attivazione").
+    // Si spegne invece di alzare la profondita' del pannello: a partita finita i comandi non
+    // servono piu', e lasciarli vivi vorrebbe dire farli combattere con ogni finestra che
+    // apriremo in futuro sopra al gioco.
+    state.spegni = () => {
+      state.left = state.right = state.aimUp = state.aimDown = false;
+      state.sprayHeld = state.jumpHeld = false;
+      state.jumpQueued = state.dashQueued = state.bombaQueued = false;
+      creati.forEach((o) => { if (o && o.destroy) o.destroy(); });
+      creati.length = 0;
+    };
 
     return state;
   }

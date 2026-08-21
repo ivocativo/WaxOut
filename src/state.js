@@ -293,7 +293,7 @@ window.armaCorrente = function () {
 // dal gioco. `color` per il banner, `id` per la chiave i18n (mut_<id>).
 window.MUTATORS = [
   { id: 'haste',    color: '#ff8f5a', apply(s) { s.mutEnemySpeed = 1.4; s.mutEnemyWax = 1.5; } },
-  { id: 'horde',    color: '#9be870', apply(s) { s.mutMaxEnemies = 3; s.mutEnemyHp = 0.6; } },
+  { id: 'horde',    color: '#9be870', conta: 1,  apply(s) { s.mutMaxEnemies = 3; s.mutEnemyHp = 0.6; } },
   { id: 'armored',  color: '#8fd0ff', apply(s) { s.mutEnemyHp = 1.7; s.mutEnemyWax = 1.3; } },
   { id: 'lowgrav',  color: '#c9a0ff', apply(s) { s.physics.world.gravity.y = Math.round(window.CONFIG.GRAVITY * 0.55); } },
   { id: 'bonanza',  color: '#ffd166', apply(s) { s.mutWaxMult = 2; } },
@@ -301,10 +301,24 @@ window.MUTATORS = [
   { id: 'quake',    color: '#e0a83a', apply(s) { s.mutQuake = true; s.startWaxCollapseEvent(); } },
   // Nuovi (2026-07-26, richiesta varieta'): riusano i moltiplicatori mut* gia' esistenti.
   { id: 'glass',    color: '#7fe3ff', apply(s) { s.mutEnemyHp = 0.45; s.mutEnemyDmg = 1.5; } },   // fragili ma tosti
-  { id: 'frenzy',   color: '#ff7bd5', apply(s) { s.mutMaxEnemies = 3; s.mutEnemyWax = 1.5; } },    // tanti + piu' cerume
-  { id: 'berserk',  color: '#ff5a5a', apply(s) { s.mutEnemySpeed = 1.6; s.mutEnemyDmg = 1.4; s.mutMaxEnemies = -1; } },  // pochi ma feroci
+  { id: 'frenzy',   color: '#ff7bd5', conta: 1,  apply(s) { s.mutMaxEnemies = 3; s.mutEnemyWax = 1.5; } },    // tanti + piu' cerume
+  { id: 'berserk',  color: '#ff5a5a', conta: -1, apply(s) { s.mutEnemySpeed = 1.6; s.mutEnemyDmg = 1.4; s.mutMaxEnemies = -1; } },  // pochi ma feroci
   { id: 'ironwax',  color: '#b0b8c0', apply(s) { s.mutWaxHp = 2.3; s.mutWaxMult = 1.6; } },        // cerume durissimo ma prezioso
 ];
+
+// ⚠️ QUALI MUTATORI POSSONO CAPITARE IN QUALE TIPO DI LIVELLO.
+// Segnalato dall'utente: usciva SCIAME (il livello dei tanti nemici) insieme a BERSERK ("pochi
+// ma feroci"). I due cartelli si smentivano a vicenda e il livello non era ne' una cosa ne'
+// l'altra. Il campo `conta` dice se un mutatore AGGIUNGE (+1) o TOGLIE (-1) nemici.
+// ⚠️ La regola sta QUI, nei dati, e non nei due posti che pescano — il sorteggio di GameScene e
+// la porta rischiosa di DoorScene, che scelgono tipo e mutatore in modo indipendente. Scritta
+// due volte prima o poi divergerebbe, ed e' esattamente cosi' che e' nato il difetto.
+window.mutatoreVaCon = function (mut, kind) {
+  const m = (typeof mut === 'string') ? (window.MUTATORS || []).find((x) => x.id === mut) : mut;
+  if (!m) return true;
+  if (kind === 'swarm' && (m.conta | 0) < 0) return false;   // sciame = tanti: non toglierne
+  return true;
+};
 
 // EVENTI CASUALI di livello (indipendenti dai mutatori, possono capitare insieme): a
 // differenza dei mutatori (regolano solo numeri) qui parte una MECCANICA a tempo, gestita da
