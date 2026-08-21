@@ -289,6 +289,8 @@ window.I18n = (function () {
       tar_armi_ok: 'All weapons unlocked — pick one in the Arsenal',
       tar_cerume_btn: '+3000 WAX',
       tar_cerume_ok: '+3000 wax banked',
+      tar_infezione: 'UNLOCK INFECTION',
+      tar_infezione_ok: 'Infection maxed: legendaries and caps unlocked',
       tar_reset: 'RESET ALL KNOBS',
       // --- ARSENALE: i kit di window.ARMI (nome + una riga che dice come CAMBIA il gioco) ---
       menu_armi: 'ARSENAL',
@@ -580,6 +582,8 @@ window.I18n = (function () {
       tar_armi_ok: 'Tutte le armi sbloccate - scegline una nell Arsenale',
       tar_cerume_btn: '+3000 CERUME',
       tar_cerume_ok: '+3000 cerume in banca',
+      tar_infezione: 'SBLOCCA INFEZIONE',
+      tar_infezione_ok: 'Infezione al massimo: leggendari e tetti sbloccati',
       tar_reset: 'AZZERA TUTTE LE MANOPOLE',
       menu_armi: 'ARSENALE',
       armi_title: 'ARSENALE',

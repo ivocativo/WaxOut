@@ -119,6 +119,17 @@ window.Meta = (function () {
     },
 
     // Solo per test/debug: azzera tutto.
+    // SOLO PER IL PANNELLO DI PROVA: porta il record di infezione al grado indicato, cosi' si
+    // possono provare i leggendari e i tetti alti senza dover vincere cinque run.
+    // ⚠️ Sta qui e non nel pannello perche' scrivere dentro `state` da fuori salterebbe il
+    // salvataggio: la modifica sparirebbe alla prima riapertura del gioco.
+    forzaInfezione(grado) {
+      const max = window.CONFIG.INFEZIONE_MAX;
+      state.infezioneMax = Math.max(-1, Math.min(grado | 0, max));
+      save();
+      return state.infezioneMax;
+    },
+
     resetAll() { state = defaults(); save(); return state; },
   };
 })();

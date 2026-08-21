@@ -31,6 +31,20 @@ class PauseScene extends Phaser.Scene {
     window.GameGfx.uiButton(this, W / 2, H / 2 + 42, T.t('pause_restart'), () => this.restartLevel(), { w: 250, h: 46, size: 18 });
     window.GameGfx.uiButton(this, W / 2, H / 2 + 102, T.t('pause_menu'), () => this.toMenu(), { w: 250, h: 46, size: 18 });
 
+    // SELETTORE LINGUA anche qui (richiesta dell'utente): chi si accorge a meta' run di voler
+    // cambiare lingua non deve abbandonare la partita per farlo. Stesso posto del menu — in alto
+    // a destra — perche' si cerchi dove ci si aspetta.
+    // ⚠️ Si ridisegna la SOLA schermata di pausa: la partita sotto sta dormendo e non va toccata.
+    // Le scritte gia' a schermo nella run (cartelli, HUD) restano nella lingua di prima fino al
+    // livello dopo: rifarle vorrebbe dire ricostruire la scena di gioco, cioe' perdere la partita.
+    const langBtn = this.add.text(W - 16, 16, T.t('menu_lang', { lang: T.nativeName(T.lang) }), {
+      fontFamily: 'monospace', fontSize: '15px', color: '#14161f',
+      backgroundColor: '#ffd166', padding: { x: 12, y: 7 },
+    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    langBtn.on('pointerover', () => langBtn.setStyle({ backgroundColor: '#ffe199' }));
+    langBtn.on('pointerout', () => langBtn.setStyle({ backgroundColor: '#ffd166' }));
+    langBtn.on('pointerdown', () => { window.Sfx.unlock(); T.next(); this.scene.restart(); });
+
     // PANNELLO DI PROVA (⚠️ da togliere prima di pubblicare, vedi src/taratura.js). Qui e non
     // solo nel menu perche' i numeri si giudicano mentre si gioca: la pausa DORME sotto e la
     // partita riprende da dove stava. Piccolo e in un angolo: non e' roba da giocatore.

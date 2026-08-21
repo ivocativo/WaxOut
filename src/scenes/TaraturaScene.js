@@ -44,6 +44,14 @@ class TaraturaScene extends Phaser.Scene {
       window.Sfx.pick();
       this.msg(T.t('tar_cerume_ok'));
     });
+    // SBLOCCA INFEZIONE: porta il record al grado massimo, cosi' si possono provare i leggendari
+    // e i tetti alti senza dover vincere cinque run di fila. E' una scorciatoia di prova, non un
+    // regalo: sta nel pannello, che a `PANNELLO_PROVA: false` sparisce insieme a tutto il resto.
+    this.pulsante(W / 2, by + 40, T.t('tar_infezione'), () => {
+      window.Meta.forzaInfezione(window.CONFIG.INFEZIONE_MAX);
+      window.Sfx.unlock();
+      this.msg(T.t('tar_infezione_ok'));
+    });
     this.pulsante(W / 2 + 238, by + 40, T.t('tar_reset'), () => {
       TA.reset(); window.Sfx.hurt(); this.scene.restart({ from: this.tornaA });
     });

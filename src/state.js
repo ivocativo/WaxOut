@@ -187,14 +187,14 @@ window.effettoCerumeAcceso = function () {
 // 24 mentre la vita dei nemici cresce col livello). Legarlo all'infezione vorrebbe dire lasciare
 // il difetto in piedi proprio per chi non ha ancora vinto. Il suo tetto e' alto e basta.
 window.UNLOCKS = {
-  hp:    { per: 20, base: 45, step: 35, max: 10, perInfezione: 1, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
-  dmg:   { per: 4,  base: 55, step: 45, max: 10, perInfezione: 1, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
-  speed: { per: 15, base: 40, step: 30, max: 8,  perInfezione: 1, name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
+  hp:    { per: 20, base: 50, step: 38, max: 10, perInfezione: 1, name: 'Cuore Extra',   effect: '+20 HP a inizio run' },
+  dmg:   { per: 4,  base: 61, step: 50, max: 10, perInfezione: 1, name: 'Lama Affilata', effect: '+4 danno a inizio run' },
+  speed: { per: 15, base: 44, step: 33, max: 8,  perInfezione: 1, name: 'Stivali Molla', effect: '+15 velocita a inizio run' },
   // ⚠️ `per` E' UNA FRAZIONE, non un numero fisso: +8% di danno del getto per livello comprato.
   // Prezzo piu' alto degli altri (base 70, passo 55) perche' l'effetto e' moltiplicativo e non
   // si spegne mai: a 12 livelli sono +96%, cioe' il getto quasi raddoppia.
-  getto: { per: 0.08, base: 70, step: 55, max: 12, perInfezione: 0, name: 'Ugello Potenziato', effect: '+8% danno del getto per livello' },
-  djump: { per: 1,  base: 200, step: 0, max: 1,  perInfezione: 0, name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
+  getto: { per: 0.08, base: 77, step: 61, max: 12, perInfezione: 0, name: 'Ugello Potenziato', effect: '+8% danno del getto per livello' },
+  djump: { per: 1,  base: 220, step: 0, max: 1,  perInfezione: 0, name: 'Doppio Salto Innato', effect: 'Inizi ogni run col doppio salto' },
 };
 
 // PROGETTI (blueprint): sblocchi PERMANENTI una-tantum che aggiungono ABILITA' NUOVE al
@@ -202,14 +202,14 @@ window.UNLOCKS = {
 // qui, col cerume in banca). A differenza di UNLOCKS non danno bonus di statistica: danno
 // CONTENUTO nuovo. 'ability' = id dell'abilità (deve combaciare con UpgradeScene.ALL).
 window.BLUEPRINTS = {
-  magnet:    { cost: 120, ability: 'magnet'    },
-  blast:     { cost: 220, ability: 'blast'     },
-  splash:    { cost: 320, ability: 'splash'    },
-  companion: { cost: 500, ability: 'companion' },
-  backshot:  { cost: 260, ability: 'backshot'  },
-  rage:      { cost: 280, ability: 'rage'      },
-  stunshot:  { cost: 300, ability: 'stunshot'  },
-  slam:      { cost: 450, ability: 'slam'      },
+  magnet:    { cost: 132, ability: 'magnet'    },
+  blast:     { cost: 242, ability: 'blast'     },
+  splash:    { cost: 352, ability: 'splash'    },
+  companion: { cost: 550, ability: 'companion' },
+  backshot:  { cost: 286, ability: 'backshot'  },
+  rage:      { cost: 308, ability: 'rage'      },
+  stunshot:  { cost: 330, ability: 'stunshot'  },
+  slam:      { cost: 495, ability: 'slam'      },
 };
 
 // LEGGENDARI (2026-08-19, richiesta dell'utente): sblocchi carissimi che si comprano SOLO dopo
@@ -225,7 +225,7 @@ window.BLUEPRINTS = {
 // domina, quindi un leggendario che tocca i numeri e' un potenziamento come gli altri; uno che
 // cambia comportamento e' un giocattolo nuovo.
 window.LEGGENDARI = {
-  bomba: { cost: 1800, ability: 'bomba', infezione: 0 },
+  bomba: { cost: 1980, ability: 'bomba', infezione: 0 },
 };
 
 // ARSENALE (2026-07-27, richiesta dell'utente). Ogni "arma" e' in realta' un KIT COMPLETO:
