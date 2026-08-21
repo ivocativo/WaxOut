@@ -21,6 +21,46 @@ getto vale META' che sulla mazza (`jetDamage: 16 + lv('dmg') * per * 0.5`). Da q
 dell'utente di un potenziamento del negozio dedicato ai colpi a distanza: e' fondata, e la crosta
 a 17 palline al grado 5 e' il caso limite che la giustifica.
 
+## H.7 — ASSEDIO: COSTRINGERE A MUOVERSI (da progettare, 2026-08-21)
+Segnalato dai tester: nell'ASSEDIO conviene piantarsi in un punto e aspettare che i nemici
+arrivino. Il modo migliore di giocarlo e' anche il piu' noioso, che e' il difetto peggiore che
+possa avere una modalita'.
+
+**⚠️ PRIMA DI SCEGLIERE, IL DATO CHE DECIDE: i nemici INSEGUONO il giocatore** (l'IA usa
+`versoIlGiocatore`). E' questa la ragione per cui si puo' campeggiare, e cambia il giudizio sulle
+due idee dell'utente:
+
+- **Idea A — valanga di cerume da sinistra che avanza lentamente.** Attacca la causa: se il punto
+  in cui stai smette di essere un posto sicuro, restare fermi non e' piu' un'opzione. Da decidere
+  cosa succede al contatto: danno continuo, oppure il terreno che sparisce dietro (piu' gentile e
+  piu' leggibile di una morte istantanea). Riusa la grafica del cerume che c'e' gia'.
+- **Idea B — nemici che compaiono sempre piu' a destra.** ⚠️ Da sola NON risolve: i nemici
+  camminano verso di te, quindi anche nascendo lontani ti raggiungono e si torna ad aspettarli.
+  Funzionerebbe solo rendendoli fermi o lentissimi, cioe' cambiando il tipo di nemico.
+
+**Raccomandazione: A.** E' l'unica delle due che tocca il motivo per cui si campeggia. B si puo'
+aggiungere sopra, come rifinitura, ma non al posto di A.
+
+**Terza strada, se A risultasse troppo dura:** la quota dell'assedio legata a ZONE — il conteggio
+avanza solo per i nemici eliminati vicino a un punto che si sposta lungo il condotto. Costringe a
+spostarsi senza minacciare di morte, ma e' piu' codice e piu' difficile da spiegare al giocatore.
+
+⚠️ Da fare INSIEME alla verifica dal vivo dell'assedio, che nel backlog e' segnata come mai
+avvenuta ("Verificare dal vivo il tipo Assedio, mai giocato davvero").
+
+## H.6 — UN SOLO LEGGENDARIO EQUIPAGGIATO PER RUN (deciso dall'utente, 2026-08-21)
+Con piu' leggendari non si possono aggiungere N pulsanti a schermo: lo spazio dei comandi e' gia'
+pieno (leva, salto, spruzzo, scatto, bomba). **Decisione dell'utente: se ne equipaggia UNO per
+run.** Il pulsante a schermo resta quindi sempre uno solo, qualunque sia il leggendario scelto.
+Da fare quando esistera' il SECONDO leggendario — con uno solo la scelta non ha nulla fra cui
+scegliere e sarebbe un passaggio in piu' per niente.
+**Dove metterlo:** esiste gia' `ArmiScene` (l'ARSENALE), una schermata di scelta PRIMA della run,
+oggi chiusa da una riga in state.js (`const scelta = 'fioc'`). E' il posto naturale: nasce per
+questo, e riaprirla costa meno che inventare un'altra schermata.
+⚠️ Attenzione al pulsante: oggi `touch.js` lo disegna se `player.bomba`. Con la scelta diventera'
+"se c'e' un leggendario equipaggiato", e l'icona dovra' dipendere da QUALE — quindi serve un campo
+`icona` sul leggendario, non un `if` per ognuno.
+
 ## H.5 — ARMI: PERCHE' NON FUNZIONAVANO (dall'utente, 2026-08-19)
 I 5 kit dell'Arsenale erano stati bocciati. Il motivo, detto dall'utente:
  1. **alteravano il corpo a corpo**, che non e' quello che si vuole variare;

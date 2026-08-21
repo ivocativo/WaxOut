@@ -294,9 +294,9 @@ class ShopScene extends Phaser.Scene {
     const nuova = this.disegnaPagina(dove);
     nuova.x = -verso * W;
     this.contenitore = nuova;
-    this.tweens.add({ targets: vecchia, x: verso * W, duration: 220, ease: 'Cubic.out',
+    this.tweens.add({ targets: vecchia, x: verso * W, duration: 340, ease: 'Cubic.out',
       onComplete: () => vecchia.destroy() });
-    this.tweens.add({ targets: nuova, x: 0, duration: 220, ease: 'Cubic.out',
+    this.tweens.add({ targets: nuova, x: 0, duration: 340, ease: 'Cubic.out',
       onComplete: () => { this._inTransizione = false; } });
   }
 

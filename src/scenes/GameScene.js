@@ -2564,19 +2564,20 @@ class GameScene extends Phaser.Scene {
     // il risultato era che "sparivano": nessun rapporto visibile fra il gesto e l'effetto.
     // Ora c'e' un'ONDA che parte dal personaggio, e ogni nemico muore QUANDO L'ONDA LO RAGGIUNGE.
     // E' la stessa quantita' di danno, ma raccontata: si vede una causa che si propaga.
-    const onda = this.add.circle(px, py, raggio, 0xbfe8ff, 0.20).setDepth(139).setScale(0.02);
-    onda.setStrokeStyle(7, 0xffffff, 0.95);
+    // ⚠️ ARANCIONE e non azzurro (scelta dell'utente, 2026-08-21).
+    const onda = this.add.circle(px, py, raggio, 0xffb347, 0.20).setDepth(139).setScale(0.02);
+    onda.setStrokeStyle(7, 0xffd166, 0.95);
     this.tweens.add({ targets: onda, scale: 1, alpha: 0, duration: DURATA, ease: 'Cubic.out',
       onComplete: () => onda.destroy() });
     // Una seconda onda piu' lenta e piu' tenue: da' spessore al fronte invece di una riga sola.
     const scia = this.add.circle(px, py, raggio, 0xffffff, 0).setDepth(138).setScale(0.02);
-    scia.setStrokeStyle(18, 0x9fd8ff, 0.35);
+    scia.setStrokeStyle(18, 0xff8a3d, 0.35);
     this.tweens.add({ targets: scia, scale: 1, alpha: 0, duration: DURATA * 1.35, ease: 'Quad.out',
       onComplete: () => scia.destroy() });
     // Lampo breve e non pieno: deve annunciare il colpo, non coprire l'onda che e' la cosa da
     // guardare. Prima era 0,85 di opacita' per 420ms e si mangiava tutto.
     const lampo = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height,
-      0xfff7e8, 0.45).setDepth(140).setScrollFactor(0);
+      0xffc26b, 0.45).setDepth(140).setScrollFactor(0);
     this.tweens.add({ targets: lampo, alpha: 0, duration: 220, ease: 'Quad.out',
       onComplete: () => lampo.destroy() });
     this.cameras.main.shake(300, 0.014);
@@ -2586,7 +2587,7 @@ class GameScene extends Phaser.Scene {
     for (let n = 0; n < 14; n++) {
       const a = Math.random() * Math.PI * 2;
       const d = raggio * (0.25 + Math.random() * 0.55);
-      const b = this.add.circle(px, py, 4 + Math.random() * 7, 0xffffff, 0.75).setDepth(139);
+      const b = this.add.circle(px, py, 4 + Math.random() * 7, 0xffe0a3, 0.75).setDepth(139);
       this.tweens.add({ targets: b, x: px + Math.cos(a) * d, y: py + Math.sin(a) * d,
         alpha: 0, duration: DURATA * (0.7 + Math.random() * 0.6), ease: 'Cubic.out',
         onComplete: () => b.destroy() });
@@ -4563,6 +4564,13 @@ class GameScene extends Phaser.Scene {
     // Tempo GIOCATO: avanza solo qui dentro, quindi menu e pause non lo fanno correre.
     // E' il cronometro delle ricariche lunghe, che devono attraversare i livelli (vedi la Bomba).
     window.GameState.tempoDiGioco += delta;
+    // Il pulsante della Bomba mostra quanto manca alla ricarica: si aggiorna da qui perche' e'
+    // qui che vive il cronometro. A bomba mai usata la ricarica e' gia' finita, quindi 1.
+    if (this.touch && this.touch.aggiornaBomba) {
+      const pronta = window.GameState.bombaPronta || 0;
+      const manca = pronta - window.GameState.tempoDiGioco;
+      this.touch.aggiornaBomba(manca <= 0 ? 1 : 1 - (manca / window.CONFIG.BOMBA_RICARICA));
+    }
     window.GameGfx.updateBackground(this);   // parallax: scorre gli strati di sfondo
     this.animateWax(time);                    // cerume "fluido": ondeggia e cola
     this.fermaProiettiliNelTerreno();         // colline e soffitto fermano i colpi (non sono solidi)

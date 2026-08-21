@@ -284,9 +284,31 @@ window.TouchControls = (function () {
     // cosi' i pulsanti restano incolonnati e non si crea un buco.
     if (window.GameState.player && window.GameState.player.bomba) {
       const dy = haScatto ? (ar * 2 + 16) * 2 : (ar * 2 + 16);
-      const bBomba = button(scene, jx, jy - dy, ar * 0.82, 'bomba');
-      creati.push(bBomba, bBomba._icon);
+      const rb = ar * 0.82, bx2 = jx, by2 = jy - dy;
+      const bBomba = button(scene, bx2, by2, rb, 'bomba');
+      // INDICATORE DI RICARICA (playtest 2026-08-21: "l'icona non da' indicazioni di quando e'
+      // pronta"). Appena usata la bomba il pulsante si smorza, e un settore si riempie IN SENSO
+      // ORARIO dall'alto — come una lancetta che fa il giro. Quando il cerchio e' completo la
+      // bomba e' di nuovo pronta e il pulsante torna acceso.
+      // ⚠️ Il senso orario e il partire dall'alto non sono un vezzo: sono la convenzione che
+      // chiunque legge senza doverla imparare. Un settore che cresce da sinistra direbbe la
+      // stessa cosa e non si capirebbe al volo.
+      const gRic = scene.add.graphics().setScrollFactor(0).setDepth(DEPTH + 2);
+      creati.push(bBomba, bBomba._icon, gRic);
       tapBtn(bBomba, 'bombaQueued');
+      // p = quanto manca alla ricarica, da 0 (appena usata) a 1 (pronta).
+      state.aggiornaBomba = (p) => {
+        const q = Math.max(0, Math.min(1, p));
+        gRic.clear();
+        const acceso = q >= 1;
+        bBomba.setAlpha(acceso ? 1 : 0.4);
+        bBomba._icon.setAlpha(acceso ? 1 : 0.4);
+        if (acceso) return;
+        const da = -Math.PI / 2;                       // si parte dalle ore 12
+        gRic.fillStyle(0xfff7e8, 0.30);
+        gRic.slice(bx2, by2, rb - 3, da, da + Math.PI * 2 * q, false);
+        gRic.fillPath();
+      };
     }
 
     // ⚠️ SPEGNERE I COMANDI QUANDO LA PARTITA E' FINITA. Il pannello di fine run e' disegnato
